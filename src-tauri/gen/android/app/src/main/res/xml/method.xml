@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Metadados do ClipSync Keyboard (IME). Sem settingsActivity: a configuração
+     fica dentro do app ClipSync (Ajustes → Teclado). -->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:supportsSwitchingToNextInputMethod="true">
+    <subtype
+        android:label="@string/ime_subtype_pt_br"
+        android:imeSubtypeLocale="pt_BR"
+        android:languageTag="pt-BR"
+        android:imeSubtypeMode="keyboard" />
+    <subtype
+        android:label="@string/ime_subtype_en_us"
+        android:imeSubtypeLocale="en_US"
+        android:languageTag="en-US"
+        android:imeSubtypeMode="keyboard" />
+</input-method>

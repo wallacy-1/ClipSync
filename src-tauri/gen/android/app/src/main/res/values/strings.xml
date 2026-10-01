@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">"ClipSync"</string>
+    <string name="main_activity_title">"ClipSync"</string>
+    <string name="ime_label">ClipSync Keyboard</string>
+    <string name="ime_subtype_pt_br">Português (Brasil)</string>
+    <string name="ime_subtype_en_us">English (US)</string>
+</resources>
