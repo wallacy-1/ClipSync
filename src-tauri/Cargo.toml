@@ -1,0 +1,77 @@
+[package]
+name = "clipsync"
+version = "0.1.0"
+description = "ClipSync — área de transferência sincronizada por P2P na rede local"
+authors = ["wallacy"]
+edition = "2021"
+rust-version = "1.77"
+
+[lib]
+name = "clipsync_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "net", "io-util", "sync", "time", "macros", "fs"] }
+thiserror = "2"
+anyhow = "1"
+log = "0.4"
+env_logger = "0.11"
+
+# Persistência local
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+# Identidade e criptografia (nada implementado manualmente)
+snow = { version = "0.9", default-features = false, features = ["default-resolver"] }
+chacha20poly1305 = "0.10"
+sha2 = "0.10"
+hmac = "0.12"
+rand = "0.8"
+hex = "0.4"
+uuid = { version = "1", features = ["v4"] }
+zeroize = "1"
+
+# Descoberta na LAN
+mdns-sd = "0.13"
+local-ip-address = "0.6"
+
+# QR Code de pareamento
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+
+# Classificação de conteúdo
+regex = "1"
+once_cell = "1"
+chrono = "0.4"
+gethostname = "0.5"
+
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-dialog = "2"
+keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_DataExchange", "Win32_Storage_FileSystem"] }
+
+[target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
+tauri-plugin-barcode-scanner = "2"
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+
+# Debug sem DWARF: o .so Android sai com ~180 MB com debuginfo e não cabe no emulador.
+[profile.dev]
+strip = "debuginfo"
+
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true
