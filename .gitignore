@@ -1,0 +1,38 @@
+# Node / Vite
+node_modules
+dist
+*.local
+
+# Rust / Tauri
+src-tauri/target
+src-tauri/gen/schemas
+
+# Android / Gradle (gen/android tem .gitignore próprio; isto cobre probes/)
+.gradle/
+build/
+local.properties
+.externalNativeBuild
+.cxx
+*.apk
+*.aab
+*.iml
+
+# Assinatura / segredos
+*.jks
+*.keystore
+keystore.properties
+key.properties
+.env
+.env.*
+
+# Claude Code (config pessoal)
+.claude/settings.local.json
+
+# IDE / SO
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
