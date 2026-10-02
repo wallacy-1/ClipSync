@@ -1,6 +1,5 @@
-//! Imagem copiada. Não vira item de histórico: vira um PNG em disco privado e segue
-//! pela transferência de arquivos (`FileOffer.purpose = "clipboard"`), que já tem
-//! retomada, SHA-256 e FGS. Quem recebe põe a imagem no clipboard em vez de Downloads.
+//! Imagem copiada não vira item de histórico: vira PNG em disco privado e segue pela
+//! transferência de arquivos (`FileOffer.purpose = "clipboard"`). Quem recebe põe no clipboard.
 //!
 //! ```text
 //! cópia ─▶ poll (sem texto) ─▶ PNG em <app_data>/clip-images ─▶ send_file_with(purpose)
