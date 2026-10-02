@@ -7,7 +7,7 @@ use super::state::{CancelledBy, Event};
 use super::source::{self, TransferSource};
 use super::{dest, hash, ACK_TIMEOUT_SECS, WINDOW_CHUNKS};
 use crate::state::AppState;
-use crate::transport::protocol::{transfer_id_bytes, DataFrame, FileCancelReason, FileOffer, FileRejectReason, Message, DATA_MAX};
+use crate::transport::protocol::{transfer_id_bytes, DataFrame, FileCancelReason, FileOffer, FileRejectReason, Message, CAP_FILE_ASK_V1, DATA_MAX};
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use tokio::io::{AsyncReadExt, AsyncSeekExt};
@@ -169,9 +169,14 @@ async fn run_inner(app: &AppHandle, id: &str, device_id: &str, data_tx: mpsc::Se
         return Err(lost_connection(app, id, device_id, ctl_rx));
     }
 
-    // Aguarda FileAccept{offset}.
+    // Aguarda FileAccept{offset}. Peer que pergunta ao usuário ganha minutos, não segundos.
+    let accept_timeout = if super::manager::peer_has_cap(app, device_id, CAP_FILE_ASK_V1) {
+        Duration::from_secs(super::ASK_WAIT_SECS)
+    } else {
+        HANDSHAKE_TIMEOUT
+    };
     let offset = loop {
-        match tokio::time::timeout(HANDSHAKE_TIMEOUT, ctl_rx.recv()).await {
+        match tokio::time::timeout(accept_timeout, ctl_rx.recv()).await {
             Ok(Some(Ctl::Accepted { offset })) => break offset,
             Ok(Some(c)) => {
                 if let Some(s) = common(app, id, device_id, &c) {

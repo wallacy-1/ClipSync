@@ -51,6 +51,9 @@ export interface Settings {
   autoSend: boolean;
   autoReceive: boolean;
   syncedTypes: string[];
+  /** Arquivo recebido: "auto" | "limit" (aceita até fileAutoAcceptMb) | "ask". */
+  fileAccept: "auto" | "limit" | "ask";
+  fileAutoAcceptMb: number;
   typesRev: number;
   lanOnly: boolean;
   ignorePasswordManagers: boolean;

@@ -11,6 +11,14 @@ const TYPES: { id: string; label: string }[] = [
   { id: "image", label: "Imagens" },
 ];
 
+const ACCEPT_LIMITS = [25, 100, 500, 1024];
+
+function acceptHelp(mode: string, mb: number) {
+  if (mode === "auto") return "Aceita qualquer arquivo de dispositivos pareados";
+  if (mode === "ask") return "Pergunta antes de cada arquivo";
+  return `Aceita até ${mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`} sozinho; acima disso pergunta`;
+}
+
 const EXPIRE_OPTIONS = [
   { v: 1, label: "1 h" }, { v: 6, label: "6 h" }, { v: 24, label: "24 h" }, { v: 168, label: "7 dias" }, { v: 0, label: "Nunca" },
 ];
@@ -53,6 +61,20 @@ export function SyncRows() {
       </Row>
       <Row label="Receber automático" help="Aplica na área de transferência ao chegar">
         <Toggle on={s.autoReceive} onChange={(v) => save({ autoReceive: v })} />
+      </Row>
+      <Row label="Arquivos recebidos" help={acceptHelp(s.fileAccept, s.fileAutoAcceptMb)}>
+        <select
+          className="select"
+          value={s.fileAccept === "limit" ? `limit:${s.fileAutoAcceptMb}` : s.fileAccept}
+          onChange={(e) => {
+            const [mode, mb] = e.target.value.split(":");
+            void save(mode === "limit" ? { fileAccept: "limit", fileAutoAcceptMb: Number(mb) } : { fileAccept: mode as "auto" | "ask" });
+          }}
+        >
+          <option value="auto">Sempre aceitar</option>
+          {ACCEPT_LIMITS.map((mb) => <option key={mb} value={`limit:${mb}`}>Perguntar acima de {mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`}</option>)}
+          <option value="ask">Sempre perguntar</option>
+        </select>
       </Row>
       <Row label="Tipos sincronizados" help={typesHelp}>
         {editingTypes ? (

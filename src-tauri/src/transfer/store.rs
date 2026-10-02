@@ -255,12 +255,13 @@ impl Db {
     /// transferring/verifying` vira `waiting` (retomável). Retorna os ids afetados.
     pub fn transfer_sweep_on_startup(&self) -> Result<Vec<String>> {
         let conn = self.conn.lock().unwrap();
-        let mut st = conn.prepare("SELECT id FROM file_transfers WHERE state IN ('offered','incoming','transferring','verifying')")?;
+        // `incoming` (oferta ainda sem aceite) fica: a reoferta reavalia a política e pergunta de novo.
+        let mut st = conn.prepare("SELECT id FROM file_transfers WHERE state IN ('offered','transferring','verifying')")?;
         let ids: Vec<String> = st.query_map([], |r| r.get(0))?.filter_map(|r| r.ok()).collect();
         drop(st);
         conn.execute(
             "UPDATE file_transfers SET state = 'waiting', state_reason = 'restart', updated_at = ?1 \
-             WHERE state IN ('offered','incoming','transferring','verifying')",
+             WHERE state IN ('offered','transferring','verifying')",
             params![now_ms()],
         )?;
         Ok(ids)
@@ -270,7 +271,7 @@ impl Db {
     /// `(expiradas, apagadas)`; as expiradas ainda têm `.part` para o chamador limpar.
     pub fn transfer_purge(&self, now: i64) -> Result<(Vec<TransferRecord>, u32)> {
         let conn = self.conn.lock().unwrap();
-        let mut st = conn.prepare(&format!("SELECT {COLS} FROM file_transfers WHERE state IN ('queued','waiting') AND updated_at < ?1"))?;
+        let mut st = conn.prepare(&format!("SELECT {COLS} FROM file_transfers WHERE state IN ('queued','waiting','incoming') AND updated_at < ?1"))?;
         let expired: Vec<TransferRecord> = st.query_map(params![now - WAITING_EXPIRY_MS], row_to_record)?.filter_map(|r| r.ok()).collect();
         drop(st);
         for t in &expired {

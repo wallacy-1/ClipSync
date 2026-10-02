@@ -27,6 +27,9 @@ pub const TAG_DATA: u8 = 2;
 pub const CAP_FILE_V1: &str = "file-v1";
 /// Entende `FileOffer.purpose = "clipboard"` (imagem copiada vai para o clipboard, não para Downloads).
 pub const CAP_CLIP_IMAGE_V1: &str = "clip-image-v1";
+/// O receptor pode perguntar ao usuário antes de aceitar: o emissor espera o `FileAccept`
+/// por até `transfer::ASK_WAIT_SECS` em vez de 30 s.
+pub const CAP_FILE_ASK_V1: &str = "file-ask-v1";
 
 /// Primeira mensagem, em texto puro (não carrega dados do usuário): só diz
 /// qual handshake usar.

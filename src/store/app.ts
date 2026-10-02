@@ -60,6 +60,8 @@ interface AppStore {
   pendingShare: SharedPayload | null;
   /** Arquivos copiados no Explorer aguardando "Enviar para…" (Windows). */
   copiedFiles: CopiedFiles | null;
+  /** Ids de transferências recebidas esperando "Aceitar/Recusar". */
+  asks: string[];
 
   init: () => Promise<void>;
   setView: (v: View) => void;
@@ -105,6 +107,8 @@ interface AppStore {
   dismissShare: () => void;
   sendCopiedFiles: (deviceId: string) => Promise<void>;
   dismissCopiedFiles: () => void;
+  acceptTransfer: (id: string) => Promise<void>;
+  declineTransfer: (id: string) => Promise<void>;
 }
 
 let toastSeq = 0;
@@ -145,6 +149,7 @@ export const useApp = create<AppStore>((set, get) => ({
   pendingFile: null,
   pendingShare: null,
   copiedFiles: null,
+  asks: [],
 
   async init() {
     // StrictMode monta duas vezes em dev: registrar listeners só uma vez.
@@ -173,6 +178,9 @@ export const useApp = create<AppStore>((set, get) => ({
     await Promise.all([
       listen("share:received", () => void get().checkShare()),
       listen<CopiedFiles>("clipboard:files", (copiedFiles) => set({ copiedFiles })),
+      listen<TransferRecord>("transfer:ask", (rec) => {
+        set((s) => ({ transfers: [rec, ...s.transfers.filter((t) => t.id !== rec.id)], asks: s.asks.includes(rec.id) ? s.asks : [...s.asks, rec.id] }));
+      }),
       listen<ClipboardItem>("clipboard:changed", (item) => {
         // Copiou outra coisa: a oferta de arquivos perdeu o sentido.
         set((s) => ({ items: upsertItem(s.items, item), totalItems: s.totalItems + 1, copiedFiles: null }));
@@ -213,7 +221,9 @@ export const useApp = create<AppStore>((set, get) => ({
           delete busy[rec.id];
           const exists = s.transfers.some((t) => t.id === rec.id);
           const transfers = exists ? s.transfers.map((t) => (t.id === rec.id ? rec : t)) : [rec, ...s.transfers];
-          return { transfers, transferBusy: busy };
+          // Saiu de `incoming` (aceito, recusado, cancelado pelo emissor): o pedido acabou.
+          const asks = rec.state.kind === "incoming" ? s.asks : s.asks.filter((x) => x !== rec.id);
+          return { transfers, transferBusy: busy, asks };
         });
         if (rec.state.kind === "completed" && rec.direction === "in") get().showToast(`Recebido: ${rec.safeName}`);
         if (rec.state.kind === "failed") {
@@ -225,6 +235,14 @@ export const useApp = create<AppStore>((set, get) => ({
         set((s) => ({ transfers: s.transfers.map((t) => (t.id === id ? { ...t, bytesDone, size } : t)) }));
       }),
     ]);
+
+    // Pedidos "Aceitar/Recusar" que chegaram antes de a UI existir (janela aberta depois).
+    try {
+      const asks = await api.transferAsks();
+      if (asks.length > 0) {
+        set((s) => ({ transfers: [...asks, ...s.transfers.filter((t) => !asks.some((a) => a.id === t.id))], asks: asks.map((a) => a.id) }));
+      }
+    } catch { /* núcleo antigo sem o comando */ }
   },
 
   setView: (view) => set({ view, filter: view === "pinned" ? "pinned" : get().filter === "pinned" ? "all" : get().filter }),
@@ -452,6 +470,19 @@ export const useApp = create<AppStore>((set, get) => ({
     }
   },
   dismissCopiedFiles: () => set({ copiedFiles: null }),
+  async acceptTransfer(id) {
+    set((s) => ({ asks: s.asks.filter((x) => x !== id) }));
+    try { await api.transferAccept(id); } catch (e) { get().showToast(String(e), "error"); }
+  },
+  async declineTransfer(id) {
+    set((s) => ({ asks: s.asks.filter((x) => x !== id) }));
+    try {
+      const rec = await api.transferDecline(id);
+      set((s) => ({ transfers: s.transfers.map((t) => (t.id === id ? rec : t)) }));
+    } catch (e) {
+      get().showToast(String(e), "error");
+    }
+  },
 
   showToast(text, kind) {
     const id = ++toastSeq;

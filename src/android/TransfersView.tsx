@@ -63,6 +63,9 @@ function TransferCard({ t }: { t: TransferRecord }) {
   const devices = useApp((s) => s.devices);
   const selfId = useApp((s) => s.me?.deviceId ?? "");
   const busy = useApp((s) => !!s.transferBusy[t.id]);
+  const asked = useApp((s) => s.asks.includes(t.id));
+  const accept = useApp((s) => s.acceptTransfer);
+  const decline = useApp((s) => s.declineTransfer);
   const cancel = useApp((s) => s.cancelTransfer);
   const resume = useApp((s) => s.resumeTransfer);
   const open = useApp((s) => s.openTransfer);
@@ -97,7 +100,12 @@ function TransferCard({ t }: { t: TransferRecord }) {
       {hasBar && <div className={`tr-bar ${kind}`}><span style={{ width: `${pct}%` }} /></div>}
       <div className="foot">
         <span className={`tr-detail${kind === "failed" ? " failed" : ""}`}>{transferDetail(t, dev)}</span>
-        {primary && <button className="btn btn-secondary" disabled={primary.disabled} onClick={primary.run}>{primary.label}</button>}
+        {asked ? (
+          <div className="row-flex" style={{ gap: 6 }}>
+            <button className="btn btn-secondary" onClick={() => void decline(t.id)}>Recusar</button>
+            <button className="btn btn-primary" onClick={() => void accept(t.id)}>Aceitar</button>
+          </div>
+        ) : primary && <button className="btn btn-secondary" disabled={primary.disabled} onClick={primary.run}>{primary.label}</button>}
       </div>
     </div>
   );

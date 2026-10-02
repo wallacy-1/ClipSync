@@ -23,6 +23,8 @@ const settings: Settings = {
   autoSend: true,
   autoReceive: true,
   syncedTypes: ["text", "link", "code", "email", "image"],
+  fileAccept: "limit",
+  fileAutoAcceptMb: 100,
   typesRev: 1,
   lanOnly: true,
   ignorePasswordManagers: true,
@@ -144,6 +146,15 @@ export function mockListen(name: string, h: (p: unknown) => void) {
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// ?ask=1 simula um arquivo grande chegando que pede "Aceitar/Recusar".
+if (params.get("ask")) {
+  setTimeout(() => {
+    const rec = mkT({ originalName: "video-ferias-2026.mp4", size: 850 * MB, deviceId: "pixel8", direction: "in", state: { kind: "incoming" } });
+    transfers = [rec, ...transfers];
+    emit("transfer:ask", rec);
+  }, 1200);
+}
 
 // ?copied=1 simula Ctrl+C de arquivos no Explorer (oferta "Enviar para…").
 if (params.get("copied")) {
@@ -307,6 +318,13 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
     }
     case "transfer_open":
     case "transfer_reveal": return;
+    case "transfer_asks": return transfers.filter((t) => t.direction === "in" && t.state.kind === "incoming");
+    case "transfer_accept": {
+      setTransfer(args.id as string, { state: { kind: "transferring" } });
+      setTimeout(() => setTransfer(args.id as string, { state: { kind: "completed" }, completedAt: Date.now() }), 1500);
+      return;
+    }
+    case "transfer_decline": return setTransfer(args.id as string, { state: { kind: "cancelled", by: "local" } });
     case "share_take": {
       // ?share=files|text simula um "Compartilhar → ClipSync" (consumido uma vez).
       const kind = params.get("share");

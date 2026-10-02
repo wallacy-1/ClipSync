@@ -9,6 +9,7 @@ import { DevicesView } from "./DevicesView";
 import { TransfersView } from "./TransfersView";
 import { SettingsView } from "./SettingsView";
 import { CopiedFilesOffer } from "./CopiedFilesOffer";
+import { AskPrompt } from "../components/AskPrompt";
 
 const NAV: { id: View; label: string; hint?: string; Icon: typeof Clipboard }[] = [
   { id: "history", label: "Histórico", hint: "Ctrl+1", Icon: Clipboard },
@@ -107,7 +108,10 @@ export function WinShell() {
 
         {view === "history" || view === "pinned" ? <HistoryView /> : view === "devices" ? <DevicesView /> : view === "transfers" ? <TransfersView /> : <SettingsView />}
       </div>
-      <CopiedFilesOffer variant="float" />
+      <div className="float-stack">
+        <AskPrompt variant="float" />
+        <CopiedFilesOffer variant="float" />
+      </div>
       <Toast />
     </div>
   );

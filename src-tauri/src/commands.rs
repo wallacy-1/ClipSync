@@ -425,6 +425,22 @@ pub fn transfer_cancel(app: AppHandle, id: String) -> Result<crate::transfer::st
     crate::transfer::manager::cancel(&app, &id)
 }
 
+/// Pedidos "Aceitar/Recusar" abertos (arquivos recebidos acima do limite ou de device sem aceite automático).
+#[tauri::command]
+pub fn transfer_asks(app: AppHandle) -> Vec<crate::transfer::store::TransferRecord> {
+    crate::transfer::manager::asks(&app)
+}
+
+#[tauri::command]
+pub fn transfer_accept(app: AppHandle, id: String) -> Result<()> {
+    crate::transfer::manager::accept(&app, &id)
+}
+
+#[tauri::command]
+pub fn transfer_decline(app: AppHandle, id: String) -> Result<crate::transfer::store::TransferRecord> {
+    crate::transfer::manager::decline(&app, &id)
+}
+
 #[tauri::command]
 pub fn transfer_resume(app: AppHandle, id: String) -> Result<crate::transfer::store::TransferRecord> {
     crate::transfer::manager::resume(&app, &id)

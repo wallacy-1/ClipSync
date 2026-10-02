@@ -69,6 +69,10 @@ pub struct Settings {
     pub sensitive_expire_minutes: u32,
     pub excluded_apps: Vec<String>,
     pub launch_at_login: bool,
+    /// Arquivo recebido: "auto" (sempre aceita), "limit" (aceita até `file_auto_accept_mb`,
+    /// pergunta acima), "ask" (sempre pergunta). Imagem do clipboard não passa por aqui.
+    pub file_accept: String,
+    pub file_auto_accept_mb: u32,
 }
 
 impl Settings {
@@ -98,6 +102,8 @@ impl Default for Settings {
             sensitive_expire_minutes: 2,
             excluded_apps: vec!["Bitwarden".into(), "1Password".into()],
             launch_at_login: false,
+            file_accept: "limit".into(),
+            file_auto_accept_mb: 100,
         }
     }
 }

@@ -7,7 +7,7 @@ use crate::state::{AppState, ConnHandle};
 use crate::sync;
 use crate::transport::noise::{handshake_initiator, handshake_responder, HandshakeResult};
 use crate::transfer;
-use crate::transport::protocol::{read_frame, write_frame, DataFrame, Inbound, Message, PreHello, SecureChannel, CAP_CLIP_IMAGE_V1, CAP_FILE_V1, PROTOCOL_VERSION};
+use crate::transport::protocol::{read_frame, write_frame, DataFrame, Inbound, Message, PreHello, SecureChannel, CAP_CLIP_IMAGE_V1, CAP_FILE_ASK_V1, CAP_FILE_V1, PROTOCOL_VERSION};
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use tokio::net::TcpStream;
@@ -35,11 +35,11 @@ fn local_caps() -> Vec<String> {
     // Transferência de arquivos: Windows e Android; iOS não é alvo.
     #[cfg(not(target_os = "ios"))]
     {
-        vec![CAP_FILE_V1.to_string(), CAP_CLIP_IMAGE_V1.to_string()]
+        vec![CAP_FILE_V1.to_string(), CAP_CLIP_IMAGE_V1.to_string(), CAP_FILE_ASK_V1.to_string()]
     }
     #[cfg(target_os = "ios")]
     {
-        let _ = (CAP_FILE_V1, CAP_CLIP_IMAGE_V1);
+        let _ = (CAP_FILE_V1, CAP_CLIP_IMAGE_V1, CAP_FILE_ASK_V1);
         Vec::new()
     }
 }

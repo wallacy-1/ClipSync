@@ -5,15 +5,17 @@
 use super::state::{transition, CancelledBy, Direction, Event, TransferState};
 use super::store::{NewTransfer, TransferRecord};
 use super::source::{self, TransferSource};
-use super::{dest, names, receiver, sender, validate_offer, CHUNK_SIZE, MAX_FILE_SIZE, MAX_OPEN_PER_DEVICE};
+use super::{dest, names, receiver, sender, validate_offer, ASK_TTL_SECS, CHUNK_SIZE, MAX_FILE_SIZE, MAX_OPEN_PER_DEVICE};
+use crate::db::StoredDevice;
 use crate::error::{AppError, Result};
 use crate::events;
 use crate::models::now_ms;
 use crate::state::AppState;
 use crate::transport::protocol::{
-    transfer_id_string, DataFrame, FileCancelReason, FileOffer, FileRejectReason, Message, CAP_FILE_V1,
+    transfer_id_string, DataFrame, FileCancelReason, FileOffer, FileRejectReason, Message, CAP_FILE_ASK_V1, CAP_FILE_V1,
 };
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Manager};
@@ -39,9 +41,21 @@ pub struct Active {
     pub frames: Option<mpsc::Sender<DataFrame>>,
 }
 
+/// Oferta esperando o usuário decidir ("Aceitar/Recusar"). A linha já existe como `incoming`.
+pub struct PendingOffer {
+    pub device_id: String,
+    pub conn_id: u64,
+    pub offer: FileOffer,
+    pub part: PathBuf,
+    pub dest_dir: PathBuf,
+}
+
 #[derive(Default)]
 pub struct TransferManager {
     active: Mutex<HashMap<String, Active>>,
+    asks: Mutex<HashMap<String, PendingOffer>>,
+    /// Aceitas pelo usuário enquanto a conexão do emissor tinha caído: entram direto na reoferta.
+    accepted: Mutex<HashSet<String>>,
     last_progress_emit: Mutex<HashMap<String, Instant>>,
     #[cfg_attr(not(target_os = "android"), allow(dead_code))]
     last_fgs_update: Mutex<HashMap<String, Instant>>,
@@ -215,6 +229,12 @@ pub fn peer_supports_files(app: &AppHandle, device_id: &str) -> bool {
     file_conn(app, device_id).is_some()
 }
 
+pub fn peer_has_cap(app: &AppHandle, device_id: &str, cap: &str) -> bool {
+    let state = mgr(app);
+    let conns = state.connections.lock().unwrap();
+    conns.get(device_id).map(|c| c.caps.iter().any(|x| x == cap)).unwrap_or(false)
+}
+
 /// Enfileira o envio de uma origem local (caminho ou `content://` no Android) para
 /// um device pareado. Retorna a linha criada; o envio real começa quando houver
 /// conexão com `file-v1`.
@@ -272,6 +292,10 @@ pub fn cancel(app: &AppHandle, id: &str) -> Result<TransferRecord> {
     let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other("transferência não encontrada".into()))?;
     if rec.state.is_terminal() {
         return Ok(rec);
+    }
+    if take_ask(app, id).is_some() {
+        // Pedido de aceite aberto: cancelar = recusar.
+        return decline(app, id);
     }
     if let Some(ctl) = ctl_of(app, &rec.device_id, id) {
         // A task fecha arquivo, apaga .part, aplica o estado e avisa o peer.
@@ -438,6 +462,9 @@ fn route(app: &AppHandle, device_id: &str, id: &str, ctl: Ctl) {
 
 fn on_remote_cancel(app: &AppHandle, device_id: &str, id: &str, reason: FileCancelReason) {
     log::info!("[FILE] Cancelled by peer id={id} from={device_id} reason={reason:?}");
+    if take_ask(app, id).is_some() {
+        log::info!("[FILE] Ask withdrawn by sender id={id}");
+    }
     if let Some(tx) = ctl_of(app, device_id, id) {
         let _ = tx.send(Ctl::Cancel(CancelledBy::Remote));
         return;
@@ -567,22 +594,124 @@ fn on_offer(app: &AppHandle, device_id: &str, conn_id: u64, offer: FileOffer) {
         if let Ok(Some(rec)) = state.db.transfer_get(&id) {
             events::emit(app, events::TRANSFER_STATE, &rec);
         }
-        // Imagem do clipboard é sempre guardada (como o texto); aplicar é decidido ao chegar.
-        let auto = clip_image || (dev.auto_receive && state.settings().auto_receive && !state.is_paused());
-        if !auto {
-            let _ = apply(app, &id, Event::Decline);
-            return reject(app, device_id, &id, FileRejectReason::Declined);
-        }
     } else if let Some(sha) = offer.sha256.as_deref() {
         let _ = state.db.transfer_set_hashes(&id, Some(sha), None);
     }
 
+    // Decide só o que ainda não foi aceito: linha nova ou `incoming` de uma oferta anterior
+    // (reoferta após queda/reinício). Imagem do clipboard é sempre guardada, como o texto.
+    let undecided = existing.as_ref().map(|r| matches!(r.state, TransferState::Incoming)).unwrap_or(true);
+    if undecided && !clip_image {
+        match decide(app, &dev, device_id, &id, offer.size) {
+            Decision::Accept => {}
+            Decision::Decline => {
+                let _ = apply(app, &id, Event::Decline);
+                return reject(app, device_id, &id, FileRejectReason::Declined);
+            }
+            Decision::Ask => return ask(app, PendingOffer { device_id: device_id.to_string(), conn_id, offer, part, dest_dir }),
+        }
+    }
+    start_receiver(app, PendingOffer { device_id: device_id.to_string(), conn_id, offer, part, dest_dir });
+}
+
+#[derive(Debug, PartialEq, Eq)]
+enum Decision {
+    Accept,
+    Ask,
+    Decline,
+}
+
+/// Política de aceite (ver `Settings::file_accept`). Peer sem `file-ask-v1` desistiria em
+/// 30 s: para ele vale a regra antiga (aceita se "receber automático", senão recusa).
+fn decide(app: &AppHandle, dev: &StoredDevice, device_id: &str, id: &str, size: u64) -> Decision {
+    let state = mgr(app);
+    if state.transfers.accepted.lock().unwrap().remove(id) {
+        return Decision::Accept;
+    }
+    let s = state.settings();
+    let auto_ok = dev.auto_receive && s.auto_receive && !state.is_paused();
+    if !peer_has_cap(app, device_id, CAP_FILE_ASK_V1) {
+        return if auto_ok { Decision::Accept } else { Decision::Decline };
+    }
+    policy(auto_ok, &s.file_accept, s.file_auto_accept_mb, size)
+}
+
+/// "Receber automático" desligado (device, global ou pausa) = sempre perguntar.
+fn policy(auto_ok: bool, mode: &str, limit_mb: u32, size: u64) -> Decision {
+    if !auto_ok {
+        return Decision::Ask;
+    }
+    match mode {
+        "auto" => Decision::Accept,
+        "ask" => Decision::Ask,
+        _ if size <= limit_mb as u64 * 1024 * 1024 => Decision::Accept,
+        _ => Decision::Ask,
+    }
+}
+
+/// Guarda a oferta e avisa a UI (`transfer:ask`). Sem resposta em `ASK_TTL_SECS`, recusa.
+fn ask(app: &AppHandle, p: PendingOffer) {
+    let state = mgr(app);
+    let id = p.offer.transfer_id.clone();
+    log::info!("[FILE] Asking user id={id} from={} name={:?} size={}", p.device_id, p.offer.name, p.offer.size);
+    let fresh = state.transfers.asks.lock().unwrap().insert(id.clone(), p).is_none();
+    if let Ok(Some(rec)) = state.db.transfer_get(&id) {
+        events::emit(app, events::TRANSFER_ASK, &rec);
+    }
+    if fresh {
+        let app = app.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(ASK_TTL_SECS)).await;
+            let open = mgr(&app).transfers.asks.lock().unwrap().contains_key(&id);
+            if open {
+                log::info!("[FILE] Ask expired id={id}");
+                let _ = decline(&app, &id);
+            }
+        });
+    }
+}
+
+fn take_ask(app: &AppHandle, id: &str) -> Option<PendingOffer> {
+    mgr(app).transfers.asks.lock().unwrap().remove(id)
+}
+
+pub fn asks(app: &AppHandle) -> Vec<TransferRecord> {
+    let state = mgr(app);
+    let ids: Vec<String> = state.transfers.asks.lock().unwrap().keys().cloned().collect();
+    ids.iter().filter_map(|id| state.db.transfer_get(id).ok().flatten()).collect()
+}
+
+/// Usuário aceitou. Conexão ainda é a da oferta → começa agora; senão aceita na reoferta.
+pub fn accept(app: &AppHandle, id: &str) -> Result<()> {
+    let p = take_ask(app, id).ok_or_else(|| AppError::Other("pedido não encontrado ou expirado".into()))?;
+    log::info!("[FILE] Accepted by user id={id}");
+    if file_conn(app, &p.device_id).map(|(c, _)| c == p.conn_id).unwrap_or(false) {
+        start_receiver(app, p);
+    } else {
+        mgr(app).transfers.accepted.lock().unwrap().insert(id.to_string());
+    }
+    Ok(())
+}
+
+/// Usuário recusou (ou o pedido expirou): `cancelled/local` aqui, `FileReject{Declined}` lá.
+pub fn decline(app: &AppHandle, id: &str) -> Result<TransferRecord> {
+    let _ = take_ask(app, id);
+    mgr(app).transfers.accepted.lock().unwrap().remove(id);
+    let rec = apply(app, id, Event::Decline)?;
+    log::info!("[FILE] Declined by user id={id}");
+    reject(app, &rec.device_id, id, FileRejectReason::Declined);
+    Ok(rec)
+}
+
+fn start_receiver(app: &AppHandle, p: PendingOffer) {
+    let PendingOffer { device_id, conn_id, offer, part, dest_dir } = p;
+    let id = offer.transfer_id.clone();
     let (ctl_tx, ctl_rx) = mpsc::unbounded_channel();
     let (frames_tx, frames_rx) = mpsc::channel(RECEIVER_QUEUE_FRAMES);
-    register(app, &id, Active { device_id: device_id.to_string(), conn_id, direction: Direction::In, ctl: ctl_tx, frames: Some(frames_tx) });
+    register(app, &id, Active { device_id: device_id.clone(), conn_id, direction: Direction::In, ctl: ctl_tx, frames: Some(frames_tx) });
     let app2 = app.clone();
-    let dev_id = device_id.to_string();
-    let id2 = id.clone();
+    let dev_id = device_id;
+    let id2 = id;
     tauri::async_runtime::spawn(async move {
         receiver::run(receiver::Params { app: app2.clone(), id: id2.clone(), device_id: dev_id, offer, part, dest_dir, frames_rx, ctl_rx }).await;
         unregister(&app2, &id2);
@@ -635,5 +764,22 @@ pub fn cancel_all_for_device(app: &AppHandle, device_id: &str) {
         if let Ok(rec) = apply(app, &rec.id, Event::Cancel(CancelledBy::System)) {
             cleanup_part(app, &rec);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{policy, Decision};
+
+    #[test]
+    fn accept_policy() {
+        const MB: u64 = 1024 * 1024;
+        assert_eq!(policy(true, "auto", 100, 5_000 * MB), Decision::Accept);
+        assert_eq!(policy(true, "ask", 100, 1), Decision::Ask);
+        assert_eq!(policy(true, "limit", 100, 100 * MB), Decision::Accept);
+        assert_eq!(policy(true, "limit", 100, 100 * MB + 1), Decision::Ask);
+        assert_eq!(policy(true, "limit", 0, 1), Decision::Ask);
+        // Receber automático desligado: pergunta, nunca recusa calado.
+        assert_eq!(policy(false, "auto", 100, 1), Decision::Ask);
     }
 }

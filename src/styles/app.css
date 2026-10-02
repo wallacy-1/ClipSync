@@ -355,7 +355,9 @@ button { font-family: inherit; }
 
 /* oferta de arquivos copiados no Explorer */
 .copied-offer { background: var(--color-surface); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
-.copied-offer.float { position: fixed; right: 20px; bottom: 20px; width: 320px; max-width: calc(100vw - 40px); box-shadow: var(--shadow-lg); z-index: 40; animation: csSlide .18s ease-out; }
+/* pilha flutuante da janela (pedido de aceite + oferta de arquivos copiados) */
+.float-stack { position: fixed; right: 20px; bottom: 20px; width: 320px; max-width: calc(100vw - 40px); display: flex; flex-direction: column; gap: 10px; z-index: 40; }
+.copied-offer.float, .ask-card.float { box-shadow: var(--shadow-lg); animation: csSlide .18s ease-out; }
 .copied-offer.inline { margin-bottom: 6px; }
 .copied-offer .co-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .copied-offer .co-icon { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; background: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent); }
@@ -366,6 +368,18 @@ button { font-family: inherit; }
 .copied-offer .co-close:hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
 .copied-offer .co-actions { display: flex; flex-wrap: wrap; gap: 6px; }
 .copied-offer .co-send { font-size: 12.5px; padding: 6px 12px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* pedido "Aceitar/Recusar" de arquivo recebido */
+.ask-card { background: var(--color-surface); border: 1px solid var(--color-divider); border-radius: var(--radius-md); padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.ask-card .co-head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ask-card .co-icon { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; flex-shrink: 0; background: color-mix(in srgb, var(--color-accent) 14%, transparent); color: var(--color-accent); }
+.ask-card .co-body { flex: 1; min-width: 0; }
+.ask-card .ask-from { font-size: 11.5px; font-weight: 600; color: var(--color-neutral-700); }
+.ask-card .co-title { font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.ask-card .co-meta { font-size: 11.5px; color: var(--color-neutral-700); margin-top: 2px; }
+.ask-card .ask-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.ask-card .ask-actions .btn { flex: 1; }
+.ask-card.android { position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); box-shadow: var(--shadow-lg); z-index: 45; animation: csSlide .18s ease-out; }
 
 /* toast */
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--color-text); color: var(--color-bg); padding: 10px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; box-shadow: var(--shadow-lg); z-index: 50; animation: csSlide .18s ease-out; max-width: 90vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

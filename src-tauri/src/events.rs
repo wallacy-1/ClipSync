@@ -31,6 +31,8 @@ pub const TRAY_SHOWN: &str = "tray:shown";
 pub const TRANSFER_STATE: &str = "transfer:state";
 /// `{ id, bytesDone, size }`, no máximo a cada ~250 ms por transferência.
 pub const TRANSFER_PROGRESS: &str = "transfer:progress";
+/// Oferta esperando "Aceitar/Recusar": `TransferRecord` (estado `incoming`).
+pub const TRANSFER_ASK: &str = "transfer:ask";
 
 /// "Compartilhar → ClipSync" pendente (Android); a UI busca com `share_take`.
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]

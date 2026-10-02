@@ -11,6 +11,7 @@ import { SettingsView } from "./SettingsView";
 import { Onboarding } from "./Onboarding";
 import { SendSheet } from "./SendSheet";
 import { ShareSheet } from "./ShareSheet";
+import { AskPrompt } from "../components/AskPrompt";
 import { ItemSheet } from "./ItemSheet";
 import { KeyboardPrompt } from "./KeyboardPrompt";
 
@@ -47,6 +48,7 @@ export function AndroidShell() {
       <div className="and">
         <Onboarding onPair={() => { setStartScan(true); setTab("devices"); void useApp.getState().finishOnboarding(); }} />
         {pendingShare && <ShareSheet />}
+        {!pendingShare && <AskPrompt variant="android" />}
         <Toast />
       </div>
     );
@@ -58,6 +60,7 @@ export function AndroidShell() {
       <div className="and">
         <KeyboardPrompt onConfigure={() => { setSettingsSub("keyboard"); setTab("settings"); }} />
         {pendingShare && <ShareSheet />}
+        {!pendingShare && <AskPrompt variant="android" />}
         <Toast />
       </div>
     );
@@ -83,6 +86,7 @@ export function AndroidShell() {
 
       {sendId && <SendSheet itemId={sendId} onClose={() => setSendId(null)} />}
       {pendingShare && <ShareSheet />}
+      {!pendingShare && <AskPrompt variant="android" />}
       {detailId && <ItemSheet itemId={detailId} onClose={() => setDetailId(null)} onSend={(id) => { setDetailId(null); setSendId(id); }} />}
       <Toast />
     </div>

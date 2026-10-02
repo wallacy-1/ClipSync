@@ -82,6 +82,9 @@ function TransferRow({ t }: { t: TransferRecord }) {
   const devices = useApp((s) => s.devices);
   const selfId = useApp((s) => s.me?.deviceId ?? "");
   const busy = useApp((s) => !!s.transferBusy[t.id]);
+  const asked = useApp((s) => s.asks.includes(t.id));
+  const accept = useApp((s) => s.acceptTransfer);
+  const decline = useApp((s) => s.declineTransfer);
   const cancel = useApp((s) => s.cancelTransfer);
   const resume = useApp((s) => s.resumeTransfer);
   const open = useApp((s) => s.openTransfer);
@@ -126,7 +129,12 @@ function TransferRow({ t }: { t: TransferRecord }) {
       </div>
       <span className={`tag ${TRANSFER_TAG[kind]}`}>{TRANSFER_LABEL[kind]}</span>
       <div className="tr-actions">
-        {primary && <button className="btn btn-secondary" disabled={primary.disabled} onClick={primary.run}>{primary.label}</button>}
+        {asked ? (
+          <div className="row-flex" style={{ gap: 6 }}>
+            <button className="btn btn-secondary" onClick={() => void decline(t.id)}>Recusar</button>
+            <button className="btn btn-primary" onClick={() => void accept(t.id)}>Aceitar</button>
+          </div>
+        ) : primary && <button className="btn btn-secondary" disabled={primary.disabled} onClick={primary.run}>{primary.label}</button>}
         <div className="menu-wrap" ref={menuRef}>
           <button className="icon-btn" title="Mais" onClick={() => setMenu((m) => !m)}><More size={15} /></button>
           {menu && (

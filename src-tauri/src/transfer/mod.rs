@@ -24,6 +24,10 @@ pub const MAX_CHUNKS: u32 = (MAX_FILE_SIZE / CHUNK_SIZE as u64) as u32;
 pub const MAX_OPEN_PER_DEVICE: usize = 20;
 /// Sem `FileAck` por este tempo com dados pendentes → considera a conexão morta.
 pub const ACK_TIMEOUT_SECS: u64 = 30;
+/// Emissor: espera pelo `FileAccept` de um peer que pergunta ao usuário (`file-ask-v1`).
+pub const ASK_WAIT_SECS: u64 = 10 * 60;
+/// Receptor: pedido sem resposta é recusado antes de o emissor desistir.
+pub const ASK_TTL_SECS: u64 = 9 * 60;
 /// Espaço livre exigido: `size * 105 % + este extra`.
 pub const FREE_SPACE_MARGIN: u64 = 64 * 1024 * 1024;
 
