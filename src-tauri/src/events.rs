@@ -29,6 +29,10 @@ pub const TRANSFER_STATE: &str = "transfer:state";
 /// `{ id, bytesDone, size }`, no máximo a cada ~250 ms por transferência.
 pub const TRANSFER_PROGRESS: &str = "transfer:progress";
 
+/// "Compartilhar → ClipSync" pendente (Android); a UI busca com `share_take`.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+pub const SHARE_RECEIVED: &str = "share:received";
+
 pub fn emit<P: Serialize + Clone>(app: &AppHandle, name: &str, payload: P) {
     if let Err(e) = app.emit(name, payload) {
         log::warn!("falha ao emitir {name}: {e}");

@@ -8,6 +8,7 @@ import type {
   ItemsPage,
   PairingInfo,
   PickedFile,
+  SharedPayload,
   Settings,
   SyncStatus,
   TransferRecord,
@@ -92,6 +93,9 @@ export const api = {
   transferPeerSupports: (deviceId: string) => call<boolean>("transfer_peer_supports", { deviceId }),
   transferOpen: (id: string) => call<void>("transfer_open", { id }),
   transferReveal: (id: string) => call<void>("transfer_reveal", { id }),
+  // "Compartilhar → ClipSync" (Android)
+  shareTake: () => call<SharedPayload | null>("share_take"),
+  shareText: (text: string, deviceIds: string[]) => call<ClipboardItem>("share_text", { text, deviceIds }),
 };
 
 /** Abre a câmera e devolve o conteúdo do QR (só Android/iOS). */

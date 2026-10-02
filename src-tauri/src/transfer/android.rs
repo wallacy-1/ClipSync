@@ -105,6 +105,20 @@ pub fn cleanup_pending() -> Result<i32> {
     })
 }
 
+/// Compartilhamento pendente (`ShareBridge`), consumido na leitura.
+pub fn share_take() -> Result<Option<String>> {
+    with_class("app.clipsync.desktop.share.ShareBridge", |env, class, _ctx| {
+        let out = env
+            .call_static_method(class, "take", "()Ljava/lang/String;", &[])
+            .and_then(|v| v.l())
+            .map_err(|e| AppError::Other(format!("ShareBridge.take: {e}")))?;
+        if out.is_null() {
+            return Ok(None);
+        }
+        jstring_to_string(env, out).map(Some)
+    })
+}
+
 /// Abre o seletor SAF (precisa da Activity). O resultado vem por [`take_pick_result`].
 pub fn pick_file() -> Result<bool> {
     with_class(FILE_BRIDGE, |env, class, ctx| {
@@ -193,6 +207,14 @@ pub fn fgs_running() -> bool {
 pub extern "system" fn Java_app_clipsync_desktop_transfer_TransferBridge_nativeActivityResumed(_env: jni::JNIEnv, _class: jni::objects::JClass) {
     let Some(app) = crate::ime::app_handle() else { return };
     super::manager::fgs_retry_if_needed(app);
+}
+
+/// "Compartilhar → ClipSync" chegou: a UI chama `share_take`.
+#[no_mangle]
+pub extern "system" fn Java_app_clipsync_desktop_share_ShareBridge_nativeShareReceived(_env: jni::JNIEnv, _class: jni::objects::JClass) {
+    let Some(app) = crate::ime::app_handle() else { return };
+    log::info!("[SHARE] Share received from another app");
+    crate::events::emit(app, crate::events::SHARE_RECEIVED, serde_json::json!({}));
 }
 
 /// Botão "Cancelar" da notificação.

@@ -10,6 +10,7 @@ import { TransfersView } from "./TransfersView";
 import { SettingsView } from "./SettingsView";
 import { Onboarding } from "./Onboarding";
 import { SendSheet } from "./SendSheet";
+import { ShareSheet } from "./ShareSheet";
 import { ItemSheet } from "./ItemSheet";
 import { KeyboardPrompt } from "./KeyboardPrompt";
 
@@ -32,10 +33,20 @@ export function AndroidShell() {
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);
 
+  // "Compartilhar → ClipSync": ao abrir e sempre que outro app nos traz para a frente.
+  const pendingShare = useApp((s) => s.pendingShare);
+  useEffect(() => {
+    void useApp.getState().checkShare();
+    const check = () => { if (document.visibilityState === "visible") void useApp.getState().checkShare(); };
+    document.addEventListener("visibilitychange", check);
+    return () => document.removeEventListener("visibilitychange", check);
+  }, []);
+
   if (!onboarded) {
     return (
       <div className="and">
         <Onboarding onPair={() => { setStartScan(true); setTab("devices"); void useApp.getState().finishOnboarding(); }} />
+        {pendingShare && <ShareSheet />}
         <Toast />
       </div>
     );
@@ -46,6 +57,7 @@ export function AndroidShell() {
     return (
       <div className="and">
         <KeyboardPrompt onConfigure={() => { setSettingsSub("keyboard"); setTab("settings"); }} />
+        {pendingShare && <ShareSheet />}
         <Toast />
       </div>
     );
@@ -70,6 +82,7 @@ export function AndroidShell() {
       </nav>
 
       {sendId && <SendSheet itemId={sendId} onClose={() => setSendId(null)} />}
+      {pendingShare && <ShareSheet />}
       {detailId && <ItemSheet itemId={detailId} onClose={() => setDetailId(null)} onSend={(id) => { setDetailId(null); setSendId(id); }} />}
       <Toast />
     </div>

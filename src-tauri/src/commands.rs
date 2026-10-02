@@ -497,6 +497,29 @@ fn transfer_target(app: &AppHandle, id: &str) -> Result<String> {
         .ok_or_else(|| AppError::Other("arquivo não está mais disponível".into()))
 }
 
+/// "Compartilhar → ClipSync" (Android): `{files:[{uri,name,size,mime}], text}` pendente,
+/// consumido na leitura; `null` se não há (ou fora do Android).
+#[tauri::command]
+pub fn share_take() -> Result<Option<serde_json::Value>> {
+    #[cfg(target_os = "android")]
+    {
+        match crate::transfer::android::share_take()? {
+            Some(json) => Ok(Some(serde_json::from_str(&json)?)),
+            None => Ok(None),
+        }
+    }
+    #[cfg(not(target_os = "android"))]
+    Ok(None)
+}
+
+/// Texto compartilhado: vira item de histórico e vai para os dispositivos escolhidos.
+#[tauri::command]
+pub fn share_text(app: AppHandle, text: String, device_ids: Vec<String>) -> Result<ClipboardItem> {
+    let item = crate::clipboard::ingest_shared_text(&app, text)?;
+    crate::sync::send_item(&app, &item.id, &device_ids)?;
+    Ok(item)
+}
+
 #[tauri::command]
 pub fn transfer_peer_supports(app: AppHandle, device_id: String) -> bool {
     crate::transfer::manager::peer_supports_files(&app, &device_id)

@@ -97,20 +97,7 @@ pub fn handle_text(app: &AppHandle, text: String, excluded_by_source: bool, orig
         log::debug!("cópia marcada como sensível pela origem; ignorada");
         return None;
     }
-    let cls = content::classify(&text);
-    let created_at = now_ms();
-    let item = ClipboardItem {
-        id: uuid::Uuid::new_v4().to_string(),
-        content: text,
-        content_type: cls.content_type,
-        source_device_id: state.self_id(),
-        created_at,
-        expires_at: sync::expiry_for(&settings, cls.is_sensitive, created_at),
-        is_pinned: false,
-        is_sensitive: cls.is_sensitive,
-        sync_state: "local".into(),
-        metadata: serde_json::json!({}),
-    };
+    let item = new_item(&state, text);
     if !state.db.insert_item(&item).unwrap_or(false) {
         return None;
     }
@@ -127,6 +114,39 @@ pub fn handle_text(app: &AppHandle, text: String, excluded_by_source: bool, orig
     events::emit(app, events::CLIPBOARD_CHANGED, &item);
     sync::on_local_clip(app, &item);
     Some(item)
+}
+
+fn new_item(state: &AppState, text: String) -> ClipboardItem {
+    let settings = state.settings();
+    let cls = content::classify(&text);
+    let created_at = now_ms();
+    ClipboardItem {
+        id: uuid::Uuid::new_v4().to_string(),
+        content: text,
+        content_type: cls.content_type,
+        source_device_id: state.self_id(),
+        created_at,
+        expires_at: sync::expiry_for(&settings, cls.is_sensitive, created_at),
+        is_pinned: false,
+        is_sensitive: cls.is_sensitive,
+        sync_state: "local".into(),
+        metadata: serde_json::json!({}),
+    }
+}
+
+/// Texto compartilhado por outro app ("Compartilhar → ClipSync"): pedido explícito do
+/// usuário, então sem dedupe nem regras automáticas — vira histórico e o chamador envia.
+pub fn ingest_shared_text(app: &AppHandle, text: String) -> Result<ClipboardItem> {
+    if text.trim().is_empty() || text.len() > MAX_TEXT_BYTES {
+        return Err(crate::error::AppError::Other("texto vazio ou grande demais".into()));
+    }
+    let state = app.state::<AppState>();
+    let item = new_item(&state, text);
+    state.db.insert_item(&item)?;
+    let _ = state.db.dedupe_content(&content_hash(&item.content), &item.id);
+    log::info!("[CLIPBOARD] Shared text id={} type={} bytes={}", item.id, item.content_type.as_str(), item.content.len());
+    events::emit(app, events::CLIPBOARD_CHANGED, &item);
+    Ok(item)
 }
 
 /// Escreve no clipboard local marcando o hash para o watcher **e o IME**

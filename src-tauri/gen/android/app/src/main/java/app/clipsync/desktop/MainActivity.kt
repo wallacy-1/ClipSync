@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.wifi.WifiManager
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
+import app.clipsync.desktop.share.ShareBridge
 import app.clipsync.desktop.transfer.FileBridge
 import app.clipsync.desktop.transfer.TransferBridge
 
@@ -20,6 +21,16 @@ class MainActivity : TauriActivity() {
       setReferenceCounted(false)
       acquire()
     }
+    // Recriada pelo sistema (ou reaberta pelos recentes) = mesmo Intent de antes: não reenvia.
+    val fromHistory = intent?.flags?.and(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
+    if (savedInstanceState == null && !fromHistory) ShareBridge.onIntent(this, intent)
+  }
+
+  // "Compartilhar → ClipSync" com o app já aberto (singleTask).
+  override fun onNewIntent(intent: Intent) {
+    super.onNewIntent(intent)
+    setIntent(intent)
+    ShareBridge.onIntent(this, intent)
   }
 
   // Transferência ativa sem FGS (start recusado em segundo plano): agora pode subir.

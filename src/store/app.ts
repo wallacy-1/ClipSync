@@ -11,6 +11,7 @@ import type {
   PairingInfo,
   Platform,
   Settings,
+  SharedPayload,
   SyncStatus,
   TransferRecord,
 } from "../lib/types";
@@ -54,6 +55,8 @@ interface AppStore {
   transferBusy: Record<string, true>;
   /** Arquivo escolhido aguardando destino (diálogo/folha "escolher destino"). */
   pendingFile: { path: string; name: string; size: number } | null;
+  /** "Compartilhar → ClipSync" aguardando destino (Android). */
+  pendingShare: SharedPayload | null;
 
   init: () => Promise<void>;
   setView: (v: View) => void;
@@ -94,6 +97,9 @@ interface AppStore {
   openTransfer: (id: string) => Promise<void>;
   revealTransfer: (id: string) => Promise<void>;
   clearFinishedTransfers: () => void;
+  checkShare: () => Promise<void>;
+  sendShare: (deviceId: string) => Promise<void>;
+  dismissShare: () => void;
 }
 
 let toastSeq = 0;
@@ -132,6 +138,7 @@ export const useApp = create<AppStore>((set, get) => ({
   transfersLoaded: false,
   transferBusy: {},
   pendingFile: null,
+  pendingShare: null,
 
   async init() {
     // StrictMode monta duas vezes em dev: registrar listeners só uma vez.
@@ -158,6 +165,7 @@ export const useApp = create<AppStore>((set, get) => ({
     setInterval(() => set({ now: Date.now() }), 1000);
 
     await Promise.all([
+      listen("share:received", () => void get().checkShare()),
       listen<ClipboardItem>("clipboard:changed", (item) => {
         set((s) => ({ items: upsertItem(s.items, item), totalItems: s.totalItems + 1 }));
       }),
@@ -392,6 +400,35 @@ export const useApp = create<AppStore>((set, get) => ({
   },
   // Só esconde na sessão: o backend mantém 30 dias de retenção.
   clearFinishedTransfers: () => set((s) => ({ transfers: s.transfers.filter(isTransferActive) })),
+
+  async checkShare() {
+    try {
+      const share = await api.shareTake();
+      if (share && (share.files.length > 0 || share.text)) set({ pendingShare: share });
+    } catch (e) {
+      get().showToast(String(e), "error");
+    }
+  },
+  async sendShare(deviceId) {
+    const share = get().pendingShare;
+    if (!share) return;
+    set({ pendingShare: null });
+    const name = get().devices.find((d) => d.deviceId === deviceId)?.name ?? deviceId;
+    try {
+      if (share.files.length > 0) {
+        const recs: TransferRecord[] = [];
+        for (const f of share.files) recs.push(await api.transferSend(deviceId, f.uri));
+        set((s) => ({ transfers: [...recs.reverse(), ...s.transfers.filter((t) => !recs.some((r) => r.id === t.id))] }));
+        get().showToast(recs.length === 1 ? `Enviando ${recs[0].safeName} para ${name}` : `Enviando ${recs.length} arquivos para ${name}`);
+      } else if (share.text) {
+        await api.shareText(share.text, [deviceId]);
+        get().showToast(`Texto enviado para ${name}`);
+      }
+    } catch (e) {
+      get().showToast(String(e), "error");
+    }
+  },
+  dismissShare: () => set({ pendingShare: null }),
 
   showToast(text, kind) {
     const id = ++toastSeq;

@@ -156,6 +156,8 @@ pub fn run() {
             commands::transfer_pick_file,
             commands::transfer_open,
             commands::transfer_reveal,
+            commands::share_take,
+            commands::share_text,
         ]);
 
     builder

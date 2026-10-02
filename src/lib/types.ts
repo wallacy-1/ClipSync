@@ -161,5 +161,11 @@ export interface TransferRecord {
   purpose: string | null;
 }
 
+/** "Compartilhar → ClipSync" pendente (`share_take`, só Android). */
+export interface SharedPayload {
+  files: { uri: string; name: string; size: number; mime: string | null }[];
+  text: string | null;
+}
+
 /** Resultado do seletor nativo (`transfer_pick_file`). */
 export type PickedFile = { cancelled: true } | { cancelled?: false; uri: string; name: string; size: number; mime: string | null };

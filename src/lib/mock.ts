@@ -294,6 +294,15 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
     }
     case "transfer_open":
     case "transfer_reveal": return;
+    case "share_take": {
+      // ?share=files|text simula um "Compartilhar → ClipSync" (consumido uma vez).
+      const kind = params.get("share");
+      params.delete("share");
+      if (kind === "text") return { files: [], text: "https://github.com/wallacy/clipsync/issues/12" };
+      if (kind === "files") return { files: [{ uri: "content://media/1", name: "IMG_2041.jpg", size: 3.2 * MB, mime: "image/jpeg" }, { uri: "content://media/2", name: "IMG_2042.jpg", size: 2.9 * MB, mime: "image/jpeg" }], text: null };
+      return null;
+    }
+    case "share_text": return items[0];
     default:
       throw new Error(`mock: comando desconhecido ${cmd}`);
   }
