@@ -29,8 +29,14 @@ Legenda: **P1** muda a percepção de "funciona" · **P2** confiança e acabamen
   só em Arquivos. No emulador o compartilhamento de clipboard host↔guest troca a imagem por texto — testar com
   "Clipboard sharing" desligado.
 
-### 3. Arquivo copiado no Explorer (Ctrl+C) — P2
-- Detectar `CF_HDROP` no Windows e oferecer/enviar pela transferência. Hoje só pelo seletor ou arrastando para a tela.
+### 3. Arquivo copiado no Explorer (Ctrl+C) — P2 · feito (2026-10-01)
+- `clipboard/files.rs` lê `CF_HDROP` (arboard `file_list`) quando o clipboard não tem texto e emite `clipboard:files`.
+  **Nunca envia sozinho** (Ctrl+C de arquivo é quase sempre para colar em outra pasta): a UI oferece "Enviar para…" num
+  cartão no canto da janela e no topo do painel rápido; um clique envia pela transferência (`transfer_send` por arquivo).
+- Pastas ficam de fora (avisado); no máximo 20 arquivos por oferta; conectados aparecem antes dos offline (fila).
+- A oferta some ao copiar outra coisa, ao dispensar, ao enviar ou depois de 10 min.
+- Validado: `SetFileDropList` com 2 PNGs + 1 pasta → oferta "2 arquivos copiados · 1 pasta fica de fora" → Android, SHA igual.
+- Limitação: com a janela fechada e sem notificação do Windows (item 5), a oferta só aparece ao abrir a janela/painel.
 
 ### 4. Aceitar/recusar arquivo recebido — P2
 - Hoje o aceite é sempre automático (`auto_receive`): um dispositivo pareado pode encher os Downloads.
