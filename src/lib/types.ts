@@ -51,6 +51,7 @@ export interface Settings {
   autoSend: boolean;
   autoReceive: boolean;
   syncedTypes: string[];
+  typesRev: number;
   lanOnly: boolean;
   ignorePasswordManagers: boolean;
   autoExpireHours: number;
@@ -156,6 +157,8 @@ export interface TransferRecord {
   createdAt: number;
   updatedAt: number;
   completedAt: number | null;
+  /** "clipboard" = imagem copiada (vai para o clipboard, não para Downloads). */
+  purpose: string | null;
 }
 
 /** Resultado do seletor nativo (`transfer_pick_file`). */

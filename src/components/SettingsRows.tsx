@@ -8,6 +8,7 @@ const TYPES: { id: string; label: string }[] = [
   { id: "code", label: "Código" },
   { id: "email", label: "E-mail" },
   { id: "sensitive", label: "Sensíveis" },
+  { id: "image", label: "Imagens" },
 ];
 
 const EXPIRE_OPTIONS = [

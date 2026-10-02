@@ -219,6 +219,12 @@ pub fn peer_supports_files(app: &AppHandle, device_id: &str) -> bool {
 /// um device pareado. Retorna a linha criada; o envio real começa quando houver
 /// conexão com `file-v1`.
 pub fn send_file(app: &AppHandle, device_id: &str, source_str: &str) -> Result<TransferRecord> {
+    send_file_with(app, device_id, source_str, None)
+}
+
+/// [`send_file`] com finalidade: `Some("clipboard")` = imagem copiada (o peer põe no
+/// clipboard em vez de Downloads).
+pub fn send_file_with(app: &AppHandle, device_id: &str, source_str: &str, purpose: Option<&str>) -> Result<TransferRecord> {
     let state = mgr(app);
     let dev = state.db.get_device(device_id)?.ok_or_else(|| AppError::Other("dispositivo não pareado".into()))?;
     if dev.blocked {
@@ -247,9 +253,10 @@ pub fn send_file(app: &AppHandle, device_id: &str, source_str: &str) -> Result<T
         state: &TransferState::Queued,
         source: Some(&src.as_str()),
         temp_path: None,
+        purpose,
     })?;
     let rec = state.db.transfer_get(&id)?.ok_or_else(|| AppError::Other("falha ao registrar".into()))?;
-    log::info!("[FILE] Queued id={} name={:?} size={} to={}", id, safe, info.size, device_id);
+    log::info!("[FILE] Queued id={} name={:?} size={} to={} purpose={:?}", id, safe, info.size, device_id, purpose);
     events::emit(app, events::TRANSFER_STATE, &rec);
     kick(app, device_id);
     Ok(rec)
@@ -349,6 +356,7 @@ pub fn startup(app: &AppHandle) {
             log::info!("[FILE] Removed {n} orphan outgoing tmp copy(ies)");
         }
     }
+    crate::clipboard::image::purge_old(app);
 }
 
 pub fn on_connected(app: &AppHandle, device_id: &str) {
@@ -507,7 +515,13 @@ fn on_offer(app: &AppHandle, device_id: &str, conn_id: u64, offer: FileOffer) {
         None => None,
     };
 
-    let dest_dir = match dest::dest_dir(app) {
+    // Imagem copiada: vai para o diretório privado e depois para o clipboard, nunca Downloads.
+    let clip_image = crate::clipboard::image::is_clipboard(offer.purpose.as_deref());
+    if clip_image && offer.size > crate::clipboard::image::MAX_BYTES {
+        return reject(app, device_id, &id, FileRejectReason::TooLarge);
+    }
+    let dest_dir = if clip_image { crate::clipboard::image::dir(app) } else { dest::dest_dir(app) };
+    let dest_dir = match dest_dir {
         Ok(d) => d,
         Err(e) => {
             log::warn!("[FILE] destino indisponível: {e}");
@@ -545,6 +559,7 @@ fn on_offer(app: &AppHandle, device_id: &str, conn_id: u64, offer: FileOffer) {
             state: &TransferState::Incoming,
             source: None,
             temp_path: part.to_str(),
+            purpose: offer.purpose.as_deref(),
         }) {
             log::warn!("[FILE] não registrou oferta: {e}");
             return reject(app, device_id, &id, FileRejectReason::Protocol);
@@ -552,7 +567,8 @@ fn on_offer(app: &AppHandle, device_id: &str, conn_id: u64, offer: FileOffer) {
         if let Ok(Some(rec)) = state.db.transfer_get(&id) {
             events::emit(app, events::TRANSFER_STATE, &rec);
         }
-        let auto = dev.auto_receive && state.settings().auto_receive && !state.is_paused();
+        // Imagem do clipboard é sempre guardada (como o texto); aplicar é decidido ao chegar.
+        let auto = clip_image || (dev.auto_receive && state.settings().auto_receive && !state.is_paused());
         if !auto {
             let _ = apply(app, &id, Event::Decline);
             return reject(app, device_id, &id, FileRejectReason::Declined);

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { File, More, Transfers, Upload } from "../components/Icons";
-import { bytes, deviceName, isTransferActive, percent, pluralize, transferDetail, TRANSFER_LABEL, TRANSFER_TAG } from "../lib/format";
+import { bytes, deviceName, isClipImage, isTransferActive, percent, pluralize, transferDetail, TRANSFER_LABEL, TRANSFER_TAG } from "../lib/format";
 import { onFileDrop } from "../lib/ipc";
 import type { TransferRecord } from "../lib/types";
 import { useApp } from "../store/app";
@@ -117,6 +117,7 @@ function TransferRow({ t }: { t: TransferRecord }) {
         <div className="tr-meta">
           <span className={`tr-dir${incoming ? " in" : ""}`}>{incoming ? "Recebendo" : "Enviando"}</span>
           <span>{dev}</span><span>·</span><span>{bytes(t.size)}</span>
+          {isClipImage(t) && <><span>·</span><span>imagem copiada</span></>}
         </div>
       </div>
       <div>

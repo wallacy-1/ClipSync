@@ -12,6 +12,7 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager};
 
 pub mod dedupe;
+pub mod image;
 
 #[cfg(any(target_os = "android", target_os = "ios"))]
 pub mod android;
@@ -142,7 +143,11 @@ pub fn write_local(app: &AppHandle, text: &str) -> Result<()> {
 /// mudou desde a última leitura — memória compartilhada com o IME, para a mesma
 /// cópia não entrar duas vezes.
 pub fn poll_once(app: &AppHandle, prov: &dyn ClipboardProvider) -> Option<ClipboardItem> {
-    let text = prov.read_text().ok().flatten()?;
+    let Some(text) = prov.read_text().ok().flatten() else {
+        // Sem texto: pode ser uma imagem (segue pela transferência de arquivos).
+        image::poll(app);
+        return None;
+    };
     let h = content_hash(&text);
     let changed = app.state::<AppState>().clip_dedupe.lock().unwrap().poll_changed(&h);
     if !changed {
@@ -155,8 +160,10 @@ pub fn spawn_watcher(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let prov = provider(&app);
         // Ignora o que já estava no clipboard quando o app abriu.
-        if let Ok(Some(t)) = prov.read_text() {
-            app.state::<AppState>().clip_dedupe.lock().unwrap().prime(&content_hash(&t));
+        let _ = prov.changed_hint();
+        match prov.read_text() {
+            Ok(Some(t)) => app.state::<AppState>().clip_dedupe.lock().unwrap().prime(&content_hash(&t)),
+            _ => image::prime(&app),
         }
         loop {
             tokio::time::sleep(prov.poll_interval()).await;

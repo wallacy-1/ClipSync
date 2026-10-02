@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { File, Shield, Transfers, Upload } from "../components/Icons";
 import { Avatar } from "../components/ui";
-import { bytes, deviceName, isTransferActive, percent, transferDetail, TRANSFER_LABEL, TRANSFER_TAG } from "../lib/format";
+import { bytes, deviceName, isClipImage, isTransferActive, percent, transferDetail, TRANSFER_LABEL, TRANSFER_TAG } from "../lib/format";
 import type { TransferRecord } from "../lib/types";
 import { useApp } from "../store/app";
 import { useFileTargets } from "../windows/SendFileDialog";
@@ -76,7 +76,7 @@ function TransferCard({ t }: { t: TransferRecord }) {
     ? (kind === "verifying" ? null : { label: busy ? "Cancelando…" : "Cancelar", run: () => cancel(t.id), disabled: busy })
     : kind === "failed" && !incoming
       ? { label: "Tentar de novo", run: () => resume(t.id), disabled: false }
-      : kind === "completed"
+      : kind === "completed" && !isClipImage(t) // imagem do clipboard fica em disco privado: não abre por fora
         ? { label: "Abrir", run: () => open(t.id), disabled: false }
         : null;
 
@@ -89,6 +89,7 @@ function TransferCard({ t }: { t: TransferRecord }) {
           <div className="tr-meta">
             <span className={`tr-dir${incoming ? " in" : ""}`}>{incoming ? "Recebendo" : "Enviando"}</span>
             <span>{dev}</span>
+            {isClipImage(t) && <span>· imagem copiada</span>}
           </div>
         </div>
         <span className={`tag ${TRANSFER_TAG[kind]}`}>{TRANSFER_LABEL[kind]}</span>

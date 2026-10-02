@@ -75,7 +75,8 @@ CREATE TABLE IF NOT EXISTS file_transfers (
   attempts INTEGER NOT NULL DEFAULT 0,
   created_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
-  completed_at INTEGER
+  completed_at INTEGER,
+  purpose TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_ft_device_state ON file_transfers(device_id, state);
 CREATE INDEX IF NOT EXISTS idx_ft_created ON file_transfers(created_at DESC);
@@ -145,6 +146,17 @@ pub fn content_hash(s: &str) -> String {
     hex::encode(Sha256::digest(s.as_bytes()))
 }
 
+/// Colunas adicionadas depois da primeira versão do schema (bancos antigos não as têm).
+fn migrate(conn: &Connection) -> Result<()> {
+    let has_purpose: bool = conn
+        .prepare("SELECT 1 FROM pragma_table_info('file_transfers') WHERE name = 'purpose'")?
+        .exists([])?;
+    if !has_purpose {
+        conn.execute_batch("ALTER TABLE file_transfers ADD COLUMN purpose TEXT")?;
+    }
+    Ok(())
+}
+
 impl Db {
     pub fn open(dir: &Path) -> Result<Self> {
         std::fs::create_dir_all(dir)?;
@@ -152,6 +164,7 @@ impl Db {
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
         conn.execute_batch(SCHEMA)?;
+        migrate(&conn)?;
         Ok(Self { conn: Mutex::new(conn) })
     }
 
@@ -420,7 +433,9 @@ impl Db {
         let raw: Option<String> = c
             .query_row("SELECT value FROM settings WHERE key = 'settings'", [], |r| r.get(0))
             .optional()?;
-        Ok(raw.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default())
+        let mut s: Settings = raw.and_then(|s| serde_json::from_str(&s).ok()).unwrap_or_default();
+        s.upgrade_types();
+        Ok(s)
     }
 
     pub fn save_settings(&self, s: &Settings) -> Result<()> {

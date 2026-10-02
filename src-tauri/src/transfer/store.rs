@@ -41,6 +41,8 @@ pub struct TransferRecord {
     pub created_at: i64,
     pub updated_at: i64,
     pub completed_at: Option<i64>,
+    /// `Some("clipboard")` = imagem copiada (vai para o clipboard, não para Downloads).
+    pub purpose: Option<String>,
 }
 
 pub struct NewTransfer<'a> {
@@ -56,6 +58,7 @@ pub struct NewTransfer<'a> {
     pub state: &'a TransferState,
     pub source: Option<&'a str>,
     pub temp_path: Option<&'a str>,
+    pub purpose: Option<&'a str>,
 }
 
 fn row_to_record(r: &Row) -> rusqlite::Result<TransferRecord> {
@@ -86,11 +89,12 @@ fn row_to_record(r: &Row) -> rusqlite::Result<TransferRecord> {
         created_at: r.get("created_at")?,
         updated_at: r.get("updated_at")?,
         completed_at: r.get("completed_at")?,
+        purpose: r.get("purpose")?,
     })
 }
 
 const COLS: &str = "id, direction, device_id, original_name, safe_name, mime, size, chunk_size, sha256_expected, sha256_actual, \
-                    state, state_reason, bytes_done, source, temp_path, final_path, attempts, created_at, updated_at, completed_at";
+                    state, state_reason, bytes_done, source, temp_path, final_path, attempts, created_at, updated_at, completed_at, purpose";
 
 impl Db {
     pub fn transfer_insert(&self, t: &NewTransfer) -> Result<()> {
@@ -98,8 +102,8 @@ impl Db {
         let conn = self.conn.lock().unwrap();
         conn.execute(
             "INSERT INTO file_transfers (id, direction, device_id, original_name, safe_name, mime, size, chunk_size, sha256_expected, \
-             state, state_reason, bytes_done, source, temp_path, attempts, created_at, updated_at) \
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 0, ?12, ?13, 0, ?14, ?14)",
+             state, state_reason, bytes_done, source, temp_path, attempts, created_at, updated_at, purpose) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, 0, ?12, ?13, 0, ?14, ?14, ?15)",
             params![
                 t.id,
                 t.direction.as_str(),
@@ -115,6 +119,7 @@ impl Db {
                 t.source,
                 t.temp_path,
                 now,
+                t.purpose,
             ],
         )?;
         Ok(())
@@ -307,6 +312,7 @@ mod tests {
             state: Box::leak(Box::new(state.clone())),
             source: None,
             temp_path: None,
+            purpose: None,
         }
     }
 

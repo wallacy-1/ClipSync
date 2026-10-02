@@ -54,8 +54,12 @@ pub struct Settings {
     pub device_name: String,
     pub auto_send: bool,
     pub auto_receive: bool,
-    /// Categorias sincronizadas: text, link, code, email, sensitive
+    /// Categorias sincronizadas: text, link, code, email, sensitive, image
     pub synced_types: Vec<String>,
+    /// Versão da lista de categorias; sobe quando surge categoria nova ligada por padrão.
+    /// Campo ausente (configuração salva antes dele) = 0.
+    #[serde(default)]
+    pub types_rev: u32,
     pub lan_only: bool,
     pub ignore_password_managers: bool,
     /// Horas até apagar do histórico; 0 = nunca
@@ -67,13 +71,26 @@ pub struct Settings {
     pub launch_at_login: bool,
 }
 
+impl Settings {
+    pub const TYPES_REV: u32 = 1;
+
+    /// Liga as categorias novas em configurações salvas antes delas existirem.
+    pub fn upgrade_types(&mut self) {
+        if self.types_rev < 1 && !self.synced_types.iter().any(|t| t == "image") {
+            self.synced_types.push("image".into());
+        }
+        self.types_rev = self.types_rev.max(Self::TYPES_REV);
+    }
+}
+
 impl Default for Settings {
     fn default() -> Self {
         Self {
             device_name: String::new(),
             auto_send: true,
             auto_receive: true,
-            synced_types: vec!["text".into(), "link".into(), "code".into(), "email".into()],
+            synced_types: vec!["text".into(), "link".into(), "code".into(), "email".into(), "image".into()],
+            types_rev: Settings::TYPES_REV,
             lan_only: true,
             ignore_password_managers: true,
             auto_expire_hours: 24,

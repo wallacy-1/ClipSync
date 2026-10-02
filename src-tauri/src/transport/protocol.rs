@@ -25,6 +25,8 @@ pub const TAG_JSON_MORE: u8 = 1;
 pub const TAG_DATA: u8 = 2;
 
 pub const CAP_FILE_V1: &str = "file-v1";
+/// Entende `FileOffer.purpose = "clipboard"` (imagem copiada vai para o clipboard, não para Downloads).
+pub const CAP_CLIP_IMAGE_V1: &str = "clip-image-v1";
 
 /// Primeira mensagem, em texto puro (não carrega dados do usuário): só diz
 /// qual handshake usar.
@@ -51,6 +53,10 @@ pub struct FileOffer {
     /// só será conhecido no `FileDone` (fonte não-seekável, ex.: alguns providers SAF).
     pub sha256: Option<String>,
     pub mtime: Option<i64>,
+    /// `None` = arquivo comum. `Some("clipboard")` = imagem copiada (só para peers com
+    /// [`CAP_CLIP_IMAGE_V1`]). Ausente no JSON de peers antigos.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub purpose: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -329,6 +335,7 @@ mod tests {
             total_chunks: 4,
             sha256: None,
             mtime: Some(1_700_000_000_000),
+            purpose: None,
         }
     }
 
@@ -369,6 +376,21 @@ mod tests {
         }
         let s = serde_json::to_string(&Message::FileReject { transfer_id: "t".into(), reason: FileRejectReason::TooLarge }).unwrap();
         assert!(s.contains(r#""reason":"tooLarge""#));
+    }
+
+    #[test]
+    fn offer_purpose_is_optional_on_the_wire() {
+        // Arquivo comum não leva o campo: JSON idêntico ao de peers sem clip-image-v1.
+        let plain = serde_json::to_string(&Message::FileOffer(offer())).unwrap();
+        assert!(!plain.contains("purpose"));
+        let back: Message = serde_json::from_str(&plain).unwrap();
+        assert!(matches!(back, Message::FileOffer(FileOffer { purpose: None, .. })));
+        let img = FileOffer { purpose: Some("clipboard".into()), ..offer() };
+        let s = serde_json::to_string(&Message::FileOffer(img.clone())).unwrap();
+        match serde_json::from_str::<Message>(&s).unwrap() {
+            Message::FileOffer(back) => assert_eq!(back, img),
+            _ => panic!(),
+        }
     }
 
     #[test]

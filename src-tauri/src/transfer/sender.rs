@@ -163,6 +163,7 @@ async fn run_inner(app: &AppHandle, id: &str, device_id: &str, data_tx: mpsc::Se
         total_chunks,
         sha256: Some(sha.clone()),
         mtime: opened.file.metadata().ok().and_then(|m| m.modified().ok()).and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok()).map(|d| d.as_millis() as i64),
+        purpose: rec.purpose.clone(),
     };
     if !send(app, device_id, Message::FileOffer(offer)) {
         return Err(lost_connection(app, id, device_id, ctl_rx));

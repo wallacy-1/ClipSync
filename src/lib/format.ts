@@ -160,6 +160,9 @@ export function transferError(error: string, device: string): string {
 }
 
 /** Segunda linha do item: bytes e percentual vêm do evento; nada é estimado aqui. */
+/** Imagem do clipboard (vai para a área de transferência, não para Downloads). */
+export const isClipImage = (t: TransferRecord) => t.purpose === "clipboard";
+
 export function transferDetail(t: TransferRecord, device: string): string {
   const pct = percent(t);
   switch (t.state.kind) {
@@ -169,7 +172,9 @@ export function transferDetail(t: TransferRecord, device: string): string {
     case "queued": return `Aguardando conexão com ${device}`;
     case "offered": return `Aguardando ${device} aceitar`;
     case "incoming": return `${bytes(t.size)} · aguardando aceite`;
-    case "completed": return t.direction === "in" ? `${bytes(t.size)} · salvo em Downloads` : `${bytes(t.size)} · enviado`;
+    case "completed":
+      if (isClipImage(t)) return t.direction === "in" ? `${bytes(t.size)} · imagem copiada recebida` : `${bytes(t.size)} · imagem copiada enviada`;
+      return t.direction === "in" ? `${bytes(t.size)} · salvo em Downloads` : `${bytes(t.size)} · enviado`;
     case "cancelled": return `Cancelado em ${pct}% · ${bytes(t.size)}`;
     case "failed": return transferError(t.state.error, device);
   }

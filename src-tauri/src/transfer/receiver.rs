@@ -114,6 +114,8 @@ struct Rx {
     safe_name: String,
     mime: Option<String>,
     offer_sha: Option<String>,
+    /// `Some("clipboard")`: finaliza no diretório privado e aplica no clipboard.
+    purpose: Option<String>,
 }
 
 impl Rx {
@@ -162,13 +164,25 @@ impl Rx {
             send(&self.app, &self.device_id, Message::FileResult { transfer_id: self.id.clone(), ok: false, error: Some(why.into()) });
             return;
         }
-        match dest::finalize_platform(&self.part, &self.dest_dir, &self.safe_name, self.mime.as_deref()) {
+        let clip_image = crate::clipboard::image::is_clipboard(self.purpose.as_deref());
+        let finalized = if clip_image {
+            dest::finalize(&self.part, &self.dest_dir, &self.safe_name).map(|p| {
+                let name = p.file_name().and_then(|n| n.to_str()).unwrap_or(&self.safe_name).to_string();
+                (p.to_string_lossy().into_owned(), name)
+            })
+        } else {
+            dest::finalize_platform(&self.part, &self.dest_dir, &self.safe_name, self.mime.as_deref())
+        };
+        match finalized {
             Ok((final_path, name)) => {
                 let _ = state.db.transfer_set_paths(&self.id, None, Some(&final_path), Some(&name));
                 set_progress(&self.app, &self.id, self.size, self.size);
                 let _ = apply(&self.app, &self.id, Event::Verified);
                 log::info!("[FILE] Received id={} from={} size={} path={}", self.id, self.device_id, self.size, final_path);
                 send(&self.app, &self.device_id, Message::FileResult { transfer_id: self.id.clone(), ok: true, error: None });
+                if clip_image {
+                    crate::clipboard::image::on_received(&self.app, &self.device_id, std::path::Path::new(&final_path));
+                }
             }
             Err(e) => {
                 let _ = std::fs::remove_file(&self.part);
@@ -194,6 +208,7 @@ pub async fn run(p: Params) {
         safe_name: rec.safe_name.clone(),
         mime: rec.mime.clone(),
         offer_sha: offer.sha256.clone(),
+        purpose: offer.purpose.clone(),
     };
 
     // 1. Offset durável: o que a linha diz, limitado ao que o .part realmente tem,

@@ -667,6 +667,7 @@ dependencies = [
  "log",
  "mdns-sd",
  "once_cell",
+ "png 0.17.16",
  "qrcode",
  "rand",
  "regex",
