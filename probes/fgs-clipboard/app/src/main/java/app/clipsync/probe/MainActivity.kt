@@ -32,6 +32,24 @@ class MainActivity : AppCompatActivity() {
         }
         // Automação: `am start ... --ez start true` inicia o service (FGS só pode nascer com o app em foreground).
         if (intent?.getBooleanExtra("start", false) == true) startProbe()
+        // Automação: `am start ... --es copy_image x.png` põe uma imagem no clipboard como
+        // um app qualquer faria ("Copiar imagem"). O PNG vem de getExternalFilesDir (adb push).
+        intent?.getStringExtra("copy_image")?.let { copyImage(it) }
+    }
+
+    private fun copyImage(name: String) {
+        runCatching {
+            val src = java.io.File(getExternalFilesDir(null), name)
+            val values = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "probe-${System.currentTimeMillis()}-$name")
+                put(android.provider.MediaStore.Images.Media.MIME_TYPE, "image/png")
+            }
+            val uri = contentResolver.insert(android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)!!
+            contentResolver.openOutputStream(uri)!!.use { out -> src.inputStream().use { it.copyTo(out) } }
+            val cm = getSystemService(android.content.ClipboardManager::class.java)
+            cm.setPrimaryClip(android.content.ClipData.newUri(contentResolver, "probe", uri))
+            Log.i(ClipProbeService.TAG, "[COPY] image on clipboard uri=$uri bytes=${src.length()}")
+        }.onFailure { Log.w(ClipProbeService.TAG, "[COPY] failed: $it") }
     }
 
     private fun startProbe() {
