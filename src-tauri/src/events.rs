@@ -15,6 +15,9 @@ pub const CLIPBOARD_CHANGED: &str = "clipboard:changed";
 pub const CLIPBOARD_SENT: &str = "clipboard:sent";
 pub const CLIPBOARD_RECEIVED: &str = "clipboard:received";
 pub const CLIPBOARD_EXPIRED: &str = "clipboard:expired";
+/// Arquivos copiados no Explorer: `CopiedFiles`; a UI oferece enviar (nunca automático).
+#[cfg_attr(not(windows), allow(dead_code))]
+pub const CLIPBOARD_FILES: &str = "clipboard:files";
 
 pub const SYNC_STARTED: &str = "sync:started";
 pub const SYNC_COMPLETED: &str = "sync:completed";

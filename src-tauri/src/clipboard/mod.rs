@@ -12,6 +12,8 @@ use std::time::Duration;
 use tauri::{AppHandle, Manager};
 
 pub mod dedupe;
+#[cfg(windows)]
+pub mod files;
 pub mod image;
 
 #[cfg(any(target_os = "android", target_os = "ios"))]
@@ -164,7 +166,11 @@ pub fn write_local(app: &AppHandle, text: &str) -> Result<()> {
 /// cópia não entrar duas vezes.
 pub fn poll_once(app: &AppHandle, prov: &dyn ClipboardProvider) -> Option<ClipboardItem> {
     let Some(text) = prov.read_text().ok().flatten() else {
-        // Sem texto: pode ser uma imagem (segue pela transferência de arquivos).
+        // Sem texto: arquivos copiados no Explorer (só oferta) ou imagem (segue pela transferência).
+        #[cfg(windows)]
+        if files::poll(app) {
+            return None;
+        }
         image::poll(app);
         return None;
     };
@@ -183,6 +189,8 @@ pub fn spawn_watcher(app: AppHandle) {
         let _ = prov.changed_hint();
         match prov.read_text() {
             Ok(Some(t)) => app.state::<AppState>().clip_dedupe.lock().unwrap().prime(&content_hash(&t)),
+            #[cfg(windows)]
+            _ if files::prime(&app) => {}
             _ => image::prime(&app),
         }
         loop {

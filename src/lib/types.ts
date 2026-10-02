@@ -167,5 +167,13 @@ export interface SharedPayload {
   text: string | null;
 }
 
+/** Arquivos copiados no Explorer (`clipboard:files`, só Windows): o app oferece enviar. */
+export interface CopiedFiles {
+  files: { path: string; name: string; size: number }[];
+  skippedDirs: number;
+  skippedFiles: number;
+  copiedAt: number;
+}
+
 /** Resultado do seletor nativo (`transfer_pick_file`). */
 export type PickedFile = { cancelled: true } | { cancelled?: false; uri: string; name: string; size: number; mime: string | null };

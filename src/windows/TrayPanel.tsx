@@ -4,6 +4,7 @@ import { ItemText, Toast, TypeTag } from "../components/ui";
 import { api } from "../lib/ipc";
 import { deviceName, relTime } from "../lib/format";
 import { usePeers, useVisibleItems, useApp } from "../store/app";
+import { CopiedFilesOffer } from "./CopiedFilesOffer";
 
 export function TrayPanel() {
   const query = useApp((s) => s.query);
@@ -58,6 +59,7 @@ export function TrayPanel() {
         <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar no histórico…" />
       </label>
       <div className="tray-list">
+        <CopiedFilesOffer variant="inline" />
         {items.length === 0 && <div className="muted" style={{ padding: "18px 12px", fontSize: 13 }}>Nada por aqui ainda.</div>}
         {items.map((it, i) => (
           <button key={it.id} className={`tray-row${i === active ? " active" : ""}`} onMouseEnter={() => setActive(i)} onClick={() => paste(it.id)}>

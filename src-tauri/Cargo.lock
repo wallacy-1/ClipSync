@@ -655,6 +655,7 @@ name = "clipsync"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "arboard",
  "chacha20poly1305",
  "chrono",
  "env_logger",

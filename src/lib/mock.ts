@@ -145,6 +145,19 @@ export function mockListen(name: string, h: (p: unknown) => void) {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// ?copied=1 simula Ctrl+C de arquivos no Explorer (oferta "Enviar para…").
+if (params.get("copied")) {
+  setTimeout(() => emit("clipboard:files", {
+    files: [
+      { path: "C:\Users\wallacy\Desktop\contrato-assinado.pdf", name: "contrato-assinado.pdf", size: 2.4 * MB },
+      { path: "C:\Users\wallacy\Desktop\fotos-obra.zip", name: "fotos-obra.zip", size: 148 * MB },
+    ],
+    skippedDirs: 1,
+    skippedFiles: 0,
+    copiedAt: Date.now(),
+  }), 1200);
+}
+
 function filterItems(query?: string, category?: string) {
   let out = items.slice();
   if (query?.trim()) {

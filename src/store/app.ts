@@ -12,6 +12,7 @@ import type {
   Platform,
   Settings,
   SharedPayload,
+  CopiedFiles,
   SyncStatus,
   TransferRecord,
 } from "../lib/types";
@@ -57,6 +58,8 @@ interface AppStore {
   pendingFile: { path: string; name: string; size: number } | null;
   /** "Compartilhar → ClipSync" aguardando destino (Android). */
   pendingShare: SharedPayload | null;
+  /** Arquivos copiados no Explorer aguardando "Enviar para…" (Windows). */
+  copiedFiles: CopiedFiles | null;
 
   init: () => Promise<void>;
   setView: (v: View) => void;
@@ -100,6 +103,8 @@ interface AppStore {
   checkShare: () => Promise<void>;
   sendShare: (deviceId: string) => Promise<void>;
   dismissShare: () => void;
+  sendCopiedFiles: (deviceId: string) => Promise<void>;
+  dismissCopiedFiles: () => void;
 }
 
 let toastSeq = 0;
@@ -139,6 +144,7 @@ export const useApp = create<AppStore>((set, get) => ({
   transferBusy: {},
   pendingFile: null,
   pendingShare: null,
+  copiedFiles: null,
 
   async init() {
     // StrictMode monta duas vezes em dev: registrar listeners só uma vez.
@@ -166,8 +172,10 @@ export const useApp = create<AppStore>((set, get) => ({
 
     await Promise.all([
       listen("share:received", () => void get().checkShare()),
+      listen<CopiedFiles>("clipboard:files", (copiedFiles) => set({ copiedFiles })),
       listen<ClipboardItem>("clipboard:changed", (item) => {
-        set((s) => ({ items: upsertItem(s.items, item), totalItems: s.totalItems + 1 }));
+        // Copiou outra coisa: a oferta de arquivos perdeu o sentido.
+        set((s) => ({ items: upsertItem(s.items, item), totalItems: s.totalItems + 1, copiedFiles: null }));
       }),
       listen<{ item: ClipboardItem; fromDeviceId: string; applied: boolean }>("clipboard:received", ({ item, fromDeviceId }) => {
         set((s) => ({ items: upsertItem(s.items, item), totalItems: s.totalItems + 1 }));
@@ -429,6 +437,21 @@ export const useApp = create<AppStore>((set, get) => ({
     }
   },
   dismissShare: () => set({ pendingShare: null }),
+  async sendCopiedFiles(deviceId) {
+    const offer = get().copiedFiles;
+    if (!offer) return;
+    set({ copiedFiles: null });
+    const name = get().devices.find((d) => d.deviceId === deviceId)?.name ?? deviceId;
+    try {
+      const recs: TransferRecord[] = [];
+      for (const f of offer.files) recs.push(await api.transferSend(deviceId, f.path));
+      set((s) => ({ transfers: [...recs.reverse(), ...s.transfers.filter((t) => !recs.some((r) => r.id === t.id))] }));
+      get().showToast(recs.length === 1 ? `Enviando ${recs[0].safeName} para ${name}` : `Enviando ${recs.length} arquivos para ${name}`);
+    } catch (e) {
+      get().showToast(String(e), "error");
+    }
+  },
+  dismissCopiedFiles: () => set({ copiedFiles: null }),
 
   showToast(text, kind) {
     const id = ++toastSeq;
