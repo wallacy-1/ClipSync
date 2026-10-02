@@ -38,9 +38,19 @@ Legenda: **P1** muda a percepção de "funciona" · **P2** confiança e acabamen
 - Validado: `SetFileDropList` com 2 PNGs + 1 pasta → oferta "2 arquivos copiados · 1 pasta fica de fora" → Android, SHA igual.
 - Limitação: com a janela fechada e sem notificação do Windows (item 5), a oferta só aparece ao abrir a janela/painel.
 
-### 4. Aceitar/recusar arquivo recebido — P2
-- Hoje o aceite é sempre automático (`auto_receive`): um dispositivo pareado pode encher os Downloads.
-- Fazer: prompt "Aceitar/Recusar" com nome, tamanho e origem; limite de tamanho para aceite automático por dispositivo.
+### 4. Aceitar/recusar arquivo recebido — P2 · feito (2026-10-01)
+- Ajuste "Arquivos recebidos": **Sempre aceitar** / **Perguntar acima de 25 MB · 100 MB (padrão) · 500 MB · 1 GB** / **Sempre perguntar**
+  (`Settings.file_accept` + `file_auto_accept_mb`). Imagem do clipboard não passa por aqui.
+- "Receber automático" desligado (global, do dispositivo ou pausa) agora **pergunta** em vez de recusar calado.
+- Pedido: cartão "X quer enviar · nome · tamanho · Recusar/Aceitar" (janela do PC: pilha flutuante; Android: acima das abas) e
+  botões no card da transferência. `transfer:ask`, `transfer_asks/accept/decline`.
+- Protocolo: capability `file-ask-v1`. Emissor espera o aceite até 10 min (antes 30 s); receptor recusa sozinho em 9 min.
+  Peer sem a capability mantém a regra antiga (aceita se "receber automático", senão recusa).
+- Queda/reinício com pedido aberto: a linha fica `incoming`, a reoferta reavalia a política e pergunta de novo; aceite dado
+  com a conexão caída vale na reoferta.
+- Validado (emulador Android 17 + PC): PC→Android com "Sempre perguntar", app reinstalado no meio, aceito após 40 s → SHA igual;
+  Android→PC 7,5 KB com limite 100 MB → automático; com "Sempre perguntar" → Recusar → emissor `rejected:declined`
+  ("PC recusou o arquivo").
 
 ## Confiança e acabamento
 
