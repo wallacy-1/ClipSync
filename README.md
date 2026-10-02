@@ -149,7 +149,9 @@ Pixel 8a · **Android 17 / API 37** · x86_64).
 
 ## Limitações conhecidas do MVP
 
-- Só texto (a arquitetura já separa `ContentType` e `ClipboardProvider` para imagens/arquivos depois).
+- Clipboard: texto vira histórico; **imagem copiada** sincroniza pela transferência de arquivos e vai direto para o clipboard
+  do outro lado (não entra no histórico). Ver `docs/roadmap.md` § 2.
+- Android: **Compartilhar → ClipSync** envia arquivos e texto de qualquer app (`docs/roadmap.md` § 1).
 - No Android, a leitura do clipboard só acontece com o app em primeiro plano (restrição do Android 10+); receber em segundo plano depende do processo estar vivo.
 - mDNS no Android: `MainActivity` adquire `MulticastLock` (API oficial); como fallback, o QR carrega os endereços do PC e o app reconecta pelo último endereço conhecido.
 - "Apps excluídos" é armazenado, mas a detecção por app de origem depende de API nativa ainda não ligada (STUB de configuração); a flag `ExcludeClipboardContentFromMonitorProcessing` do Windows já é respeitada (REAL).
