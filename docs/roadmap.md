@@ -65,8 +65,19 @@ Legenda: **P1** muda a percepção de "funciona" · **P2** confiança e acabamen
   nada); em debug o aviso aparece como "Windows PowerShell" (sem AUMID registrado); no build instalado usa o identifier
   `app.clipsync.desktop` — conferir o nome no instalador.
 
-### 6. Iniciar com o Windows — P2
-- `tauri-plugin-autostart`, ligado por padrão, abrindo direto no tray. Sem o PC rodando nada sincroniza.
+### 6. Iniciar com o Windows — P2 · feito (2026-10-02)
+- `autostart.rs` + `tauri-plugin-autostart` (~2.5): entrada `ClipSync` em `HKCU\...\Run` com `--autostart`; nesse modo a janela
+  principal não abre (fica só a bandeja). `tauri.conf.json` cria a janela escondida e o setup a mostra nas aberturas normais.
+- Ligado por padrão na primeira execução do **build instalado** (`autostart_initialized`); debug e perfis de teste nunca se
+  registram. O registro é a fonte da verdade: desligar pelo Gerenciador de Tarefas reflete no ajuste ao abrir.
+- Ajuste "Iniciar com o Windows" (só Windows).
+- `tauri-plugin-single-instance` (~2.4): abrir o ClipSync de novo com ele na bandeja só traz a janela (antes criava um 2º
+  processo disputando a porta 47820). Desligado com `CLIPSYNC_PROFILE` (testes com vários perfis).
+- Versões fixadas para manter `tauri` 2.11 (as mais novas exigem 2.12 e o `@tauri-apps/api` do npm está em 2.11).
+- Validado: ligar → chave `ClipSync = "...clipsync.exe --autostart"`; desligar → chave removida; abrir com `--autostart` →
+  janela principal e painel invisíveis; Android continua abrindo normal. Single-instance não testado ao vivo (exigiria o perfil
+  padrão, que criaria identidade e credencial reais nesta máquina).
+- Correção junto: imagens do clipboard agora ficam no diretório do perfil (antes iam para a raiz mesmo com perfil de teste).
 
 ### 7. Permissão de notificação no Android 13+ — P2
 - Pedir `POST_NOTIFICATIONS` na primeira transferência. Sem ela o progresso e o botão Cancelar do FGS ficam invisíveis.
