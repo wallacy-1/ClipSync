@@ -657,6 +657,9 @@ fn ask(app: &AppHandle, p: PendingOffer) {
     let fresh = state.transfers.asks.lock().unwrap().insert(id.clone(), p).is_none();
     if let Ok(Some(rec)) = state.db.transfer_get(&id) {
         events::emit(app, events::TRANSFER_ASK, &rec);
+        if fresh {
+            crate::notify::ask(app, &rec);
+        }
     }
     if fresh {
         let app = app.clone();

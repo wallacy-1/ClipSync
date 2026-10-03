@@ -158,6 +158,7 @@ pub fn on_clip_received(app: &AppHandle, from_device_id: &str, mut item: Clipboa
             log::warn!("falha ao escrever no clipboard: {e}");
         }
     }
+    crate::notify::text_received(app, &item, from_device_id, apply);
     events::emit(
         app,
         events::CLIPBOARD_RECEIVED,

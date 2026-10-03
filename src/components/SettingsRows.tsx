@@ -37,6 +37,7 @@ export function Row({ label, help, children }: { label: string; help: string; ch
 
 export function SyncRows() {
   const s = useApp((st) => st.settings)!;
+  const platform = useApp((st) => st.platform);
   const save = useApp((st) => st.saveSettings);
   const me = useApp((st) => st.me);
   const [editingTypes, setEditingTypes] = useState(false);
@@ -76,6 +77,18 @@ export function SyncRows() {
           <option value="ask">Sempre perguntar</option>
         </select>
       </Row>
+      {platform === "windows" && (
+        <>
+          <Row label="Notificações do Windows" help="Arquivo recebido e pedido de aceite, com a janela fechada">
+            <Toggle on={s.notifications} onChange={(v) => save({ notifications: v })} />
+          </Row>
+          {s.notifications && (
+            <Row label="Avisar texto recebido" help="Mostra uma notificação a cada texto que chega">
+              <Toggle on={s.notifyText} onChange={(v) => save({ notifyText: v })} />
+            </Row>
+          )}
+        </>
+      )}
       <Row label="Tipos sincronizados" help={typesHelp}>
         {editingTypes ? (
           <div className="type-chips">

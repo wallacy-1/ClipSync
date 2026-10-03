@@ -62,6 +62,8 @@ windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_
 png = "0.17"
 # Lista de arquivos copiados no Explorer (CF_HDROP); mesma versão que o plugin de clipboard já usa.
 arboard = "3.6"
+# Toasts do Windows com botões (Abrir, Aceitar/Recusar).
+tauri-winrt-notification = "0.8"
 
 [target.'cfg(any(target_os = "android", target_os = "ios"))'.dependencies]
 tauri-plugin-barcode-scanner = "2"

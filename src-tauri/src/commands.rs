@@ -488,15 +488,20 @@ pub async fn transfer_pick_file(app: AppHandle) -> Result<serde_json::Value> {
 
 #[tauri::command]
 pub fn transfer_open(app: AppHandle, id: String) -> Result<()> {
-    let target = transfer_target(&app, &id)?;
-    tauri_plugin_opener::open_path(&target, None::<&str>).map_err(|e| AppError::Other(e.to_string()))
+    open_transfer(&app, &id, false)
 }
 
 /// Só desktop.
 #[tauri::command]
 pub fn transfer_reveal(app: AppHandle, id: String) -> Result<()> {
-    let target = transfer_target(&app, &id)?;
-    tauri_plugin_opener::reveal_item_in_dir(&target).map_err(|e| AppError::Other(e.to_string()))
+    open_transfer(&app, &id, true)
+}
+
+/// Abre o arquivo de uma transferência concluída, ou (`reveal`) mostra na pasta.
+pub(crate) fn open_transfer(app: &AppHandle, id: &str, reveal: bool) -> Result<()> {
+    let target = transfer_target(app, id)?;
+    let r = if reveal { tauri_plugin_opener::reveal_item_in_dir(&target) } else { tauri_plugin_opener::open_path(&target, None::<&str>) };
+    r.map_err(|e| AppError::Other(e.to_string()))
 }
 
 /// Caminho abrível de uma transferência: destino final (recebida) ou origem (enviada).

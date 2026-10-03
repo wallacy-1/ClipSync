@@ -182,6 +182,8 @@ impl Rx {
                 send(&self.app, &self.device_id, Message::FileResult { transfer_id: self.id.clone(), ok: true, error: None });
                 if clip_image {
                     crate::clipboard::image::on_received(&self.app, &self.device_id, std::path::Path::new(&final_path));
+                } else if let Ok(Some(rec)) = state.db.transfer_get(&self.id) {
+                    crate::notify::file_received(&self.app, &rec);
                 }
             }
             Err(e) => {

@@ -54,6 +54,9 @@ export interface Settings {
   /** Arquivo recebido: "auto" | "limit" (aceita até fileAutoAcceptMb) | "ask". */
   fileAccept: "auto" | "limit" | "ask";
   fileAutoAcceptMb: number;
+  /** Toasts do Windows (arquivo recebido, pedido de aceite). */
+  notifications: boolean;
+  notifyText: boolean;
   typesRev: number;
   lanOnly: boolean;
   ignorePasswordManagers: boolean;

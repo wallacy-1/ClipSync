@@ -15,6 +15,7 @@ mod state;
 mod sync;
 mod transfer;
 mod transport;
+mod notify;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod tray;
 

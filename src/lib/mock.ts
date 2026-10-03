@@ -25,6 +25,8 @@ const settings: Settings = {
   syncedTypes: ["text", "link", "code", "email", "image"],
   fileAccept: "limit",
   fileAutoAcceptMb: 100,
+  notifications: true,
+  notifyText: false,
   typesRev: 1,
   lanOnly: true,
   ignorePasswordManagers: true,

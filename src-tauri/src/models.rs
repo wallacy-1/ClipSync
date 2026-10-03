@@ -73,6 +73,10 @@ pub struct Settings {
     /// pergunta acima), "ask" (sempre pergunta). Imagem do clipboard não passa por aqui.
     pub file_accept: String,
     pub file_auto_accept_mb: u32,
+    /// Toasts do Windows (arquivo recebido, pedido de aceite) com a janela sem foco.
+    pub notifications: bool,
+    /// Também avisar texto recebido (desligado: o clipboard muda o tempo todo).
+    pub notify_text: bool,
 }
 
 impl Settings {
@@ -104,6 +108,8 @@ impl Default for Settings {
             launch_at_login: false,
             file_accept: "limit".into(),
             file_auto_accept_mb: 100,
+            notifications: true,
+            notify_text: false,
         }
     }
 }
