@@ -27,6 +27,7 @@ const settings: Settings = {
   fileAutoAcceptMb: 100,
   notifications: true,
   notifyText: false,
+  autostartInitialized: true,
   typesRev: 1,
   lanOnly: true,
   ignorePasswordManagers: true,

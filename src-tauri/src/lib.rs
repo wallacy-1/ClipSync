@@ -1,6 +1,8 @@
 //! Cada instalação é um nó independente: identidade e histórico próprios, P2P cifrado na LAN.
 #[cfg(target_os = "android")]
 mod android_jni;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod autostart;
 mod clipboard;
 mod commands;
 mod content;
@@ -40,7 +42,13 @@ pub fn run() {
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
-        builder = builder.plugin(tauri_plugin_dialog::init());
+        // Precisa ser o primeiro plugin. Perfis de teste (várias instâncias de propósito) ficam de fora.
+        if std::env::var("CLIPSYNC_PROFILE").map(|p| p.trim().is_empty()).unwrap_or(true) {
+            builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| tray::show_main(app)));
+        }
+        builder = builder
+            .plugin(tauri_plugin_dialog::init())
+            .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec![autostart::ARG])));
     }
 
     builder = builder
@@ -96,7 +104,16 @@ pub fn run() {
             ime::attach(&handle);
 
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            tray::setup(&handle)?;
+            {
+                tray::setup(&handle)?;
+                autostart::sync_on_startup(&handle);
+                // A janela nasce escondida (tauri.conf.json); no login do Windows fica só a bandeja.
+                if autostart::launched_at_login() {
+                    log::info!("[AUTOSTART] started at login: tray only");
+                } else {
+                    tray::show_main(&handle);
+                }
+            }
 
             Ok(())
         })

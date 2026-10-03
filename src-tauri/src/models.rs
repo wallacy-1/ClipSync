@@ -68,7 +68,10 @@ pub struct Settings {
     pub hide_sensitive: bool,
     pub sensitive_expire_minutes: u32,
     pub excluded_apps: Vec<String>,
+    /// Espelho da entrada no registro (`autostart.rs`), que é a fonte da verdade.
     pub launch_at_login: bool,
+    /// A primeira execução já decidiu o padrão (ligado no build instalado).
+    pub autostart_initialized: bool,
     /// Arquivo recebido: "auto" (sempre aceita), "limit" (aceita até `file_auto_accept_mb`,
     /// pergunta acima), "ask" (sempre pergunta). Imagem do clipboard não passa por aqui.
     pub file_accept: String,
@@ -106,6 +109,7 @@ impl Default for Settings {
             sensitive_expire_minutes: 2,
             excluded_apps: vec!["Bitwarden".into(), "1Password".into()],
             launch_at_login: false,
+            autostart_initialized: false,
             file_accept: "limit".into(),
             file_auto_accept_mb: 100,
             notifications: true,

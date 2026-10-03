@@ -79,6 +79,9 @@ export function SyncRows() {
       </Row>
       {platform === "windows" && (
         <>
+          <Row label="Iniciar com o Windows" help="Abre escondido na bandeja ao ligar o PC; sem ele rodando nada sincroniza">
+            <Toggle on={s.launchAtLogin} onChange={(v) => save({ launchAtLogin: v })} />
+          </Row>
           <Row label="Notificações do Windows" help="Arquivo recebido e pedido de aceite, com a janela fechada">
             <Toggle on={s.notifications} onChange={(v) => save({ notifications: v })} />
           </Row>

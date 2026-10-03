@@ -65,6 +65,7 @@ export interface Settings {
   sensitiveExpireMinutes: number;
   excludedApps: string[];
   launchAtLogin: boolean;
+  autostartInitialized: boolean;
 }
 
 export interface SyncStatus {

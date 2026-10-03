@@ -177,6 +177,10 @@ pub fn get_settings(state: State<'_, AppState>) -> Result<Settings> {
 #[tauri::command]
 pub fn set_settings(app: AppHandle, state: State<'_, AppState>, settings: Settings) -> Result<Settings> {
     let old = state.settings();
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    if old.launch_at_login != settings.launch_at_login {
+        crate::autostart::set(&app, settings.launch_at_login)?;
+    }
     state.db.save_settings(&settings)?;
     *state.settings.write().unwrap() = settings.clone();
     if old.device_name != settings.device_name {
