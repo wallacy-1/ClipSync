@@ -79,8 +79,15 @@ Legenda: **P1** muda a percepção de "funciona" · **P2** confiança e acabamen
   padrão, que criaria identidade e credencial reais nesta máquina).
 - Correção junto: imagens do clipboard agora ficam no diretório do perfil (antes iam para a raiz mesmo com perfil de teste).
 
-### 7. Permissão de notificação no Android 13+ — P2
-- Pedir `POST_NOTIFICATIONS` na primeira transferência. Sem ela o progresso e o botão Cancelar do FGS ficam invisíveis.
+### 7. Permissão de notificação no Android 13+ — P2 · feito (2026-10-02)
+- `transfer/NotifyPermission.kt`: estado `granted` / `prompt` / `blocked` (negada de vez) / `unsupported` (< 13); pedido pelo
+  diálogo do sistema ou, se `blocked`, abre as configurações de notificação do app. Comandos `notify_permission` e
+  `notify_permission_request`.
+- Pedido automático (uma vez, sem bloquear) no primeiro envio de arquivo e no "Compartilhar → ClipSync" com arquivos.
+- Banner em Arquivos enquanto não houver permissão: "Notificações desativadas · Permitir" ou "Abrir ajustes". Estado relido ao
+  voltar ao app.
+- Validado no emulador (Android 17): permissão revogada → banner "Permitir" → diálogo → "Não permitir" 2× → "Abrir ajustes" →
+  configurações do app → ligar → volta com `granted` e o banner some.
 
 ### 8. Notificação de "concluído" no Android — P3
 - Ao terminar um recebimento: notificação com "Abrir" (o FGS hoje some sem aviso ao concluir).
