@@ -8,7 +8,9 @@
 //!
 //! Anti-loop: Windows ignora o número de sequência da própria escrita; Android
 //! marca a própria escrita com o rótulo "ClipSync" (`ClipImageBridge`).
-use crate::error::{AppError, Result};
+#[cfg(not(windows))]
+use crate::error::AppError;
+use crate::error::Result;
 use crate::models::now_ms;
 use crate::state::AppState;
 use std::path::{Path, PathBuf};
@@ -26,12 +28,9 @@ pub fn is_clipboard(purpose: Option<&str>) -> bool {
     purpose == Some(PURPOSE)
 }
 
+/// Dentro do diretório do perfil (`AppState::app_dir`), não da raiz do app.
 pub fn dir(app: &AppHandle) -> Result<PathBuf> {
-    let dir = app
-        .path()
-        .app_data_dir()
-        .map_err(|e| AppError::Other(format!("diretório privado indisponível: {e}")))?
-        .join(SUBDIR);
+    let dir = app.state::<AppState>().app_dir.join(SUBDIR);
     std::fs::create_dir_all(&dir)?;
     Ok(dir)
 }
