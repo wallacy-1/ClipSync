@@ -54,8 +54,16 @@ Legenda: **P1** muda a percepção de "funciona" · **P2** confiança e acabamen
 
 ## Confiança e acabamento
 
-### 5. Notificação ao receber no PC — P2
-- Toast do Windows para "arquivo recebido" (com Abrir / Mostrar na pasta) e, opcionalmente, "texto recebido".
+### 5. Notificação ao receber no PC — P2 · feito (2026-10-02)
+- `notify.rs` (crate `tauri-winrt-notification`): toast **Arquivo recebido de X** com **Abrir / Mostrar na pasta**; toast
+  **X quer enviar um arquivo** com **Aceitar / Recusar** (item 4); clique no corpo abre a janela. Texto recebido só com
+  "Avisar texto recebido" ligado (padrão desligado); conteúdo sensível nunca aparece no aviso.
+- Só com a janela principal sem foco (com foco, a UI já mostra). Ajustes "Notificações do Windows" e "Avisar texto recebido".
+- Validado no PC (perfis a/b): toasts gerados; com o "Não incomodar" do Windows ligado eles vão direto para a central de
+  notificações; "Mostrar na pasta" abriu o Explorer com o arquivo selecionado e "Aceitar" aceitou o pedido (`completed`).
+- Limitações: os botões só funcionam com o ClipSync rodando (sem ativador COM, avisos antigos de um processo anterior não fazem
+  nada); em debug o aviso aparece como "Windows PowerShell" (sem AUMID registrado); no build instalado usa o identifier
+  `app.clipsync.desktop` — conferir o nome no instalador.
 
 ### 6. Iniciar com o Windows — P2
 - `tauri-plugin-autostart`, ligado por padrão, abrindo direto no tray. Sem o PC rodando nada sincroniza.
