@@ -168,6 +168,9 @@ export interface TransferRecord {
   purpose: string | null;
 }
 
+/** Permissão de notificação do Android 13+ (`notify_permission`). */
+export type NotifyPermission = "granted" | "prompt" | "blocked" | "unsupported";
+
 /** "Compartilhar → ClipSync" pendente (`share_take`, só Android). */
 export interface SharedPayload {
   files: { uri: string; name: string; size: number; mime: string | null }[];

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { File, Shield, Transfers, Upload } from "../components/Icons";
+import { Bell, File, Shield, Transfers, Upload } from "../components/Icons";
 import { Avatar } from "../components/ui";
 import { bytes, deviceName, isClipImage, isTransferActive, percent, transferDetail, TRANSFER_LABEL, TRANSFER_TAG } from "../lib/format";
 import type { TransferRecord } from "../lib/types";
@@ -37,6 +37,7 @@ export function TransfersView() {
       </div>
 
       <div className="and-scroll">
+        <NotifyBanner />
         {loaded && transfers.length === 0 ? (
           <div className="and-empty">
             <div className="orb"><Transfers size={36} /></div>
@@ -56,6 +57,23 @@ export function TransfersView() {
 
       {pendingFile && <SendFileSheet file={pendingFile} onClose={() => setPendingFile(null)} />}
     </>
+  );
+}
+
+/** Android 13+ sem permissão de notificação: o FGS roda, mas progresso e Cancelar somem. */
+function NotifyBanner() {
+  const perm = useApp((s) => s.notifyPerm);
+  const request = useApp((s) => s.requestNotifyPerm);
+  if (perm !== "prompt" && perm !== "blocked") return null;
+  return (
+    <div className="and-notice">
+      <Bell size={18} />
+      <div className="body">
+        <div className="title">Notificações desativadas</div>
+        <div className="text">Sem elas, o progresso e o botão Cancelar não aparecem quando o app está fechado.</div>
+      </div>
+      <button className="btn btn-secondary" onClick={() => void request()}>{perm === "blocked" ? "Abrir ajustes" : "Permitir"}</button>
+    </div>
   );
 }
 

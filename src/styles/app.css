@@ -504,6 +504,12 @@ button { font-family: inherit; }
 .and-tr-card .foot .tr-detail { margin-top: 0; flex: 1; min-width: 0; }
 .and-tr-card .foot .btn-secondary { min-height: 44px; font-weight: 700; font-size: 13.5px; padding: 0 18px; flex-shrink: 0; }
 .and-tr-cta { padding: 14px 18px 12px; }
+.and-notice { display: flex; align-items: center; gap: 12px; margin: 0 18px 12px; padding: 12px 14px; border-radius: var(--radius-md); background: color-mix(in srgb, var(--color-accent) 12%, var(--color-surface)); color: var(--color-text); }
+.and-notice > svg { color: var(--color-accent); flex-shrink: 0; }
+.and-notice .body { flex: 1; min-width: 0; }
+.and-notice .title { font-size: 13.5px; font-weight: 700; }
+.and-notice .text { font-size: 12.5px; color: var(--color-neutral-700); margin-top: 2px; line-height: 1.4; }
+.and-notice .btn { flex-shrink: 0; font-size: 13px; padding: 7px 12px; }
 .and-tr-cta .btn { height: 52px; font-weight: 700; font-size: 16px; gap: 9px; }
 .and-head .pill { margin-left: 0; }
 .and-tabs .and-tab { padding: 8px 10px; min-width: 60px; }

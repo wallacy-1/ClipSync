@@ -328,6 +328,8 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
       return;
     }
     case "transfer_decline": return setTransfer(args.id as string, { state: { kind: "cancelled", by: "local" } });
+    case "notify_permission": return params.get("notify") ?? "granted";
+    case "notify_permission_request": return;
     case "share_take": {
       // ?share=files|text simula um "Compartilhar → ClipSync" (consumido uma vez).
       const kind = params.get("share");

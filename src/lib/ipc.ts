@@ -9,6 +9,7 @@ import type {
   PairingInfo,
   PickedFile,
   SharedPayload,
+  NotifyPermission,
   Settings,
   SyncStatus,
   TransferRecord,
@@ -97,6 +98,8 @@ export const api = {
   transferOpen: (id: string) => call<void>("transfer_open", { id }),
   transferReveal: (id: string) => call<void>("transfer_reveal", { id }),
   // "Compartilhar → ClipSync" (Android)
+  notifyPermission: () => call<NotifyPermission>("notify_permission"),
+  notifyPermissionRequest: (openSettings: boolean) => call<void>("notify_permission_request", { openSettings }),
   shareTake: () => call<SharedPayload | null>("share_take"),
   shareText: (text: string, deviceIds: string[]) => call<ClipboardItem>("share_text", { text, deviceIds }),
 };

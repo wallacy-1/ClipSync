@@ -178,6 +178,8 @@ pub fn run() {
             commands::transfer_open,
             commands::transfer_reveal,
             commands::share_take,
+            commands::notify_permission,
+            commands::notify_permission_request,
             commands::share_text,
         ]);
 

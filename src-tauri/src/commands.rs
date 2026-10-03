@@ -537,6 +537,34 @@ pub fn share_take() -> Result<Option<serde_json::Value>> {
     Ok(None)
 }
 
+/// Permissão de notificação do Android 13+ (progresso e Cancelar das transferências).
+/// `granted` | `prompt` | `blocked` | `unsupported` (fora do Android e Android < 13).
+#[tauri::command]
+pub fn notify_permission() -> Result<String> {
+    #[cfg(target_os = "android")]
+    return crate::transfer::android::notify_status();
+    #[cfg(not(target_os = "android"))]
+    Ok("unsupported".into())
+}
+
+/// Mostra o diálogo do sistema (`prompt`) ou abre as configurações de notificação (`blocked`).
+#[tauri::command]
+pub fn notify_permission_request(open_settings: bool) -> Result<()> {
+    #[cfg(target_os = "android")]
+    {
+        if open_settings {
+            crate::transfer::android::notify_open_settings()
+        } else {
+            crate::transfer::android::notify_request().map(|_| ())
+        }
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = open_settings;
+        Ok(())
+    }
+}
+
 /// Texto compartilhado: vira item de histórico e vai para os dispositivos escolhidos.
 #[tauri::command]
 pub fn share_text(app: AppHandle, text: String, device_ids: Vec<String>) -> Result<ClipboardItem> {

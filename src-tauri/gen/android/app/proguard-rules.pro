@@ -28,3 +28,4 @@
 -keepclasseswithmembers class * { native <methods>; }
 -keep class app.clipsync.desktop.clip.ClipImageBridge { *; }
 -keep class app.clipsync.desktop.share.ShareBridge { *; }
+-keep class app.clipsync.desktop.transfer.NotifyPermission { *; }

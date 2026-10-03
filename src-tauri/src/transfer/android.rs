@@ -119,6 +119,35 @@ pub fn share_take() -> Result<Option<String>> {
     })
 }
 
+const NOTIFY_PERMISSION: &str = "app.clipsync.desktop.transfer.NotifyPermission";
+
+/// `granted` | `prompt` | `blocked` | `unsupported` (ver `NotifyPermission.kt`).
+pub fn notify_status() -> Result<String> {
+    with_class(NOTIFY_PERMISSION, |env, class, ctx| {
+        let out = env
+            .call_static_method(class, "status", "(Landroid/content/Context;)Ljava/lang/String;", &[JValue::Object(ctx)])
+            .and_then(|v| v.l())
+            .map_err(|e| AppError::Other(format!("NotifyPermission.status: {e}")))?;
+        jstring_to_string(env, out)
+    })
+}
+
+pub fn notify_request() -> Result<bool> {
+    with_class(NOTIFY_PERMISSION, |env, class, ctx| {
+        env.call_static_method(class, "request", "(Landroid/content/Context;)Z", &[JValue::Object(ctx)])
+            .and_then(|v| v.z())
+            .map_err(|e| AppError::Other(format!("NotifyPermission.request: {e}")))
+    })
+}
+
+pub fn notify_open_settings() -> Result<()> {
+    with_class(NOTIFY_PERMISSION, |env, class, ctx| {
+        env.call_static_method(class, "openSettings", "(Landroid/content/Context;)V", &[JValue::Object(ctx)])
+            .map(|_| ())
+            .map_err(|e| AppError::Other(format!("NotifyPermission.openSettings: {e}")))
+    })
+}
+
 /// Abre o seletor SAF (precisa da Activity). O resultado vem por [`take_pick_result`].
 pub fn pick_file() -> Result<bool> {
     with_class(FILE_BRIDGE, |env, class, ctx| {

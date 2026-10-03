@@ -29,7 +29,12 @@ export function AndroidShell() {
 
   // Android só deixa ler o clipboard em primeiro plano: ao voltar, lê agora.
   useEffect(() => {
-    const onVis = () => { if (document.visibilityState === "visible" && inTauri) void api.clipboardPollNow(); };
+    void useApp.getState().refreshNotifyPerm();
+    const onVis = () => {
+      if (document.visibilityState !== "visible") return;
+      if (inTauri) void api.clipboardPollNow();
+      void useApp.getState().refreshNotifyPerm();
+    };
     document.addEventListener("visibilitychange", onVis);
     return () => document.removeEventListener("visibilitychange", onVis);
   }, []);

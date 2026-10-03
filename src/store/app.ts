@@ -13,6 +13,7 @@ import type {
   Settings,
   SharedPayload,
   CopiedFiles,
+  NotifyPermission,
   SyncStatus,
   TransferRecord,
 } from "../lib/types";
@@ -62,6 +63,8 @@ interface AppStore {
   copiedFiles: CopiedFiles | null;
   /** Ids de transferências recebidas esperando "Aceitar/Recusar". */
   asks: string[];
+  /** Android 13+: sem ela o progresso/Cancelar da transferência não aparece. null = não consultado. */
+  notifyPerm: NotifyPermission | null;
 
   init: () => Promise<void>;
   setView: (v: View) => void;
@@ -108,6 +111,9 @@ interface AppStore {
   sendCopiedFiles: (deviceId: string) => Promise<void>;
   dismissCopiedFiles: () => void;
   acceptTransfer: (id: string) => Promise<void>;
+  refreshNotifyPerm: () => Promise<void>;
+  /** Pede (diálogo do sistema) ou, se negada de vez, abre as configurações. */
+  requestNotifyPerm: () => Promise<void>;
   declineTransfer: (id: string) => Promise<void>;
 }
 
@@ -150,6 +156,7 @@ export const useApp = create<AppStore>((set, get) => ({
   pendingShare: null,
   copiedFiles: null,
   asks: [],
+  notifyPerm: null,
 
   async init() {
     // StrictMode monta duas vezes em dev: registrar listeners só uma vez.
@@ -390,6 +397,7 @@ export const useApp = create<AppStore>((set, get) => ({
   },
   setPendingFile: (pendingFile) => set({ pendingFile }),
   async sendFile(deviceId, path) {
+    if (get().notifyPerm === "prompt") void get().requestNotifyPerm();
     try {
       const rec = await api.transferSend(deviceId, path);
       set((s) => ({ transfers: [rec, ...s.transfers.filter((t) => t.id !== rec.id)], pendingFile: null }));
@@ -440,6 +448,7 @@ export const useApp = create<AppStore>((set, get) => ({
     if (!share) return;
     set({ pendingShare: null });
     const name = get().devices.find((d) => d.deviceId === deviceId)?.name ?? deviceId;
+    if (share.files.length > 0 && get().notifyPerm === "prompt") void get().requestNotifyPerm();
     try {
       if (share.files.length > 0) {
         const recs: TransferRecord[] = [];
@@ -470,6 +479,16 @@ export const useApp = create<AppStore>((set, get) => ({
     }
   },
   dismissCopiedFiles: () => set({ copiedFiles: null }),
+  async refreshNotifyPerm() {
+    try { set({ notifyPerm: await api.notifyPermission() }); } catch { set({ notifyPerm: "unsupported" }); }
+  },
+  async requestNotifyPerm() {
+    const cur = get().notifyPerm;
+    if (cur !== "prompt" && cur !== "blocked") return;
+    try { await api.notifyPermissionRequest(cur === "blocked"); } catch (e) { get().showToast(String(e), "error"); }
+    // O diálogo/Configurações são do sistema: relê ao voltar (visibilitychange) e um pouco depois.
+    setTimeout(() => void get().refreshNotifyPerm(), 1500);
+  },
   async acceptTransfer(id) {
     set((s) => ({ asks: s.asks.filter((x) => x !== id) }));
     try { await api.transferAccept(id); } catch (e) { get().showToast(String(e), "error"); }
