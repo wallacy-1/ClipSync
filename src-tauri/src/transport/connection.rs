@@ -424,7 +424,8 @@ async fn run_with_pairing_id(
     // 6. Encerramento.
     {
         let mut conns = state.connections.lock().unwrap();
-        if conns.get(&device_id).map(|c| c.address == peer_addr).unwrap_or(false) {
+        // Pelo `conn_id`: o endereço discado se repete entre reconexões e não identifica a conexão.
+        if conns.get(&device_id).map(|c| c.conn_id == conn_id).unwrap_or(false) {
             conns.remove(&device_id);
         }
     }
