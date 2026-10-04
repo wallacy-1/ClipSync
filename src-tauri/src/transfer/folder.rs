@@ -89,7 +89,11 @@ fn zip_dir(src: &Path, name: &str, out: &Path) -> Result<()> {
             if ft.is_dir() {
                 stack.push((e.path(), rel));
             } else if ft.is_file() {
-                zip.start_file(rel, opts).map_err(zerr)?;
+                let file_opts = match zip_time(&e.metadata()?) {
+                    Some(t) => opts.last_modified_time(t),
+                    None => opts,
+                };
+                zip.start_file(rel, file_opts).map_err(zerr)?;
                 let mut f = std::fs::File::open(e.path())?;
                 std::io::copy(&mut f, &mut zip)?;
             }
@@ -97,6 +101,22 @@ fn zip_dir(src: &Path, name: &str, out: &Path) -> Result<()> {
     }
     zip.finish().map_err(zerr)?.flush()?;
     Ok(())
+}
+
+/// Data de modificação para a entrada do zip; sem ela os arquivos extraídos saem com 1980-01-01.
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn zip_time(meta: &std::fs::Metadata) -> Option<zip::DateTime> {
+    use chrono::{Datelike, Timelike};
+    let t: chrono::DateTime<chrono::Local> = meta.modified().ok()?.into();
+    zip::DateTime::from_date_and_time(
+        u16::try_from(t.year()).ok()?,
+        t.month() as u8,
+        t.day() as u8,
+        t.hour() as u8,
+        t.minute() as u8,
+        t.second() as u8,
+    )
+    .ok()
 }
 
 #[cfg(any(target_os = "android", target_os = "ios"))]
@@ -125,6 +145,8 @@ mod tests {
         let mut s = String::new();
         std::io::Read::read_to_string(&mut z.by_name("Fotos/a.txt").unwrap(), &mut s).unwrap();
         assert_eq!(s, "ola");
+        // A data de modificação vai junto (não o padrão 1980-01-01 do zip).
+        assert!(z.by_name("Fotos/a.txt").unwrap().last_modified().map(|t| t.year() > 2000).unwrap_or(false));
         let _ = std::fs::remove_dir_all(&base);
     }
 }
