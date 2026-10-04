@@ -311,7 +311,7 @@ button { font-family: inherit; }
 .and-dev-card .name { font-weight: 700; font-size: 16px; }
 .and-dev-card .detail { font-size: 12.5px; color: var(--color-neutral-700); }
 .and-dev-card .bottom { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--color-divider); font-size: 13.5px; }
-.and-dev-card .bottom span { flex: 1; }
+.and-dev-card .bottom > span { flex: 1; }
 .and-dev-card .bottom .btn-ghost { font-size: 12.5px; font-weight: 700; color: var(--color-danger-fg); }
 .and-note { margin: 22px 18px 18px; background: var(--color-accent-2-200); border-radius: var(--radius-lg); padding: 16px; display: flex; gap: 12px; align-items: flex-start; font-size: 13px; color: var(--color-accent-2-900); font-weight: 600; line-height: 1.5; }
 .and-note svg { flex-shrink: 0; }
@@ -350,6 +350,7 @@ button { font-family: inherit; }
 .and-settings .setting-row { padding: 15px 16px; min-height: 68px; gap: 14px; }
 .and-settings .setting-row:last-child { border-bottom: 0; }
 .and-settings .setting-row .label { font-size: 15px; }
+.and-settings .setting-row input.input { width: 45%; }
 .and-settings .section-title { font-size: 11.5px; margin-bottom: 10px; }
 .and-settings .btn-secondary { height: 52px; font-weight: 700; font-size: 15px; }
 
