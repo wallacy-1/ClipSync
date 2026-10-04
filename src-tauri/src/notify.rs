@@ -1,15 +1,31 @@
-//! Toasts do Windows: arquivo recebido (Abrir / Mostrar na pasta), pedido de aceite
-//! (Aceitar / Recusar) e, se ligado, texto recebido. Só quando a janela principal não
-//! está em foco (com ela em foco a UI já mostra). Fora do Windows tudo é no-op.
+//! Avisos do sistema, só com o app fora de foco (com foco a própria UI mostra).
+//! Windows: toasts de arquivo recebido, pedido de aceite e, se ligado, texto recebido.
+//! Android: "Arquivo recebido", que abre o arquivo ao tocar (`ReceivedNotifier.kt`).
 use crate::models::ClipboardItem;
 use crate::transfer::store::TransferRecord;
 use tauri::AppHandle;
+#[cfg(any(windows, target_os = "android"))]
+use {crate::state::AppState, tauri::Manager};
+
+#[cfg(any(windows, target_os = "android"))]
+fn device_name(app: &AppHandle, id: &str) -> String {
+    app.state::<AppState>().db.get_device(id).ok().flatten().map(|d| d.name).unwrap_or_else(|| "outro dispositivo".into())
+}
+
+#[cfg(any(windows, target_os = "android"))]
+fn size(n: u64) -> String {
+    const MB: f64 = 1024.0 * 1024.0;
+    match n {
+        n if n < 1024 => format!("{n} B"),
+        n if (n as f64) < MB => format!("{:.0} KB", n as f64 / 1024.0),
+        n if (n as f64) < 1024.0 * MB => format!("{:.1} MB", n as f64 / MB).replace('.', ","),
+        n => format!("{:.2} GB", n as f64 / (1024.0 * MB)).replace('.', ","),
+    }
+}
 
 #[cfg(windows)]
 mod imp {
     use super::*;
-    use crate::state::AppState;
-    use tauri::Manager;
     use tauri_winrt_notification::Toast;
 
     /// Instalado, o atalho do instalador registra o AUMID = identifier. Em debug não há
@@ -29,20 +45,6 @@ mod imp {
         let focused = app.get_webview_window("main").and_then(|w| w.is_focused().ok()).unwrap_or(false);
         log::debug!("[NOTIFY] main focused={focused}");
         !focused
-    }
-
-    fn device_name(app: &AppHandle, id: &str) -> String {
-        app.state::<AppState>().db.get_device(id).ok().flatten().map(|d| d.name).unwrap_or_else(|| "outro dispositivo".into())
-    }
-
-    fn size(n: u64) -> String {
-        const MB: f64 = 1024.0 * 1024.0;
-        match n {
-            n if n < 1024 => format!("{n} B"),
-            n if (n as f64) < MB => format!("{:.0} KB", n as f64 / 1024.0),
-            n if (n as f64) < 1024.0 * MB => format!("{:.1} MB", n as f64 / MB).replace('.', ","),
-            n => format!("{:.2} GB", n as f64 / (1024.0 * MB)).replace('.', ","),
-        }
     }
 
     /// Botão = `"<ação>:<id>"`; clique no corpo = `None` (abre a janela).
@@ -124,7 +126,17 @@ mod imp {
 #[cfg(windows)]
 pub use imp::{ask, file_received, text_received};
 
-#[cfg(not(windows))]
+#[cfg(target_os = "android")]
+pub fn file_received(app: &AppHandle, rec: &TransferRecord) {
+    let Some(uri) = rec.final_path.as_deref() else { return };
+    let title = format!("Arquivo recebido de {}", device_name(app, &rec.device_id));
+    let text = format!("{} · {} · Downloads/ClipSync", rec.safe_name, size(rec.size));
+    if let Err(e) = crate::transfer::android::notify_received(&rec.id, &title, &text, uri, rec.mime.as_deref()) {
+        log::warn!("[NOTIFY] aviso de recebido falhou id={}: {e}", rec.id);
+    }
+}
+
+#[cfg(not(any(windows, target_os = "android")))]
 pub fn file_received(_app: &AppHandle, _rec: &TransferRecord) {}
 #[cfg(not(windows))]
 pub fn ask(_app: &AppHandle, _rec: &TransferRecord) {}

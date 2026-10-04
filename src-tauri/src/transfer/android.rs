@@ -148,6 +148,26 @@ pub fn notify_open_settings() -> Result<()> {
     })
 }
 
+/// "Arquivo recebido" com Abrir (`ReceivedNotifier`). `false` = não notificou (app na frente
+/// ou sem permissão).
+pub fn notify_received(id: &str, title: &str, text: &str, uri: &str, mime: Option<&str>) -> Result<bool> {
+    with_class("app.clipsync.desktop.transfer.ReceivedNotifier", |env, class, ctx| {
+        let (ji, jt, jx, ju) = (jstr(env, id)?, jstr(env, title)?, jstr(env, text)?, jstr(env, uri)?);
+        let jm = match mime {
+            Some(m) => jstr(env, m)?,
+            None => jni::objects::JString::from(jni::objects::JObject::null()),
+        };
+        env.call_static_method(
+            class,
+            "notify",
+            "(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;)Z",
+            &[JValue::Object(ctx), JValue::Object(&ji), JValue::Object(&jt), JValue::Object(&jx), JValue::Object(&ju), JValue::Object(&jm)],
+        )
+        .and_then(|v| v.z())
+        .map_err(|e| AppError::Other(format!("ReceivedNotifier.notify: {e}")))
+    })
+}
+
 /// Abre o seletor SAF (precisa da Activity). O resultado vem por [`take_pick_result`].
 pub fn pick_file() -> Result<bool> {
     with_class(FILE_BRIDGE, |env, class, ctx| {
