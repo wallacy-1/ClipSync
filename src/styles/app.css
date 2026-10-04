@@ -286,6 +286,8 @@ button { font-family: inherit; }
 .and-search { margin: 4px 18px 8px; display: flex; align-items: center; gap: 9px; background: var(--color-neutral-100); border: 1px solid var(--color-divider); border-radius: 999px; padding: 10px 15px; }
 .and-search input { flex: 1; border: 0; background: transparent; font: inherit; font-size: 14px; color: var(--color-text); min-width: 0; }
 .and-filters { display: flex; gap: 7px; padding: 0 18px 8px; overflow-x: auto; }
+/* O WebView do Android não suporta `scrollbar-width`. */
+.and-filters::-webkit-scrollbar { display: none; }
 .and-filters .chip { flex-shrink: 0; }
 
 /* folha inferior */
@@ -320,6 +322,8 @@ button { font-family: inherit; }
 
 .scan { flex: 1; display: flex; flex-direction: column; background: var(--color-neutral-900); color: var(--color-bg); }
 .scan.transparent { background: transparent; }
+/* A câmera é desenhada por trás da WebView: toda a cadeia até o scanner precisa ser transparente. */
+.and:has(.scan.transparent) { background: transparent; }
 .scan .head { padding: 16px 18px; display: flex; align-items: center; gap: 14px; }
 .scan .head button { background: transparent; border: 0; color: inherit; padding: 0; display: flex; }
 .scan .head .title { font-family: var(--font-heading); font-size: 21px; }
@@ -352,6 +356,9 @@ button { font-family: inherit; }
 .and-settings .setting-row:last-child { border-bottom: 0; }
 .and-settings .setting-row .label { font-size: 15px; }
 .and-settings .setting-row input.input { width: 45%; }
+/* Seletor não cabe ao lado do texto no celular: vai para a linha de baixo. */
+.and-settings .setting-row:has(> .select) { flex-wrap: wrap; row-gap: 10px; }
+.and-settings .setting-row:has(> .select) .info { flex-basis: 100%; }
 .and-settings .section-title { font-size: 11.5px; margin-bottom: 10px; }
 .and-settings .btn-secondary { height: 52px; font-weight: 700; font-size: 15px; }
 

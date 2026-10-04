@@ -121,7 +121,7 @@ function ScanView({ onBack, onManual }: { onBack: () => void; onManual: () => vo
         const ok = await run(() => api.pairWithPayload(raw));
         if (ok && alive.current) onBack();
       } catch (e) {
-        if (!cancelled) setError(String(e));
+        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
       } finally {
         if (!cancelled) setScanning(false);
       }
