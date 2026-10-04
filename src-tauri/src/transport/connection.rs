@@ -31,6 +31,38 @@ const PING_EVERY: Duration = Duration::from_secs(20);
 const IDLE_TIMEOUT: Duration = Duration::from_secs(70);
 
 /// Capabilities anunciadas no `Hello`.
+/// Identidade anunciada: o nome dos Ajustes vale sobre o da instalação.
+fn local_identity(state: &AppState) -> DeviceIdentity {
+    let me = state.identity.read().unwrap().summary();
+    let s = state.settings();
+    DeviceIdentity { name: if s.device_name.is_empty() { me.name.clone() } else { s.device_name }, ..me }
+}
+
+/// Renomeado: reenvia o `Hello` para quem já está conectado (peers antigos ignoram).
+pub fn announce_identity(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    let hello = Message::Hello { identity: local_identity(&state), caps: local_caps() };
+    let ids: Vec<String> = state.connections.lock().unwrap().keys().cloned().collect();
+    for id in ids {
+        state.send_to(&id, hello.clone());
+    }
+}
+
+fn on_identity_update(app: &AppHandle, device_id: &str, identity: DeviceIdentity) {
+    let state = app.state::<AppState>();
+    let Ok(Some(d)) = state.db.get_device(device_id) else { return };
+    if identity.device_id != device_id || identity.public_key != d.public_key || identity.name.trim().is_empty() {
+        return;
+    }
+    if identity.name == d.name && identity.platform == d.platform {
+        return;
+    }
+    log::info!("[DEVICE] Renamed id={device_id} name={:?}", identity.name);
+    if state.db.upsert_device(&StoredDevice { name: identity.name, platform: identity.platform, ..d }).is_ok() {
+        events::emit(app, events::DEVICE_UPDATED, state.devices());
+    }
+}
+
 fn local_caps() -> Vec<String> {
     // Transferência de arquivos: Windows e Android; iOS não é alvo.
     #[cfg(not(target_os = "ios"))]
@@ -202,14 +234,7 @@ async fn run_with_pairing_id(
     let mut chan = SecureChannel::new(stream, hs.transport);
 
     // 3. Autenticação: em sessão normal só aceitamos chave já pareada.
-    let me = state.identity.read().unwrap().summary();
-    let me = DeviceIdentity {
-        name: {
-            let s = state.settings();
-            if s.device_name.is_empty() { me.name.clone() } else { s.device_name }
-        },
-        ..me
-    };
+    let me = local_identity(&state);
     let peer_caps: Vec<String>;
     let stored: StoredDevice = match &mode {
         Mode::Session => {
@@ -329,7 +354,8 @@ async fn run_with_pairing_id(
                     Message::Ping => { let _ = chan.send(&Message::Pong).await; }
                     Message::Pong => {}
                     Message::Bye => break Ok(()),
-                    Message::Hello { .. } => {}
+                    // Hello no meio da sessão = o peer mudou de nome.
+                    Message::Hello { identity, .. } => on_identity_update(&app, &device_id, identity),
                     Message::Ack { id } => {
                         log::info!("[SYNC] Item acknowledged id={id} by={device_id}");
                         sync::on_ack(&app, &device_id, &id)

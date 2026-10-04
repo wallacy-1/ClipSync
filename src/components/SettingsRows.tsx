@@ -51,7 +51,7 @@ export function SyncRows() {
       <Row label="Nome deste dispositivo" help="Como ele aparece nos outros aparelhos">
         <input
           className="input"
-          value={name ?? s.deviceName ?? me?.name ?? ""}
+          value={name ?? (s.deviceName || me?.name || "")}
           onChange={(e) => setName(e.target.value)}
           onBlur={() => { if (name !== null && name.trim() && name !== s.deviceName) void save({ deviceName: name.trim() }); setName(null); }}
           onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}

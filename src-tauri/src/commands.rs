@@ -193,6 +193,7 @@ pub fn set_settings(app: AppHandle, state: State<'_, AppState>, settings: Settin
         identity::rename(&state.app_dir, &state.keystore, &id, &name)?;
         state.identity.write().unwrap().name = name;
         transport::reannounce(&app);
+        connection::announce_identity(&app);
     }
     events::emit(&app, events::SETTINGS_CHANGED, &settings);
     events::emit(&app, events::DEVICE_UPDATED, state.devices());
@@ -226,7 +227,11 @@ pub fn set_device_flags(
 
 #[tauri::command]
 pub fn rename_device(app: AppHandle, state: State<'_, AppState>, device_id: String, name: String) -> Result<Vec<Device>> {
-    state.db.rename_device(&device_id, name.trim())?;
+    let name = name.trim();
+    if name.is_empty() {
+        return Err(AppError::Other("nome do dispositivo vazio".into()));
+    }
+    state.db.rename_device(&device_id, name)?;
     let devices = state.devices();
     events::emit(&app, events::DEVICE_UPDATED, &devices);
     Ok(devices)
