@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Shield } from "../components/Icons";
-import { PrivacyRows, SyncRows } from "../components/SettingsRows";
+import { AboutRows, PrivacyRows, SyncRows } from "../components/SettingsRows";
 import { Confirm } from "../components/ui";
 import { useApp } from "../store/app";
 
@@ -26,6 +26,10 @@ export function SettingsView() {
           </div>
           <div>
             <button className="btn btn-secondary" onClick={() => setConfirm(true)}>Limpar histórico agora</button>
+          </div>
+          <div>
+            <div className="section-title">Sobre</div>
+            <AboutRows />
           </div>
         </div>
       </div>

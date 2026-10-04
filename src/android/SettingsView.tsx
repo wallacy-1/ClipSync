@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Keyboard as KeyboardIcon } from "../components/Icons";
-import { PrivacyRows, SyncRows } from "../components/SettingsRows";
+import { AboutRows, PrivacyRows, SyncRows } from "../components/SettingsRows";
 import { Confirm } from "../components/ui";
 import { useApp } from "../store/app";
 import { KeyboardView, imeState } from "./KeyboardView";
@@ -51,6 +51,10 @@ export function SettingsView({ initialSub }: { initialSub?: "keyboard" | null })
             <div className="group"><PrivacyRows /></div>
           </div>
           <button className="btn btn-secondary btn-block" onClick={() => setConfirm(true)}>Limpar histórico agora</button>
+          <div>
+            <div className="section-title">Sobre</div>
+            <div className="group"><AboutRows /></div>
+          </div>
         </div>
       </div>
       {confirm && (

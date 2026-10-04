@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { PLATFORM_LABEL } from "../lib/format";
+import { appVersion } from "../lib/ipc";
 import { useApp } from "../store/app";
 import { Toggle } from "./ui";
 
@@ -137,5 +139,16 @@ export function PrivacyRows() {
         </select>
       </Row>
     </>
+  );
+}
+
+export function AboutRows() {
+  const platform = useApp((st) => st.platform);
+  const [version, setVersion] = useState<string | null>(null);
+  useEffect(() => { void appVersion().then(setVersion).catch(() => setVersion("?")); }, []);
+  return (
+    <Row label="Versão" help={`ClipSync para ${PLATFORM_LABEL[platform] ?? platform}`}>
+      <span className="tag">{version ?? "…"}</span>
+    </Row>
   );
 }

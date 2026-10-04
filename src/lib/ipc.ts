@@ -31,6 +31,13 @@ async function ensureTauri() {
   tauriListen = event.listen;
 }
 
+/** Versão do app (`tauri.conf.json`); no navegador com mock, "dev". */
+export async function appVersion(): Promise<string> {
+  if (!inTauri) return "dev";
+  const { getVersion } = await import("@tauri-apps/api/app");
+  return getVersion();
+}
+
 async function call<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (inTauri) {
     await ensureTauri();
