@@ -67,7 +67,6 @@ pub struct Settings {
     /// Ocultar tokens/cartões e expirar em 2 min
     pub hide_sensitive: bool,
     pub sensitive_expire_minutes: u32,
-    pub excluded_apps: Vec<String>,
     /// Espelho da entrada no registro (`autostart.rs`), que é a fonte da verdade.
     pub launch_at_login: bool,
     /// A primeira execução já decidiu o padrão (ligado no build instalado).
@@ -107,7 +106,6 @@ impl Default for Settings {
             auto_expire_hours: 24,
             hide_sensitive: true,
             sensitive_expire_minutes: 2,
-            excluded_apps: vec!["Bitwarden".into(), "1Password".into()],
             launch_at_login: false,
             autostart_initialized: false,
             file_accept: "limit".into(),

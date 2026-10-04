@@ -45,7 +45,6 @@ pub fn sync_on_startup(app: &AppHandle) {
     }
 }
 
-/// Usuário mudou o ajuste.
 pub fn set(app: &AppHandle, enabled: bool) -> Result<()> {
     let launcher = app.autolaunch();
     if launcher.is_enabled().ok() == Some(enabled) {

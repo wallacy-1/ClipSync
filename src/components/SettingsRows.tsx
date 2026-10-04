@@ -120,9 +120,6 @@ export function SyncRows() {
 export function PrivacyRows() {
   const s = useApp((st) => st.settings)!;
   const save = useApp((st) => st.saveSettings);
-  const [editingApps, setEditingApps] = useState(false);
-  const [apps, setApps] = useState("");
-
   return (
     <>
       <Row label="Ignorar gerenciadores de senha" help="Não captura cópias marcadas como sensíveis pelo app de origem">
@@ -138,21 +135,6 @@ export function PrivacyRows() {
           <option value="hide">Ocultar</option>
           <option value="show">Mostrar</option>
         </select>
-      </Row>
-      <Row label="Apps excluídos" help={s.excludedApps.join(", ") || "nenhum"}>
-        {editingApps ? (
-          <input
-            className="input"
-            autoFocus
-            value={apps}
-            placeholder="Bitwarden, 1Password"
-            onChange={(e) => setApps(e.target.value)}
-            onBlur={() => { void save({ excludedApps: apps.split(",").map((a) => a.trim()).filter(Boolean) }); setEditingApps(false); }}
-            onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
-          />
-        ) : (
-          <button className="tag" onClick={() => { setApps(s.excludedApps.join(", ")); setEditingApps(true); }}>{s.excludedApps.length} apps</button>
-        )}
       </Row>
     </>
   );

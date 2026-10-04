@@ -34,7 +34,6 @@ const settings: Settings = {
   autoExpireHours: 24,
   hideSensitive: true,
   sensitiveExpireMinutes: 2,
-  excludedApps: ["Bitwarden", "1Password", "Banco do Brasil"],
   launchAtLogin: false,
 };
 

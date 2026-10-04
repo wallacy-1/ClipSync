@@ -63,7 +63,6 @@ export interface Settings {
   autoExpireHours: number;
   hideSensitive: boolean;
   sensitiveExpireMinutes: number;
-  excludedApps: string[];
   launchAtLogin: boolean;
   autostartInitialized: boolean;
 }
