@@ -154,6 +154,6 @@ Pixel 8a · **Android 17 / API 37** · x86_64).
 - Android: **Compartilhar → ClipSync** envia arquivos e texto de qualquer app (`docs/roadmap.md` § 1).
 - No Android, a leitura do clipboard só acontece com o app em primeiro plano (restrição do Android 10+); receber em segundo plano depende do processo estar vivo.
 - mDNS no Android: `MainActivity` adquire `MulticastLock` (API oficial); como fallback, o QR carrega os endereços do PC e o app reconecta pelo último endereço conhecido.
-- "Apps excluídos" é armazenado, mas a detecção por app de origem depende de API nativa ainda não ligada (STUB de configuração); a flag `ExcludeClipboardContentFromMonitorProcessing` do Windows já é respeitada (REAL).
+- Exclusão por app de origem não existe (o Android não expõe a origem); vale "Ignorar gerenciadores de senha", que respeita `ExcludeClipboardContentFromMonitorProcessing` (Windows) e `EXTRA_IS_SENSITIVE` (Android 13+).
 - Transporte só IPv4 (listener em `0.0.0.0`); IPv6 fica para depois.
 - Duas instâncias na mesma máquina compartilham o clipboard do Windows — ambas detectam cada cópia (isso serviu de teste de loop mais agressivo).

@@ -33,7 +33,7 @@ Legenda: **P1** muda a percepção de "funciona" · **P2** confiança e acabamen
 - `clipboard/files.rs` lê `CF_HDROP` (arboard `file_list`) quando o clipboard não tem texto e emite `clipboard:files`.
   **Nunca envia sozinho** (Ctrl+C de arquivo é quase sempre para colar em outra pasta): a UI oferece "Enviar para…" num
   cartão no canto da janela e no topo do painel rápido; um clique envia pela transferência (`transfer_send` por arquivo).
-- Pastas ficam de fora (avisado); no máximo 20 arquivos por oferta; conectados aparecem antes dos offline (fila).
+- Pastas entram e vão como `.zip` (item 10); no máximo 20 itens por oferta; conectados aparecem antes dos offline (fila).
 - A oferta some ao copiar outra coisa, ao dispensar, ao enviar ou depois de 10 min.
 - Validado: `SetFileDropList` com 2 PNGs + 1 pasta → oferta "2 arquivos copiados · 1 pasta fica de fora" → Android, SHA igual.
 - Limitação: com a janela fechada e sem notificação do Windows (item 5), a oferta só aparece ao abrir a janela/painel.
@@ -89,8 +89,25 @@ Legenda: **P1** muda a percepção de "funciona" · **P2** confiança e acabamen
 - Validado no emulador (Android 17): permissão revogada → banner "Permitir" → diálogo → "Não permitir" 2× → "Abrir ajustes" →
   configurações do app → ligar → volta com `granted` e o banner some.
 
-### 8. Notificação de "concluído" no Android — P3
-- Ao terminar um recebimento: notificação com "Abrir" (o FGS hoje some sem aviso ao concluir).
+### 8. Notificação de "concluído" no Android — P3 · feito (2026-10-03)
+- `transfer/ReceivedNotifier.kt`: canal "Arquivos recebidos"; notificação **Arquivo recebido de X · nome · tamanho ·
+  Downloads/ClipSync**; tocar abre o arquivo (`ACTION_VIEW` na URI do MediaStore com leitura concedida, via "Abrir com") e a
+  notificação some. Chamado por `notify::file_received` (mesmo ponto do toast do Windows).
+- Só com o app fora da frente (`ProcessLifecycleOwner`) e com a permissão do item 7; imagem do clipboard não notifica.
+- Sem botão "Abrir" separado: no Android tocar num botão de ação não remove a notificação (ficava a velha na gaveta).
+- Validado no emulador (Android 17): app em segundo plano, PC envia PNG → notificação postada → tocar → abre no Google Fotos e a
+  notificação some; com o app na frente, nenhuma notificação.
+
+### 10. Lacunas de uso — feito (2026-10-03)
+- "Apps excluídos" removido: o backend nunca usou e o Android não informa o app de origem.
+- "Limpar concluídas" apaga do banco (`transfer_clear_finished`; antes só escondia até reabrir) e existe também no Android.
+- Vários arquivos de uma vez: seletor múltiplo no PC e no Android (`EXTRA_ALLOW_MULTIPLE`) e arrastar vários para a janela.
+- Pastas (PC): "Enviar pasta", arrastar ou Ctrl+C no Explorer → `transfer/folder.rs` zipa em `<perfil>/folder-zips/<uuid>/<pasta>.zip`;
+  o zip some ao concluir/cancelar e, se falhar, fica para "Tentar de novo" até a próxima subida ou "Limpar concluídas".
+- Renomear o aparelho chega na hora a quem está conectado: `Hello` reenviado no meio da sessão (peers antigos ignoram).
+- Ajustes → Sobre mostra a versão.
+- Validado no emulador (Android 17) + PC: pasta → Android chega como zip válido e o temporário é apagado; 2 arquivos escolhidos
+  no seletor do Android → PC com SHA igual; rename nos dois sentidos sem reconectar; "Limpar concluídas" sobrevive a reabrir.
 
 ## Validação
 
