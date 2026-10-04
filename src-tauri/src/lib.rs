@@ -83,7 +83,6 @@ pub fn run() {
                 pairing: Mutex::new(None),
                 listen_port: AtomicU16::new(0),
                 last_error: Mutex::new(None),
-                revealed: Mutex::new(HashSet::new()),
                 transfers: Default::default(),
             });
 
@@ -153,7 +152,6 @@ pub fn run() {
             commands::set_settings,
             commands::list_devices,
             commands::set_device_flags,
-            commands::rename_device,
             commands::remove_device,
             commands::connect_device,
             commands::start_pairing,

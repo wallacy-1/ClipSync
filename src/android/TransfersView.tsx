@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { Bell, File, Shield, Transfers, Upload } from "../components/Icons";
 import { Avatar } from "../components/ui";
-import { deviceName, filesSummary, isClipImage, isTransferActive, percent, transferDetail, TRANSFER_LABEL, TRANSFER_TAG } from "../lib/format";
+import { filesSummary, isClipImage, isTransferActive, transferDetail, TRANSFER_LABEL, TRANSFER_TAG } from "../lib/format";
 import type { LocalFile, TransferRecord } from "../lib/types";
 import { useApp } from "../store/app";
-import { useFileTargets } from "../windows/SendFileDialog";
+import { useFileTargets, useTransferRow } from "../components/transfer";
 
 export function TransfersView() {
   const transfers = useApp((s) => s.transfers);
@@ -81,28 +81,8 @@ function NotifyBanner() {
 }
 
 function TransferCard({ t }: { t: TransferRecord }) {
-  const devices = useApp((s) => s.devices);
-  const selfId = useApp((s) => s.me?.deviceId ?? "");
-  const busy = useApp((s) => !!s.transferBusy[t.id]);
-  const asked = useApp((s) => s.asks.includes(t.id));
-  const accept = useApp((s) => s.acceptTransfer);
-  const decline = useApp((s) => s.declineTransfer);
-  const cancel = useApp((s) => s.cancelTransfer);
-  const resume = useApp((s) => s.resumeTransfer);
-  const open = useApp((s) => s.openTransfer);
-
-  const kind = t.state.kind;
-  const dev = deviceName(devices, t.deviceId, selfId);
-  const incoming = t.direction === "in";
-  const hasBar = ["transferring", "verifying", "waiting", "cancelled"].includes(kind);
-  const pct = kind === "verifying" ? 100 : percent(t);
-  const primary = isTransferActive(t)
-    ? (kind === "verifying" ? null : { label: busy ? "Cancelando…" : "Cancelar", run: () => cancel(t.id), disabled: busy })
-    : kind === "failed" && !incoming
-      ? { label: "Tentar de novo", run: () => resume(t.id), disabled: false }
-      : kind === "completed" && !isClipImage(t) // imagem do clipboard fica em disco privado: não abre por fora
-        ? { label: "Abrir", run: () => open(t.id), disabled: false }
-        : null;
+  // Imagem do clipboard fica em disco privado: não abre por fora.
+  const { kind, dev, incoming, hasBar, pct, primary, asked, accept, decline } = useTransferRow(t, !isClipImage(t));
 
   return (
     <div className="and-tr-card">
@@ -123,8 +103,8 @@ function TransferCard({ t }: { t: TransferRecord }) {
         <span className={`tr-detail${kind === "failed" ? " failed" : ""}`}>{transferDetail(t, dev)}</span>
         {asked ? (
           <div className="row-flex" style={{ gap: 6 }}>
-            <button className="btn btn-secondary" onClick={() => void decline(t.id)}>Recusar</button>
-            <button className="btn btn-primary" onClick={() => void accept(t.id)}>Aceitar</button>
+            <button className="btn btn-secondary" onClick={decline}>Recusar</button>
+            <button className="btn btn-primary" onClick={accept}>Aceitar</button>
           </div>
         ) : primary && <button className="btn btn-secondary" disabled={primary.disabled} onClick={primary.run}>{primary.label}</button>}
       </div>

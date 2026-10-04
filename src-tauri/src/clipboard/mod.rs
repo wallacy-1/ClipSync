@@ -5,7 +5,7 @@ use crate::content;
 use crate::db::content_hash;
 use crate::error::Result;
 use crate::events;
-use crate::models::{now_ms, ClipboardItem};
+use crate::models::{now_ms, ClipboardItem, SyncState};
 use crate::state::AppState;
 use crate::sync;
 use std::time::Duration;
@@ -131,7 +131,7 @@ fn new_item(state: &AppState, text: String) -> ClipboardItem {
         expires_at: sync::expiry_for(&settings, cls.is_sensitive, created_at),
         is_pinned: false,
         is_sensitive: cls.is_sensitive,
-        sync_state: "local".into(),
+        sync_state: SyncState::Local,
         metadata: serde_json::json!({}),
     }
 }

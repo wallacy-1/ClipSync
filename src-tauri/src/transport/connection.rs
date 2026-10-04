@@ -30,12 +30,9 @@ const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(15);
 const PING_EVERY: Duration = Duration::from_secs(20);
 const IDLE_TIMEOUT: Duration = Duration::from_secs(70);
 
-/// Capabilities anunciadas no `Hello`.
-/// Identidade anunciada: o nome dos Ajustes vale sobre o da instalação.
 fn local_identity(state: &AppState) -> DeviceIdentity {
     let me = state.identity.read().unwrap().summary();
-    let s = state.settings();
-    DeviceIdentity { name: if s.device_name.is_empty() { me.name.clone() } else { s.device_name }, ..me }
+    DeviceIdentity { name: state.display_name(), ..me }
 }
 
 /// Renomeado: reenvia o `Hello` para quem já está conectado (peers antigos ignoram).
@@ -144,6 +141,96 @@ pub async fn connect_pair(app: AppHandle, addr: String, pairing_id: Option<Strin
         .map_err(|_| AppError::Pairing("pareamento cancelado".into()))?
 }
 
+/// Sessão normal: a chave do handshake tem de ser de um device pareado e não bloqueado.
+/// Troca `Hello` e atualiza nome/plataforma se mudaram. Retorna o device e as caps do peer.
+async fn authenticate_session(
+    state: &AppState,
+    chan: &mut SecureChannel,
+    remote_pk_hex: &str,
+    remote_id: &str,
+    peer_addr: &str,
+) -> Result<(StoredDevice, Vec<String>)> {
+    let Some(d) = state.db.device_by_public_key(remote_pk_hex)? else {
+        log::warn!("[AUTH] Rejected unpaired device id={remote_id} from {peer_addr}");
+        let _ = chan.send(&Message::Bye).await;
+        return Err(AppError::Net("dispositivo não pareado".into()));
+    };
+    if d.blocked {
+        log::warn!("[AUTH] Rejected blocked device id={remote_id}");
+        let _ = chan.send(&Message::Bye).await;
+        return Err(AppError::Net("dispositivo bloqueado".into()));
+    }
+    chan.send(&Message::Hello { identity: local_identity(state), caps: local_caps() }).await?;
+    let caps = match tokio::time::timeout(HANDSHAKE_TIMEOUT, chan.recv()).await {
+        Ok(Ok(Message::Hello { identity, caps })) => {
+            if identity.name != d.name || identity.platform != d.platform {
+                state.db.upsert_device(&StoredDevice { name: identity.name, platform: identity.platform, ..d.clone() })?;
+            }
+            caps
+        }
+        _ => return Err(AppError::Net("hello inválido".into())),
+    };
+    let stored = state.db.get_device(&d.device_id)?.unwrap_or(d);
+    Ok((stored, caps))
+}
+
+/// Peer do handshake de pareamento: chave e id derivados do Noise, endereço discável.
+struct PairPeer<'a> {
+    remote_pk_hex: &'a str,
+    remote_id: &'a str,
+    dial_addr: Option<String>,
+}
+
+/// Pareamento: troca `Hello`, confere a identidade com a chave do handshake, grava o
+/// device como confiável e encerra a sessão de pareamento. Retorna o device e as caps.
+async fn complete_pairing(
+    app: &AppHandle,
+    chan: &mut SecureChannel,
+    peer: PairPeer<'_>,
+    role: Role,
+    pairing_id: Option<String>,
+    paired_tx: &mut Option<tokio::sync::oneshot::Sender<Result<DeviceIdentity>>>,
+) -> Result<(StoredDevice, Vec<String>)> {
+    let state = app.state::<AppState>();
+    chan.send(&Message::Hello { identity: local_identity(&state), caps: local_caps() }).await?;
+    let (identity, caps) = match tokio::time::timeout(HANDSHAKE_TIMEOUT, chan.recv()).await {
+        Ok(Ok(Message::Hello { identity, caps })) => (identity, caps),
+        _ => return Err(AppError::Pairing("código incorreto, expirado ou o outro dispositivo não respondeu".into())),
+    };
+    if identity.public_key != peer.remote_pk_hex || identity.device_id != peer.remote_id {
+        return Err(AppError::Pairing("identidade não confere com a chave do handshake".into()));
+    }
+    let d = StoredDevice {
+        device_id: peer.remote_id.to_string(),
+        name: identity.name.clone(),
+        platform: identity.platform.clone(),
+        public_key: peer.remote_pk_hex.to_string(),
+        auto_send: true,
+        auto_receive: true,
+        blocked: false,
+        last_seen: Some(now_ms()),
+        last_address: peer.dial_addr,
+        paired_at: now_ms(),
+    };
+    state.db.upsert_device(&d)?;
+    log::info!("[PAIRING] Pairing completed with id={} name={:?} platform={}", peer.remote_id, identity.name, identity.platform);
+    if let Role::Responder = role {
+        *state.pairing.lock().unwrap() = None;
+        if let Some(disc) = app.try_state::<super::TransportHandle>() {
+            let _ = disc.discovery.announce(&state, false);
+        }
+    }
+    events::emit(
+        app,
+        events::PAIRING_COMPLETED,
+        serde_json::json!({ "deviceId": peer.remote_id, "name": identity.name, "pairingId": pairing_id }),
+    );
+    if let Some(tx) = paired_tx.take() {
+        let _ = tx.send(Ok(identity));
+    }
+    Ok((d, caps))
+}
+
 pub async fn run(app: AppHandle, stream: TcpStream, role: Role, mode: Mode) -> Result<()> {
     run_with_pairing_id(app, stream, role, mode, None, &mut None).await
 }
@@ -234,74 +321,11 @@ async fn run_with_pairing_id(
     let mut chan = SecureChannel::new(stream, hs.transport);
 
     // 3. Autenticação: em sessão normal só aceitamos chave já pareada.
-    let me = local_identity(&state);
-    let peer_caps: Vec<String>;
-    let stored: StoredDevice = match &mode {
-        Mode::Session => {
-            let Some(d) = state.db.device_by_public_key(&remote_pk_hex)? else {
-                log::warn!("[AUTH] Rejected unpaired device id={remote_id} from {peer_addr}");
-                let _ = chan.send(&Message::Bye).await;
-                return Err(AppError::Net("dispositivo não pareado".into()));
-            };
-            if d.blocked {
-                log::warn!("[AUTH] Rejected blocked device id={remote_id}");
-                let _ = chan.send(&Message::Bye).await;
-                return Err(AppError::Net("dispositivo bloqueado".into()));
-            }
-            chan.send(&Message::Hello { identity: me.clone(), caps: local_caps() }).await?;
-            match tokio::time::timeout(HANDSHAKE_TIMEOUT, chan.recv()).await {
-                Ok(Ok(Message::Hello { identity, caps })) => {
-                    peer_caps = caps;
-                    if identity.name != d.name || identity.platform != d.platform {
-                        state.db.upsert_device(&StoredDevice { name: identity.name.clone(), platform: identity.platform.clone(), ..d.clone() })?;
-                    }
-                }
-                _ => return Err(AppError::Net("hello inválido".into())),
-            }
-            state.db.get_device(&d.device_id)?.unwrap_or(d)
-        }
+    let (stored, peer_caps) = match &mode {
+        Mode::Session => authenticate_session(&state, &mut chan, &remote_pk_hex, &remote_id, &peer_addr).await?,
         Mode::Pair { .. } => {
-            chan.send(&Message::Hello { identity: me.clone(), caps: local_caps() }).await?;
-            let identity = match tokio::time::timeout(HANDSHAKE_TIMEOUT, chan.recv()).await {
-                Ok(Ok(Message::Hello { identity, caps })) => {
-                    peer_caps = caps;
-                    identity
-                }
-                _ => return Err(AppError::Pairing("código incorreto, expirado ou o outro dispositivo não respondeu".into())),
-            };
-            if identity.public_key != remote_pk_hex || identity.device_id != remote_id {
-                return Err(AppError::Pairing("identidade não confere com a chave do handshake".into()));
-            }
-            let d = StoredDevice {
-                device_id: remote_id.clone(),
-                name: identity.name.clone(),
-                platform: identity.platform.clone(),
-                public_key: remote_pk_hex.clone(),
-                auto_send: true,
-                auto_receive: true,
-                blocked: false,
-                last_seen: Some(now_ms()),
-                last_address: dial_addr.clone(),
-                paired_at: now_ms(),
-            };
-            state.db.upsert_device(&d)?;
-            log::info!("[PAIRING] Pairing completed with id={} name={:?} platform={}", remote_id, identity.name, identity.platform);
-            // Sessão de pareamento consumida.
-            if let Role::Responder = role {
-                *state.pairing.lock().unwrap() = None;
-                if let Some(disc) = app.try_state::<super::TransportHandle>() {
-                    let _ = disc.discovery.announce(&state, false);
-                }
-            }
-            events::emit(
-                &app,
-                events::PAIRING_COMPLETED,
-                serde_json::json!({ "deviceId": remote_id, "name": identity.name, "pairingId": pairing_id }),
-            );
-            if let Some(tx) = paired_tx.take() {
-                let _ = tx.send(Ok(identity.clone()));
-            }
-            d
+            let peer = PairPeer { remote_pk_hex: &remote_pk_hex, remote_id: &remote_id, dial_addr: dial_addr.clone() };
+            complete_pairing(&app, &mut chan, peer, role, pairing_id, paired_tx).await?
         }
     };
 
@@ -313,7 +337,7 @@ async fn run_with_pairing_id(
         let mut conns = state.connections.lock().unwrap();
         if let Some(old) = conns.insert(
             stored.device_id.clone(),
-            ConnHandle { tx, data_tx, address: peer_addr.clone(), caps: peer_caps.clone(), conn_id },
+            ConnHandle { tx, data_tx, address: peer_addr.clone(), caps: peer_caps, conn_id },
         ) {
             let _ = old.tx.send(Message::Bye);
         }

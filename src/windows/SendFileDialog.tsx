@@ -1,48 +1,10 @@
 import { useEffect, useState } from "react";
 import { File, MonitorOff, Shield } from "../components/Icons";
+import { useFileTargets } from "../components/transfer";
 import { Avatar } from "../components/ui";
-import { PLATFORM_LABEL, filesSummary } from "../lib/format";
-import { api } from "../lib/ipc";
-import type { Device, LocalFile } from "../lib/types";
-import { usePeers, useApp } from "../store/app";
-
-export interface Target {
-  device: Device;
-  selectable: boolean;
-  /** Motivo de não estar disponível (esmaecido). */
-  cap: string | null;
-  detail: string;
-}
-
-/** Classifica os pares para envio de arquivo. Consulta `file-v1` de cada conectado. */
-export function useFileTargets(): { targets: Target[]; loading: boolean } {
-  const peers = usePeers();
-  const [supports, setSupports] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let alive = true;
-    const connected = peers.filter((d) => d.state === "connected");
-    Promise.all(connected.map((d) => api.transferPeerSupports(d.deviceId).catch(() => false))).then((res) => {
-      if (!alive) return;
-      const map: Record<string, boolean> = {};
-      connected.forEach((d, i) => { map[d.deviceId] = res[i]; });
-      setSupports(map);
-      setLoading(false);
-    });
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [peers.map((d) => `${d.deviceId}:${d.state}`).join(",")]);
-
-  const targets = peers.map<Target>((d) => {
-    const os = PLATFORM_LABEL[d.platform] ?? d.platform;
-    if (d.state === "blocked") return { device: d, selectable: false, cap: "Bloqueado", detail: `${os} · bloqueado` };
-    if (d.state !== "connected") return { device: d, selectable: false, cap: "Offline", detail: `${os} · offline` };
-    if (supports[d.deviceId] === false) return { device: d, selectable: false, cap: "Sem suporte", detail: `${os} · versão antiga do ClipSync` };
-    return { device: d, selectable: true, cap: null, detail: `${os} · conectado` };
-  });
-  return { targets, loading };
-}
+import { filesSummary } from "../lib/format";
+import type { LocalFile } from "../lib/types";
+import { useApp } from "../store/app";
 
 export function SendFileDialog({ files, onClose }: { files: LocalFile[]; onClose: () => void }) {
   const { targets, loading } = useFileTargets();

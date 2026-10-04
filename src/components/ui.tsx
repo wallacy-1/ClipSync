@@ -13,7 +13,6 @@ const STATE_CLASS: Record<SyncState, string> = {
   synced: "tag-synced",
   sending: "tag-sending",
   queued: "tag-queued",
-  failed: "tag-failed",
   local: "",
 };
 

@@ -252,10 +252,6 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
         : d);
       emit("device:updated", devices);
       return devices;
-    case "rename_device":
-      devices = devices.map((d) => (d.deviceId === args.deviceId ? { ...d, name: args.name as string } : d));
-      emit("device:updated", devices);
-      return devices;
     case "remove_device":
       devices = devices.filter((d) => d.deviceId !== args.deviceId);
       emit("device:updated", devices);

@@ -29,8 +29,7 @@ impl Discovery {
     /// pareamento aberta (usado pelo código digitado manualmente).
     pub fn announce(&self, state: &AppState, pairing: bool) -> anyhow::Result<()> {
         let id = state.identity.read().unwrap().clone();
-        let settings = state.settings();
-        let name = if settings.device_name.is_empty() { id.name.clone() } else { settings.device_name.clone() };
+        let name = state.display_name();
         let port = state.port();
         if port == 0 {
             return Ok(());

@@ -66,13 +66,21 @@ pub struct TransferManager {
 pub const RECEIVER_QUEUE_FRAMES: usize = 16;
 const PROGRESS_EVERY: Duration = Duration::from_millis(250);
 
-fn mgr(app: &AppHandle) -> tauri::State<'_, AppState> {
+fn app_state(app: &AppHandle) -> tauri::State<'_, AppState> {
     app.state::<AppState>()
+}
+
+fn percent(bytes_done: u64, size: u64) -> i32 {
+    if size == 0 {
+        100
+    } else {
+        ((bytes_done as u128 * 100) / size as u128) as i32
+    }
 }
 
 /// Erro = transição inválida (logada, estado intocado).
 pub fn apply(app: &AppHandle, id: &str, event: Event) -> Result<TransferRecord> {
-    let state = mgr(app);
+    let state = app_state(app);
     let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other(format!("transferência {id} não encontrada")))?;
     let next = transition(rec.direction, &rec.state, event.clone()).map_err(|e| {
         log::warn!("[FILE] {e} id={id}");
@@ -94,7 +102,7 @@ pub fn apply(app: &AppHandle, id: &str, event: Event) -> Result<TransferRecord> 
 }
 
 pub fn set_progress(app: &AppHandle, id: &str, bytes_done: u64, size: u64) {
-    let state = mgr(app);
+    let state = app_state(app);
     let _ = state.db.transfer_set_progress(id, bytes_done);
     let mut last = state.transfers.last_progress_emit.lock().unwrap();
     let now = Instant::now();
@@ -103,35 +111,29 @@ pub fn set_progress(app: &AppHandle, id: &str, bytes_done: u64, size: u64) {
         last.insert(id.to_string(), now);
         drop(last);
         events::emit(app, events::TRANSFER_PROGRESS, serde_json::json!({ "id": id, "bytesDone": bytes_done, "size": size }));
-        let (dir, name) = {
-            let map = state.transfers.active.lock().unwrap();
-            let dir = map.get(id).map(|a| a.direction);
-            (dir, String::new())
-        };
+        let dir = state.transfers.active.lock().unwrap().get(id).map(|a| a.direction);
         if let Some(dir) = dir {
-            let percent = if size == 0 { 100 } else { ((bytes_done as u128 * 100) / size as u128) as i32 };
-            let name = state.db.transfer_get(id).ok().flatten().map(|r| r.safe_name).unwrap_or(name);
-            fgs::on_progress(app, id, dir, &name, percent);
+            fgs::on_progress(app, id, dir, percent(bytes_done, size));
         }
     }
 }
 
 fn register(app: &AppHandle, id: &str, a: Active) {
     let dir = a.direction;
-    mgr(app).transfers.active.lock().unwrap().insert(id.to_string(), a);
+    app_state(app).transfers.active.lock().unwrap().insert(id.to_string(), a);
     fgs::on_active(app, id, dir, 0);
 }
 
 /// Chamado pela própria task ao terminar (qualquer motivo).
 pub fn unregister(app: &AppHandle, id: &str) {
     let remaining = {
-        let state = mgr(app);
+        let state = app_state(app);
         let mut map = state.transfers.active.lock().unwrap();
         map.remove(id);
         map.len()
     };
-    mgr(app).transfers.last_progress_emit.lock().unwrap().remove(id);
-    mgr(app).transfers.last_fgs_update.lock().unwrap().remove(id);
+    app_state(app).transfers.last_progress_emit.lock().unwrap().remove(id);
+    app_state(app).transfers.last_fgs_update.lock().unwrap().remove(id);
     if remaining == 0 {
         fgs::on_idle(app);
     }
@@ -145,7 +147,7 @@ mod fgs {
     pub fn on_active(app: &AppHandle, id: &str, dir: Direction, percent: i32) {
         #[cfg(target_os = "android")]
         {
-            let state = mgr(app);
+            let state = app_state(app);
             let name = state.db.transfer_get(id).ok().flatten().map(|r| r.safe_name).unwrap_or_default();
             let title = if dir == Direction::Out { "Enviando arquivo" } else { "Recebendo arquivo" };
             if !super::super::android::fgs_start(title, &name, percent, id) {
@@ -156,12 +158,12 @@ mod fgs {
         let _ = (app, id, dir, percent);
     }
 
-    pub fn on_progress(app: &AppHandle, id: &str, dir: Direction, name: &str, percent: i32) {
+    pub fn on_progress(app: &AppHandle, id: &str, dir: Direction, percent: i32) {
         #[cfg(target_os = "android")]
         {
             // ≤ 1 atualização/s: o NotificationService descarta acima de ~5/s por pacote.
             {
-                let state = mgr(app);
+                let state = app_state(app);
                 let mut last = state.transfers.last_fgs_update.lock().unwrap();
                 let now = Instant::now();
                 if last.get(id).map(|t| now.duration_since(*t) < Duration::from_secs(1)).unwrap_or(false) && percent < 100 {
@@ -169,11 +171,12 @@ mod fgs {
                 }
                 last.insert(id.to_string(), now);
             }
+            let name = app_state(app).db.transfer_get(id).ok().flatten().map(|r| r.safe_name).unwrap_or_default();
             let title = if dir == Direction::Out { "Enviando arquivo" } else { "Recebendo arquivo" };
             super::super::android::fgs_update(title, &format!("{name} · {percent}%"), percent, id);
         }
         #[cfg(not(target_os = "android"))]
-        let _ = (app, id, dir, name, percent);
+        let _ = (app, id, dir, percent);
     }
 
     pub fn on_idle(app: &AppHandle) {
@@ -193,7 +196,7 @@ pub fn fgs_retry_if_needed(app: &AppHandle) {
     #[cfg(target_os = "android")]
     {
         let first = {
-            let state = mgr(app);
+            let state = app_state(app);
             let map = state.transfers.active.lock().unwrap();
             map.iter().next().map(|(id, a)| (id.clone(), a.direction))
         };
@@ -201,27 +204,27 @@ pub fn fgs_retry_if_needed(app: &AppHandle) {
         if super::android::fgs_running() {
             return;
         }
-        let percent = mgr(app).db.transfer_get(&id).ok().flatten().map(|r| if r.size == 0 { 100 } else { ((r.bytes_done as u128 * 100) / r.size as u128) as i32 }).unwrap_or(0);
+        let pct = app_state(app).db.transfer_get(&id).ok().flatten().map(|r| percent(r.bytes_done, r.size)).unwrap_or(0);
         log::info!("[FILE] Activity em primeiro plano com transferência ativa sem FGS: tentando de novo id={id}");
-        fgs::on_active(app, &id, dir, percent);
+        fgs::on_active(app, &id, dir, pct);
     }
     #[cfg(not(target_os = "android"))]
     let _ = app;
 }
 
 fn is_active(app: &AppHandle, id: &str) -> bool {
-    mgr(app).transfers.active.lock().unwrap().contains_key(id)
+    app_state(app).transfers.active.lock().unwrap().contains_key(id)
 }
 
 fn ctl_of(app: &AppHandle, device_id: &str, id: &str) -> Option<mpsc::UnboundedSender<Ctl>> {
-    let state = mgr(app);
+    let state = app_state(app);
     let map = state.transfers.active.lock().unwrap();
     map.get(id).filter(|a| a.device_id == device_id).map(|a| a.ctl.clone())
 }
 
 /// Conexão atual com o device, se anuncia `file-v1`: `(conn_id, data_tx)`.
 fn file_conn(app: &AppHandle, device_id: &str) -> Option<(u64, mpsc::Sender<DataFrame>)> {
-    let state = mgr(app);
+    let state = app_state(app);
     let conns = state.connections.lock().unwrap();
     let c = conns.get(device_id)?;
     if !c.caps.iter().any(|x| x == CAP_FILE_V1) {
@@ -235,7 +238,7 @@ pub fn peer_supports_files(app: &AppHandle, device_id: &str) -> bool {
 }
 
 pub fn peer_has_cap(app: &AppHandle, device_id: &str, cap: &str) -> bool {
-    let state = mgr(app);
+    let state = app_state(app);
     let conns = state.connections.lock().unwrap();
     conns.get(device_id).map(|c| c.caps.iter().any(|x| x == cap)).unwrap_or(false)
 }
@@ -250,7 +253,7 @@ pub fn send_file(app: &AppHandle, device_id: &str, source_str: &str) -> Result<T
 /// [`send_file`] com finalidade: `Some("clipboard")` = imagem copiada (o peer põe no
 /// clipboard em vez de Downloads).
 pub fn send_file_with(app: &AppHandle, device_id: &str, source_str: &str, purpose: Option<&str>) -> Result<TransferRecord> {
-    let state = mgr(app);
+    let state = app_state(app);
     let dev = state.db.get_device(device_id)?.ok_or_else(|| AppError::Other("dispositivo não pareado".into()))?;
     if dev.blocked {
         return Err(AppError::Other("dispositivo bloqueado".into()));
@@ -292,7 +295,7 @@ pub fn list(app: &AppHandle, limit: u32) -> Result<Vec<TransferRecord>> {
 }
 
 pub fn clear_finished(app: &AppHandle) -> Result<u32> {
-    let n = mgr(app).db.transfer_clear_finished()?;
+    let n = app_state(app).db.transfer_clear_finished()?;
     log::info!("[FILE] Cleared finished count={n}");
     super::folder::purge(app);
     Ok(n)
@@ -300,7 +303,7 @@ pub fn clear_finished(app: &AppHandle) -> Result<u32> {
 
 /// Cancelamento local (usuário). Avisa o peer se houver conexão.
 pub fn cancel(app: &AppHandle, id: &str) -> Result<TransferRecord> {
-    let state = mgr(app);
+    let state = app_state(app);
     let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other("transferência não encontrada".into()))?;
     if rec.state.is_terminal() {
         return Ok(rec);
@@ -316,7 +319,7 @@ pub fn cancel(app: &AppHandle, id: &str) -> Result<TransferRecord> {
     }
     // Sem task (queued/waiting): resolve aqui.
     let rec = apply(app, id, Event::Cancel(CancelledBy::Local))?;
-    cleanup_part(app, &rec);
+    cleanup_part(&rec);
     let notified = state.send_to(&rec.device_id, Message::FileCancel { transfer_id: id.to_string(), reason: FileCancelReason::User });
     if !notified {
         // O peer pode ter um .part esperando por nós: avisamos quando reconectar.
@@ -328,7 +331,7 @@ pub fn cancel(app: &AppHandle, id: &str) -> Result<TransferRecord> {
 /// Recoloca na fila uma transferência de saída `waiting`/`failed`/`cancelled`
 /// (nova tentativa do zero quando terminal). Receptor não retoma por conta própria.
 pub fn resume(app: &AppHandle, id: &str) -> Result<TransferRecord> {
-    let state = mgr(app);
+    let state = app_state(app);
     let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other("transferência não encontrada".into()))?;
     if rec.direction != Direction::Out {
         return Err(AppError::Other("só o lado que envia pode retomar; o outro reoferece ao reconectar".into()));
@@ -356,7 +359,7 @@ pub fn resume(app: &AppHandle, id: &str) -> Result<TransferRecord> {
 /// Subida do processo: nada está em voo → `waiting`; expira/apaga o velho;
 /// remove `.part` órfãos.
 pub fn startup(app: &AppHandle) {
-    let state = mgr(app);
+    let state = app_state(app);
     match state.db.transfer_sweep_on_startup() {
         Ok(ids) if !ids.is_empty() => log::info!("[FILE] Startup sweep: {} transfer(s) → waiting", ids.len()),
         Err(e) => log::warn!("[FILE] sweep falhou: {e}"),
@@ -365,7 +368,7 @@ pub fn startup(app: &AppHandle) {
     match state.db.transfer_purge(now_ms()) {
         Ok((expired, deleted)) => {
             for t in &expired {
-                cleanup_part(app, t);
+                cleanup_part(t);
             }
             if !expired.is_empty() || deleted > 0 {
                 log::info!("[FILE] Purge: expired={} deleted={deleted}", expired.len());
@@ -397,7 +400,7 @@ pub fn startup(app: &AppHandle) {
 }
 
 pub fn on_connected(app: &AppHandle, device_id: &str) {
-    let state = mgr(app);
+    let state = app_state(app);
     if let Ok(ids) = state.db.transfer_take_pending_notify(device_id) {
         for id in ids {
             log::info!("[FILE] Notifying peer of cancel decided offline id={id} to={device_id}");
@@ -412,7 +415,7 @@ pub fn on_connected(app: &AppHandle, device_id: &str) {
 /// (substituição) não são tocadas.
 pub fn on_disconnected(app: &AppHandle, device_id: &str, conn_id: u64) {
     let ctls: Vec<mpsc::UnboundedSender<Ctl>> = {
-        let state = mgr(app);
+        let state = app_state(app);
         let map = state.transfers.active.lock().unwrap();
         map.values().filter(|a| a.device_id == device_id && a.conn_id == conn_id).map(|a| a.ctl.clone()).collect()
     };
@@ -425,12 +428,12 @@ pub fn on_disconnected(app: &AppHandle, device_id: &str, conn_id: u64) {
 /// conexão com `file-v1` e nenhuma saída ativa.
 pub fn kick(app: &AppHandle, device_id: &str) {
     let Some((conn_id, data_tx)) = file_conn(app, device_id) else {
-        if mgr(app).is_connected(device_id) {
+        if app_state(app).is_connected(device_id) {
             log::debug!("[FILE] peer {device_id} não anuncia {CAP_FILE_V1}; fila aguarda");
         }
         return;
     };
-    let state = mgr(app);
+    let state = app_state(app);
     {
         let map = state.transfers.active.lock().unwrap();
         if map.values().any(|a| a.device_id == device_id && a.direction == Direction::Out) {
@@ -482,11 +485,11 @@ fn on_remote_cancel(app: &AppHandle, device_id: &str, id: &str, reason: FileCanc
         let _ = tx.send(Ctl::Cancel(CancelledBy::Remote));
         return;
     }
-    let state = mgr(app);
+    let state = app_state(app);
     if let Ok(Some(rec)) = state.db.transfer_get_for_device(device_id, id) {
         if !rec.state.is_terminal() {
             if let Ok(rec) = apply(app, id, Event::Cancel(CancelledBy::Remote)) {
-                cleanup_part(app, &rec);
+                cleanup_part(&rec);
             }
         }
     }
@@ -494,13 +497,13 @@ fn on_remote_cancel(app: &AppHandle, device_id: &str, id: &str, reason: FileCanc
 
 fn reject(app: &AppHandle, device_id: &str, id: &str, reason: FileRejectReason) {
     log::info!("[FILE] Offer rejected id={id} from={device_id} reason={reason:?}");
-    mgr(app).send_to(device_id, Message::FileReject { transfer_id: id.to_string(), reason });
+    app_state(app).send_to(device_id, Message::FileReject { transfer_id: id.to_string(), reason });
 }
 
 /// `FileOffer` de um device pareado: valida, decide (auto-aceite por device), cria
 /// ou retoma a linha e sobe a task do receptor, que responde `FileAccept{offset}`.
 fn on_offer(app: &AppHandle, device_id: &str, conn_id: u64, offer: FileOffer) {
-    let state = mgr(app);
+    let state = app_state(app);
     let id = offer.transfer_id.clone();
     if uuid::Uuid::parse_str(&id).is_err() {
         return reject(app, device_id, &id, FileRejectReason::Protocol);
@@ -517,8 +520,7 @@ fn on_offer(app: &AppHandle, device_id: &str, conn_id: u64, offer: FileOffer) {
         }
         return reject(app, device_id, &id, FileRejectReason::Busy);
     }
-    if let Err(e) = validate_offer(offer.size, offer.chunk_size, offer.total_chunks) {
-        let reason = if e == "tooLarge" { FileRejectReason::TooLarge } else { FileRejectReason::Protocol };
+    if let Err(reason) = validate_offer(offer.size, offer.chunk_size, offer.total_chunks) {
         return reject(app, device_id, &id, reason);
     }
     if !file_conn(app, device_id).map(|(c, _)| c == conn_id).unwrap_or(false) {
@@ -637,7 +639,7 @@ enum Decision {
 /// Política de aceite (ver `Settings::file_accept`). Peer sem `file-ask-v1` desistiria em
 /// 30 s: para ele vale a regra antiga (aceita se "receber automático", senão recusa).
 fn decide(app: &AppHandle, dev: &StoredDevice, device_id: &str, id: &str, size: u64) -> Decision {
-    let state = mgr(app);
+    let state = app_state(app);
     if state.transfers.accepted.lock().unwrap().remove(id) {
         return Decision::Accept;
     }
@@ -664,7 +666,7 @@ fn policy(auto_ok: bool, mode: &str, limit_mb: u32, size: u64) -> Decision {
 
 /// Guarda a oferta e avisa a UI (`transfer:ask`). Sem resposta em `ASK_TTL_SECS`, recusa.
 fn ask(app: &AppHandle, p: PendingOffer) {
-    let state = mgr(app);
+    let state = app_state(app);
     let id = p.offer.transfer_id.clone();
     log::info!("[FILE] Asking user id={id} from={} name={:?} size={}", p.device_id, p.offer.name, p.offer.size);
     let fresh = state.transfers.asks.lock().unwrap().insert(id.clone(), p).is_none();
@@ -678,7 +680,7 @@ fn ask(app: &AppHandle, p: PendingOffer) {
         let app = app.clone();
         tauri::async_runtime::spawn(async move {
             tokio::time::sleep(Duration::from_secs(ASK_TTL_SECS)).await;
-            let open = mgr(&app).transfers.asks.lock().unwrap().contains_key(&id);
+            let open = app_state(&app).transfers.asks.lock().unwrap().contains_key(&id);
             if open {
                 log::info!("[FILE] Ask expired id={id}");
                 let _ = decline(&app, &id);
@@ -688,11 +690,11 @@ fn ask(app: &AppHandle, p: PendingOffer) {
 }
 
 fn take_ask(app: &AppHandle, id: &str) -> Option<PendingOffer> {
-    mgr(app).transfers.asks.lock().unwrap().remove(id)
+    app_state(app).transfers.asks.lock().unwrap().remove(id)
 }
 
 pub fn asks(app: &AppHandle) -> Vec<TransferRecord> {
-    let state = mgr(app);
+    let state = app_state(app);
     let ids: Vec<String> = state.transfers.asks.lock().unwrap().keys().cloned().collect();
     ids.iter().filter_map(|id| state.db.transfer_get(id).ok().flatten()).collect()
 }
@@ -704,7 +706,7 @@ pub fn accept(app: &AppHandle, id: &str) -> Result<()> {
     if file_conn(app, &p.device_id).map(|(c, _)| c == p.conn_id).unwrap_or(false) {
         start_receiver(app, p);
     } else {
-        mgr(app).transfers.accepted.lock().unwrap().insert(id.to_string());
+        app_state(app).transfers.accepted.lock().unwrap().insert(id.to_string());
     }
     Ok(())
 }
@@ -712,7 +714,7 @@ pub fn accept(app: &AppHandle, id: &str) -> Result<()> {
 /// Usuário recusou (ou o pedido expirou): `cancelled/local` aqui, `FileReject{Declined}` lá.
 pub fn decline(app: &AppHandle, id: &str) -> Result<TransferRecord> {
     let _ = take_ask(app, id);
-    mgr(app).transfers.accepted.lock().unwrap().remove(id);
+    app_state(app).transfers.accepted.lock().unwrap().remove(id);
     let rec = apply(app, id, Event::Decline)?;
     log::info!("[FILE] Declined by user id={id}");
     reject(app, &rec.device_id, id, FileRejectReason::Declined);
@@ -740,7 +742,7 @@ fn start_receiver(app: &AppHandle, p: PendingOffer) {
 pub async fn on_data(app: &AppHandle, device_id: &str, frame: DataFrame) {
     let id = transfer_id_string(&frame.transfer_id);
     let tx = {
-        let state = mgr(app);
+        let state = app_state(app);
         let map = state.transfers.active.lock().unwrap();
         map.get(&id).filter(|a| a.device_id == device_id).and_then(|a| a.frames.clone())
     };
@@ -755,8 +757,7 @@ pub async fn on_data(app: &AppHandle, device_id: &str, frame: DataFrame) {
 }
 
 /// Remove o `.part` de uma transferência (qualquer erro é ignorado).
-pub fn cleanup_part(app: &AppHandle, rec: &TransferRecord) {
-    let _ = app;
+pub fn cleanup_part(rec: &TransferRecord) {
     if let Some(p) = rec.temp_path.as_deref() {
         let _ = std::fs::remove_file(p);
     }
@@ -765,7 +766,7 @@ pub fn cleanup_part(app: &AppHandle, rec: &TransferRecord) {
 /// Revogação/bloqueio do device: cancela tudo (ativo ou na fila), apaga `.part`
 /// e, enquanto a conexão ainda existe, avisa o peer.
 pub fn cancel_all_for_device(app: &AppHandle, device_id: &str) {
-    let state = mgr(app);
+    let state = app_state(app);
     let open = state.db.transfer_open_for_device(device_id).unwrap_or_default();
     // Avisa o peer enquanto a conexão ainda existe (o chamador manda Bye em seguida).
     for rec in &open {
@@ -778,7 +779,7 @@ pub fn cancel_all_for_device(app: &AppHandle, device_id: &str) {
             continue;
         }
         if let Ok(rec) = apply(app, &rec.id, Event::Cancel(CancelledBy::System)) {
-            cleanup_part(app, &rec);
+            cleanup_part(&rec);
         }
     }
 }

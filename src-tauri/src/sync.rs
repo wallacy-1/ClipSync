@@ -2,7 +2,7 @@
 use crate::clipboard;
 use crate::db::content_hash;
 use crate::events;
-use crate::models::{now_ms, ClipboardItem};
+use crate::models::{now_ms, ClipboardItem, SyncState};
 use crate::state::AppState;
 use crate::transport::protocol::Message;
 use std::time::Duration;
@@ -35,19 +35,18 @@ fn dispatch(app: &AppHandle, item: &ClipboardItem, targets: &[String]) {
     let mut sent = 0;
     let mut queued = 0;
     for dev in targets {
-        let wire = ClipboardItem { sync_state: "synced".into(), ..item.clone() };
+        // Enviado ou não, fica na fila até o Ack para sobreviver a queda de conexão no meio.
+        let _ = state.db.enqueue(&item.id, dev);
+        let wire = ClipboardItem { sync_state: SyncState::Synced, ..item.clone() };
         if state.send_to(dev, Message::Clip { item: wire }) {
             log::info!("[SYNC] Item sent id={} type={} to={}", item.id, item.content_type.as_str(), dev);
             sent += 1;
-            // Fica na fila até o Ack para sobreviver a queda de conexão no meio.
-            let _ = state.db.enqueue(&item.id, dev);
         } else {
             log::info!("[SYNC] Item queued id={} type={} for={}", item.id, item.content_type.as_str(), dev);
             queued += 1;
-            let _ = state.db.enqueue(&item.id, dev);
         }
     }
-    let new_state = if queued > 0 { "queued" } else if sent > 0 { "sending" } else { "local" };
+    let new_state = if queued > 0 { SyncState::Queued } else if sent > 0 { SyncState::Sending } else { SyncState::Local };
     let _ = state.db.set_sync_state(&item.id, new_state);
     events::emit(
         app,
@@ -95,9 +94,9 @@ pub fn on_connected(app: &AppHandle, device_id: &str) {
                     let _ = state.db.dequeue(&item_id, device_id);
                     continue;
                 }
-                let wire = ClipboardItem { sync_state: "synced".into(), ..item };
+                let wire = ClipboardItem { sync_state: SyncState::Synced, ..item };
                 if state.send_to(device_id, Message::Clip { item: wire }) {
-                    let _ = state.db.set_sync_state(&item_id, "sending");
+                    let _ = state.db.set_sync_state(&item_id, SyncState::Sending);
                 }
             }
             _ => {
@@ -111,18 +110,10 @@ pub fn on_connected(app: &AppHandle, device_id: &str) {
 pub fn on_ack(app: &AppHandle, device_id: &str, item_id: &str) {
     let state = app.state::<AppState>();
     let _ = state.db.dequeue(item_id, device_id);
-    let remaining: u32 = state.db.outbox_counts().unwrap_or_default().values().sum();
-    let still_pending = state
-        .db
-        .list_devices()
-        .unwrap_or_default()
-        .iter()
-        .any(|d| state.db.outbox_for(&d.device_id).map(|v| v.iter().any(|i| i == item_id)).unwrap_or(false));
-    if !still_pending {
-        let _ = state.db.set_sync_state(item_id, "synced");
+    if !state.db.outbox_has_item(item_id).unwrap_or(true) {
+        let _ = state.db.set_sync_state(item_id, SyncState::Synced);
         events::emit(app, events::SYNC_COMPLETED, serde_json::json!({ "itemId": item_id }));
     }
-    let _ = remaining;
     events::emit(app, events::SYNC_STATE, state.sync_status());
 }
 
@@ -138,7 +129,7 @@ pub fn on_clip_received(app: &AppHandle, from_device_id: &str, mut item: Clipboa
     // O item mantém a origem verdadeira e nunca é reenviado daqui — isso, mais o
     // hash guardado ao escrever no clipboard, impede o ping-pong entre dispositivos.
     item.source_device_id = from_device_id.to_string();
-    item.sync_state = "synced".into();
+    item.sync_state = SyncState::Synced;
     item.is_pinned = false;
     // Expiração local segue as regras locais.
     item.expires_at = expiry_for(&settings, item.is_sensitive, item.created_at.max(now_ms()));
@@ -183,11 +174,6 @@ pub fn spawn_expiry_task(app: AppHandle) {
             let state = app.state::<AppState>();
             match state.db.purge_expired() {
                 Ok(ids) if !ids.is_empty() => {
-                    let mut revealed = state.revealed.lock().unwrap();
-                    for id in &ids {
-                        revealed.remove(id);
-                    }
-                    drop(revealed);
                     log::info!("[EXPIRY] Items expired count={}", ids.len());
                     events::emit(&app, events::CLIPBOARD_EXPIRED, serde_json::json!({ "ids": ids }));
                 }

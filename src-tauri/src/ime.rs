@@ -24,6 +24,7 @@ pub struct ImeStatus {
 }
 
 impl ImeStatus {
+    #[cfg_attr(target_os = "android", allow(dead_code))]
     fn unsupported() -> Self {
         Self { supported: false, enabled: false, selected: false, theme: "default".into(), themes: vec![] }
     }

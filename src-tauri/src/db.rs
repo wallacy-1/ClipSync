@@ -1,7 +1,7 @@
 //! Histórico local em SQLite. Cada dispositivo tem o seu; nada é central.
 use crate::content::ContentType;
 use crate::error::Result;
-use crate::models::{ClipboardItem, Device, DeviceState, Settings, now_ms};
+use crate::models::{now_ms, ClipboardItem, Device, DeviceState, Settings, SyncState};
 use rusqlite::{params, Connection, OptionalExtension, Row};
 use std::path::Path;
 use std::sync::Mutex;
@@ -94,7 +94,7 @@ fn row_to_item(r: &Row) -> rusqlite::Result<ClipboardItem> {
         expires_at: r.get("expires_at")?,
         is_pinned: r.get::<_, i64>("is_pinned")? != 0,
         is_sensitive: r.get::<_, i64>("is_sensitive")? != 0,
-        sync_state: r.get("sync_state")?,
+        sync_state: SyncState::parse(&r.get::<_, String>("sync_state")?),
         metadata: serde_json::from_str(&meta).unwrap_or(serde_json::json!({})),
     })
 }
@@ -186,7 +186,7 @@ impl Db {
                 it.expires_at,
                 it.is_pinned as i64,
                 it.is_sensitive as i64,
-                it.sync_state,
+                it.sync_state.as_str(),
                 it.metadata.to_string(),
             ],
         )?;
@@ -262,9 +262,9 @@ impl Db {
         Ok(())
     }
 
-    pub fn set_sync_state(&self, id: &str, state: &str) -> Result<()> {
+    pub fn set_sync_state(&self, id: &str, state: SyncState) -> Result<()> {
         let c = self.conn.lock().unwrap();
-        c.execute("UPDATE clipboard_items SET sync_state = ?2 WHERE id = ?1", params![id, state])?;
+        c.execute("UPDATE clipboard_items SET sync_state = ?2 WHERE id = ?1", params![id, state.as_str()])?;
         Ok(())
     }
 
@@ -383,12 +383,6 @@ impl Db {
         Ok(())
     }
 
-    pub fn rename_device(&self, id: &str, name: &str) -> Result<()> {
-        let c = self.conn.lock().unwrap();
-        c.execute("UPDATE devices SET name = ?2 WHERE device_id = ?1", params![id, name])?;
-        Ok(())
-    }
-
     /// Remove o dispositivo e revoga a confiança (chave pública deixa de ser aceita).
     pub fn remove_device(&self, id: &str) -> Result<()> {
         let c = self.conn.lock().unwrap();
@@ -417,6 +411,12 @@ impl Db {
         let mut st = c.prepare("SELECT item_id FROM outbox WHERE device_id = ?1 ORDER BY created_at ASC")?;
         let rows = st.query_map([device_id], |r| r.get(0))?;
         Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    /// O item ainda espera Ack de algum dispositivo.
+    pub fn outbox_has_item(&self, item_id: &str) -> Result<bool> {
+        let c = self.conn.lock().unwrap();
+        Ok(c.query_row("SELECT EXISTS(SELECT 1 FROM outbox WHERE item_id = ?1)", [item_id], |r| r.get(0))?)
     }
 
     pub fn outbox_counts(&self) -> Result<std::collections::HashMap<String, u32>> {
@@ -481,7 +481,7 @@ mod tests {
             expires_at,
             is_pinned: false,
             is_sensitive: false,
-            sync_state: "queued".into(),
+            sync_state: SyncState::Queued,
             metadata: serde_json::json!({}),
         }
     }
@@ -502,6 +502,12 @@ mod tests {
         assert_eq!(db.outbox_total().unwrap(), 2);
         db.dedupe_content(&content_hash("b"), "new").unwrap();
         assert_eq!(db.outbox_for("peer").unwrap(), vec!["new".to_string()]);
+        // Ack de um peer não conclui o item enquanto outro ainda espera.
+        db.enqueue("new", "peer2").unwrap();
+        db.dequeue("new", "peer").unwrap();
+        assert!(db.outbox_has_item("new").unwrap());
+        db.dequeue("new", "peer2").unwrap();
+        assert!(!db.outbox_has_item("new").unwrap());
         drop(db);
         let _ = std::fs::remove_dir_all(&dir);
     }

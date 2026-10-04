@@ -12,6 +12,9 @@ pub mod sender;
 pub mod source;
 pub mod state;
 pub mod store;
+
+use crate::transport::protocol::FileRejectReason;
+
 /// Unidade lógica de índice/ack/checkpoint (= 5 quadros Noise de ~60 KB).
 pub const CHUNK_SIZE: u32 = 256 * 1024;
 /// Chunks em voo sem `FileAck` antes de o emissor bloquear (2 MiB).
@@ -41,18 +44,19 @@ pub fn total_chunks(size: u64, chunk_size: u32) -> u32 {
 }
 
 /// Validação de um `FileOffer` recebido: coerência interna e limites locais.
-pub fn validate_offer(size: u64, chunk_size: u32, total_chunks_declared: u32) -> std::result::Result<(), &'static str> {
+/// O erro já é o motivo da recusa enviado ao peer.
+pub fn validate_offer(size: u64, chunk_size: u32, total_chunks_declared: u32) -> std::result::Result<(), FileRejectReason> {
     if chunk_size == 0 || chunk_size > 4 * CHUNK_SIZE {
-        return Err("chunk_size inválido");
+        return Err(FileRejectReason::Protocol);
     }
     if size > MAX_FILE_SIZE {
-        return Err("tooLarge");
+        return Err(FileRejectReason::TooLarge);
     }
     if total_chunks_declared != total_chunks(size, chunk_size) {
-        return Err("total_chunks não confere com size/chunk_size");
+        return Err(FileRejectReason::Protocol);
     }
     if total_chunks_declared > MAX_CHUNKS {
-        return Err("tooLarge");
+        return Err(FileRejectReason::TooLarge);
     }
     Ok(())
 }
@@ -75,9 +79,9 @@ mod tests {
     fn offer_validation() {
         assert!(validate_offer(1_000, CHUNK_SIZE, 1).is_ok());
         assert!(validate_offer(0, CHUNK_SIZE, 0).is_ok());
-        assert_eq!(validate_offer(1_000, CHUNK_SIZE, 2), Err("total_chunks não confere com size/chunk_size"));
-        assert_eq!(validate_offer(MAX_FILE_SIZE + 1, CHUNK_SIZE, MAX_CHUNKS + 1), Err("tooLarge"));
-        assert_eq!(validate_offer(1, 0, 1), Err("chunk_size inválido"));
-        assert_eq!(validate_offer(1, 8 * CHUNK_SIZE, 1), Err("chunk_size inválido"));
+        assert_eq!(validate_offer(1_000, CHUNK_SIZE, 2), Err(FileRejectReason::Protocol));
+        assert_eq!(validate_offer(MAX_FILE_SIZE + 1, CHUNK_SIZE, MAX_CHUNKS + 1), Err(FileRejectReason::TooLarge));
+        assert_eq!(validate_offer(1, 0, 1), Err(FileRejectReason::Protocol));
+        assert_eq!(validate_offer(1, 8 * CHUNK_SIZE, 1), Err(FileRejectReason::Protocol));
     }
 }

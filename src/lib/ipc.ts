@@ -78,7 +78,6 @@ export const api = {
   listDevices: () => call<Device[]>("list_devices"),
   setDeviceFlags: (deviceId: string, flags: { autoSend?: boolean; autoReceive?: boolean; blocked?: boolean }) =>
     call<Device[]>("set_device_flags", { deviceId, ...flags }),
-  renameDevice: (deviceId: string, name: string) => call<Device[]>("rename_device", { deviceId, name }),
   removeDevice: (deviceId: string) => call<Device[]>("remove_device", { deviceId }),
   connectDevice: (deviceId: string) => call<void>("connect_device", { deviceId }),
   startPairing: () => call<PairingInfo>("start_pairing"),

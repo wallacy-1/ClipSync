@@ -25,6 +25,7 @@ pub const SYNC_FAILED: &str = "sync:failed";
 pub const SYNC_STATE: &str = "sync:state";
 
 pub const SETTINGS_CHANGED: &str = "settings:changed";
+#[cfg_attr(any(target_os = "android", target_os = "ios"), allow(dead_code))]
 pub const TRAY_SHOWN: &str = "tray:shown";
 
 /// Transferência de arquivos: `TransferRecord` completo a cada mudança de estado.

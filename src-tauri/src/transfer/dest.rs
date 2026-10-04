@@ -7,6 +7,7 @@ use crate::error::{AppError, Result};
 use std::path::{Path, PathBuf};
 use tauri::{AppHandle, Manager};
 
+#[cfg_attr(target_os = "android", allow(dead_code))]
 pub const DEST_SUBDIR: &str = "ClipSync";
 pub const PART_SUBDIR: &str = ".part";
 pub const PART_EXT: &str = "part";

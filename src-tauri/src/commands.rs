@@ -30,15 +30,11 @@ pub struct Bootstrap {
 #[tauri::command]
 pub fn bootstrap(state: State<'_, AppState>) -> Result<Bootstrap> {
     let me = state.identity.read().unwrap().summary();
-    let settings = state.settings();
     let (total, pinned) = state.db.count_items()?;
     Ok(Bootstrap {
         platform: identity::current_platform(),
-        me: DeviceIdentity {
-            name: if settings.device_name.is_empty() { me.name.clone() } else { settings.device_name.clone() },
-            ..me
-        },
-        settings,
+        me: DeviceIdentity { name: state.display_name(), ..me },
+        settings: state.settings(),
         devices: state.devices(),
         items: state.db.list_items(&ItemFilter { limit: 200, ..Default::default() })?,
         sync: state.sync_status(),
@@ -116,7 +112,6 @@ pub fn reveal_item(state: State<'_, AppState>, id: String) -> Result<String> {
     let Some(item) = state.db.get_item(&id)? else {
         return Err(AppError::Other("item não encontrado".into()));
     };
-    state.revealed.lock().unwrap().insert(id);
     Ok(item.content)
 }
 
@@ -184,11 +179,7 @@ pub fn set_settings(app: AppHandle, state: State<'_, AppState>, settings: Settin
     state.db.save_settings(&settings)?;
     *state.settings.write().unwrap() = settings.clone();
     if old.device_name != settings.device_name {
-        let name = if settings.device_name.trim().is_empty() {
-            state.identity.read().unwrap().name.clone()
-        } else {
-            settings.device_name.trim().to_string()
-        };
+        let name = state.display_name();
         let id = state.identity.read().unwrap().clone();
         identity::rename(&state.app_dir, &state.keystore, &id, &name)?;
         state.identity.write().unwrap().name = name;
@@ -220,18 +211,6 @@ pub fn set_device_flags(
         crate::transfer::manager::cancel_all_for_device(&app, &device_id);
         state.send_to(&device_id, crate::transport::protocol::Message::Bye);
     }
-    let devices = state.devices();
-    events::emit(&app, events::DEVICE_UPDATED, &devices);
-    Ok(devices)
-}
-
-#[tauri::command]
-pub fn rename_device(app: AppHandle, state: State<'_, AppState>, device_id: String, name: String) -> Result<Vec<Device>> {
-    let name = name.trim();
-    if name.is_empty() {
-        return Err(AppError::Other("nome do dispositivo vazio".into()));
-    }
-    state.db.rename_device(&device_id, name)?;
     let devices = state.devices();
     events::emit(&app, events::DEVICE_UPDATED, &devices);
     Ok(devices)
@@ -272,12 +251,11 @@ pub struct PairingInfo {
 pub fn start_pairing(app: AppHandle, state: State<'_, AppState>) -> Result<PairingInfo> {
     let session = pairing::PairingSession::new();
     let me = state.identity.read().unwrap().summary();
-    let settings = state.settings();
     let payload = pairing::PairingPayload {
         v: 1,
         pairing_id: session.id.clone(),
         device_id: me.device_id.clone(),
-        name: if settings.device_name.is_empty() { me.name.clone() } else { settings.device_name.clone() },
+        name: state.display_name(),
         platform: me.platform.clone(),
         public_key: me.public_key.clone(),
         addrs: transport::local_addrs(),
@@ -488,7 +466,7 @@ pub async fn transfer_pick_file(app: AppHandle, folder: Option<bool>) -> Result<
         }
         Err(AppError::Other("seletor não respondeu".into()))
     }
-    #[cfg(all(not(target_os = "android"), target_os = "ios"))]
+    #[cfg(target_os = "ios")]
     {
         let _ = (app, folder);
         Err(AppError::Other("seletor de arquivos indisponível nesta plataforma".into()))
@@ -542,9 +520,10 @@ pub(crate) fn open_transfer(app: &AppHandle, id: &str, reveal: bool) -> Result<(
 
 /// Caminho abrível de uma transferência: destino final (recebida) ou origem (enviada).
 fn transfer_target(app: &AppHandle, id: &str) -> Result<String> {
-    let rec = crate::transfer::manager::list(app, 1000)?
-        .into_iter()
-        .find(|t| t.id == id)
+    let rec = app
+        .state::<AppState>()
+        .db
+        .transfer_get(id)?
         .ok_or_else(|| AppError::Other("transferência não encontrada".into()))?;
     if !matches!(rec.state, crate::transfer::state::TransferState::Completed) {
         return Err(AppError::Other("a transferência ainda não terminou".into()));

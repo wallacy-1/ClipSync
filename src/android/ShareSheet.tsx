@@ -3,7 +3,7 @@ import { Shield } from "../components/Icons";
 import { Avatar } from "../components/ui";
 import { bytes, pluralize } from "../lib/format";
 import { useApp } from "../store/app";
-import { useFileTargets } from "../windows/SendFileDialog";
+import { useFileTargets } from "../components/transfer";
 
 /** "Compartilhar → ClipSync": escolher para qual dispositivo vai o que outro app compartilhou. */
 export function ShareSheet() {

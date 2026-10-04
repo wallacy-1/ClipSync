@@ -1,5 +1,5 @@
 export type ContentType = "text" | "link" | "code" | "command" | "email" | "token" | "card";
-export type SyncState = "synced" | "sending" | "queued" | "failed" | "local";
+export type SyncState = "synced" | "sending" | "queued" | "local";
 export type DeviceState =
   | "discovered"
   | "pairing"

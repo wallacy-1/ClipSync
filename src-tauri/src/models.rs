@@ -13,9 +13,40 @@ pub struct ClipboardItem {
     pub expires_at: Option<i64>,
     pub is_pinned: bool,
     pub is_sensitive: bool,
-    /// Estado de sincronização local: synced | sending | queued | failed | local
-    pub sync_state: String,
+    pub sync_state: SyncState,
     pub metadata: serde_json::Value,
+}
+
+/// Estado de sincronização local do item. Vai no fio dentro de `Clip`, mas o receptor
+/// sempre sobrescreve; `other` só protege contra valor desconhecido de outra versão.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum SyncState {
+    Sending,
+    Queued,
+    Synced,
+    #[serde(other)]
+    Local,
+}
+
+impl SyncState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            SyncState::Local => "local",
+            SyncState::Sending => "sending",
+            SyncState::Queued => "queued",
+            SyncState::Synced => "synced",
+        }
+    }
+
+    pub fn parse(s: &str) -> Self {
+        match s {
+            "sending" => SyncState::Sending,
+            "queued" => SyncState::Queued,
+            "synced" => SyncState::Synced,
+            _ => SyncState::Local,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]

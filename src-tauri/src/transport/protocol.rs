@@ -450,7 +450,7 @@ mod tests {
                 expires_at: None,
                 is_pinned: false,
                 is_sensitive: false,
-                sync_state: "local".into(),
+                sync_state: crate::models::SyncState::Local,
                 metadata: serde_json::json!({}),
             },
         };

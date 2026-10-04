@@ -14,7 +14,6 @@ export const STATE_LABEL: Record<SyncState, string> = {
   synced: "Sincronizado",
   sending: "Enviando",
   queued: "Na fila",
-  failed: "Falhou",
   local: "Local",
 };
 

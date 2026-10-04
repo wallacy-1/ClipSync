@@ -1,7 +1,7 @@
 import { File } from "../components/Icons";
 import { filesSummary } from "../lib/format";
 import { useApp } from "../store/app";
-import { useFileTargets } from "./SendFileDialog";
+import { useFileTargets } from "../components/transfer";
 
 /** A oferta some sozinha depois disso: o Ctrl+C provavelmente já virou um Ctrl+V em outra pasta. */
 const OFFER_TTL_MS = 10 * 60 * 1000;

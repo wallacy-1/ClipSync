@@ -55,7 +55,6 @@ pub struct AppState {
     pub pairing: Mutex<Option<PairingSession>>,
     pub listen_port: AtomicU16,
     pub last_error: Mutex<Option<String>>,
-    pub revealed: Mutex<std::collections::HashSet<String>>,
     /// Transferências de arquivo ativas (tasks) e throttle de progresso.
     pub transfers: crate::transfer::manager::TransferManager,
 }
@@ -67,6 +66,16 @@ impl AppState {
 
     pub fn settings(&self) -> Settings {
         self.settings.read().unwrap().clone()
+    }
+
+    /// Nome exibido e anunciado: o dos Ajustes vale sobre o da instalação.
+    pub fn display_name(&self) -> String {
+        let custom = self.settings.read().unwrap().device_name.trim().to_string();
+        if custom.is_empty() {
+            self.identity.read().unwrap().name.clone()
+        } else {
+            custom
+        }
     }
 
     pub fn is_paused(&self) -> bool {
@@ -121,7 +130,7 @@ impl AppState {
         let settings = self.settings();
         let mut out = vec![Device {
             device_id: me.device_id.clone(),
-            name: if settings.device_name.is_empty() { me.name.clone() } else { settings.device_name.clone() },
+            name: self.display_name(),
             platform: me.platform.clone(),
             public_key: me.public_key_hex(),
             state: DeviceState::Connected,
