@@ -200,6 +200,7 @@ impl Db {
             "DELETE FROM clipboard_items WHERE content_hash = ?1 AND id != ?2 AND is_pinned = 0",
             params![hash, keep_id],
         )?;
+        c.execute("DELETE FROM outbox WHERE item_id NOT IN (SELECT id FROM clipboard_items)", [])?;
         Ok(())
     }
 
@@ -301,6 +302,8 @@ impl Db {
                 [now],
             )?;
         }
+        // Fila de envio de item expirado nunca sai: sem isto o "N na fila" cresce para sempre.
+        c.execute("DELETE FROM outbox WHERE item_id NOT IN (SELECT id FROM clipboard_items)", [])?;
         Ok(ids)
     }
 
@@ -459,5 +462,47 @@ impl Db {
             params![key, value],
         )?;
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::content::ContentType;
+    use crate::models::now_ms;
+
+    fn item(id: &str, content: &str, expires_at: Option<i64>) -> ClipboardItem {
+        ClipboardItem {
+            id: id.into(),
+            content: content.into(),
+            content_type: ContentType::Text,
+            source_device_id: "me".into(),
+            created_at: now_ms(),
+            expires_at,
+            is_pinned: false,
+            is_sensitive: false,
+            sync_state: "queued".into(),
+            metadata: serde_json::json!({}),
+        }
+    }
+
+    #[test]
+    fn removed_items_leave_no_outbox_rows() {
+        let dir = std::env::temp_dir().join(format!("clipsync-db-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let db = Db::open(&dir).unwrap();
+        db.insert_item(&item("old", "a", Some(now_ms() - 1))).unwrap();
+        db.insert_item(&item("dup", "b", None)).unwrap();
+        db.insert_item(&item("new", "b", None)).unwrap();
+        for id in ["old", "dup", "new"] {
+            db.enqueue(id, "peer").unwrap();
+        }
+        assert_eq!(db.outbox_total().unwrap(), 3);
+        db.purge_expired().unwrap();
+        assert_eq!(db.outbox_total().unwrap(), 2);
+        db.dedupe_content(&content_hash("b"), "new").unwrap();
+        assert_eq!(db.outbox_for("peer").unwrap(), vec!["new".to_string()]);
+        drop(db);
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }
