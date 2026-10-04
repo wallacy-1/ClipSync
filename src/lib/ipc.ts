@@ -101,6 +101,7 @@ export const api = {
   transferDecline: (id: string) => call<TransferRecord>("transfer_decline", { id }),
   transferPickFile: (folder = false) => call<PickedFiles>("transfer_pick_file", { folder }),
   transferClearFinished: () => call<number>("transfer_clear_finished"),
+  transferRemove: (id: string) => call<void>("transfer_remove", { id }),
   transferPeerSupports: (deviceId: string) => call<boolean>("transfer_peer_supports", { deviceId }),
   transferOpen: (id: string) => call<void>("transfer_open", { id }),
   transferReveal: (id: string) => call<void>("transfer_reveal", { id }),

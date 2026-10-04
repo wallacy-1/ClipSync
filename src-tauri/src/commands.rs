@@ -423,6 +423,11 @@ pub fn transfer_clear_finished(app: AppHandle) -> Result<u32> {
 }
 
 #[tauri::command]
+pub fn transfer_remove(app: AppHandle, id: String) -> Result<()> {
+    crate::transfer::manager::remove(&app, &id)
+}
+
+#[tauri::command]
 pub fn transfer_cancel(app: AppHandle, id: String) -> Result<crate::transfer::store::TransferRecord> {
     crate::transfer::manager::cancel(&app, &id)
 }
@@ -528,9 +533,14 @@ fn transfer_target(app: &AppHandle, id: &str) -> Result<String> {
     if !matches!(rec.state, crate::transfer::state::TransferState::Completed) {
         return Err(AppError::Other("a transferência ainda não terminou".into()));
     }
-    rec.final_path
-        .or(rec.source)
-        .ok_or_else(|| AppError::Other("arquivo não está mais disponível".into()))
+    let gone = || AppError::Other("o arquivo não está mais disponível".into());
+    let target = rec.final_path.or(rec.source).ok_or_else(gone)?;
+    // Movido/apagado depois, ou zip temporário de pasta (some ao terminar o envio).
+    // `content://` (Android) não é caminho: quem abre é que valida.
+    if !target.contains("://") && !std::path::Path::new(&target).exists() {
+        return Err(gone());
+    }
+    Ok(target)
 }
 
 /// "Compartilhar → ClipSync" (Android): `{files:[{uri,name,size,mime}], text}` pendente,

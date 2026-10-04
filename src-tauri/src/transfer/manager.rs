@@ -291,7 +291,22 @@ pub fn send_file_with(app: &AppHandle, device_id: &str, source_str: &str, purpos
 }
 
 pub fn list(app: &AppHandle, limit: u32) -> Result<Vec<TransferRecord>> {
-    mgr(app).db.transfer_list(limit)
+    app_state(app).db.transfer_list(limit)
+}
+
+/// Tira uma transferência terminada da lista; o arquivo recebido fica.
+pub fn remove(app: &AppHandle, id: &str) -> Result<()> {
+    let state = app_state(app);
+    let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other("transferência não encontrada".into()))?;
+    if !rec.state.is_terminal() {
+        return Err(AppError::Other("a transferência ainda não terminou".into()));
+    }
+    state.db.transfer_delete(id)?;
+    // Falha mantém o zip da pasta para retomar; sem a linha, não há mais retomada.
+    if let Some(src) = rec.source.as_deref() {
+        super::folder::release(app, src);
+    }
+    Ok(())
 }
 
 pub fn clear_finished(app: &AppHandle) -> Result<u32> {
@@ -546,6 +561,14 @@ fn on_offer(app: &AppHandle, device_id: &str, conn_id: u64, offer: FileOffer) {
         // Id conhecido mas de outro device: nunca.
         Some(r) if r.device_id != device_id => return reject(app, device_id, &id, FileRejectReason::Protocol),
         Some(r) if r.direction != Direction::In => return reject(app, device_id, &id, FileRejectReason::Protocol),
+        // "Tentar de novo" no emissor depois de cancelada/falha aqui: recomeça do zero
+        // (passa de novo pela política de aceite). Concluída não se repete.
+        Some(r) if matches!(r.state, TransferState::Cancelled { .. } | TransferState::Failed { .. }) => {
+            if state.db.transfer_delete(&id).is_err() {
+                return reject(app, device_id, &id, FileRejectReason::Protocol);
+            }
+            None
+        }
         Some(r) if r.state.is_terminal() => return reject(app, device_id, &id, FileRejectReason::Unknown),
         Some(r) => {
             // Retomada: a oferta tem de descrever o mesmo arquivo.

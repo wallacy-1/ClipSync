@@ -56,7 +56,6 @@ interface AppStore {
   transfersLoaded: boolean;
   /** Linhas ocupadas ("Cancelando…") até o evento de estado chegar. */
   transferBusy: Record<string, true>;
-  /** Arquivo escolhido aguardando destino (diálogo/folha "escolher destino"). */
   /** Escolhidos (seletor ou arrastar) esperando o destino. */
   pendingFiles: LocalFile[] | null;
   /** "Compartilhar → ClipSync" aguardando destino (Android). */
@@ -106,6 +105,7 @@ interface AppStore {
   resumeTransfer: (id: string) => Promise<void>;
   openTransfer: (id: string) => Promise<void>;
   revealTransfer: (id: string) => Promise<void>;
+  removeTransfer: (id: string) => Promise<void>;
   clearFinishedTransfers: () => Promise<void>;
   checkShare: () => Promise<void>;
   sendShare: (deviceId: string) => Promise<void>;
@@ -122,6 +122,16 @@ interface AppStore {
 let toastSeq = 0;
 let initStarted = false;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+
+/** Roda `fn`; erro vira toast. */
+async function guarded<T>(fn: () => Promise<T>): Promise<T | undefined> {
+  try {
+    return await fn();
+  } catch (e) {
+    useApp.getState().showToast(String(e), "error");
+    return undefined;
+  }
+}
 
 function upsertItem(list: ClipboardItem[], it: ClipboardItem) {
   const rest = list.filter((x) => x.id !== it.id && x.content !== it.content);
@@ -366,36 +376,24 @@ export const useApp = create<AppStore>((set, get) => ({
     }
   },
   async setImeTheme(theme) {
-    try {
-      set({ ime: await api.imeSetTheme(theme) });
-    } catch (e) {
-      get().showToast(String(e), "error");
-    }
+    await guarded(async () => set({ ime: await api.imeSetTheme(theme) }));
   },
   async openImeSettings() {
-    try { await api.imeOpenSettings(); } catch (e) { get().showToast(String(e), "error"); }
+    await guarded(api.imeOpenSettings);
     // O seletor/Configurações são do sistema: re-lê o estado quando o usuário voltar (e um pouco depois).
     setTimeout(() => void get().refreshIme(), 1500);
   },
   async showImePicker() {
-    try { await api.imeShowPicker(); } catch (e) { get().showToast(String(e), "error"); }
+    await guarded(api.imeShowPicker);
     setTimeout(() => void get().refreshIme(), 1500);
   },
   async refreshTransfers() {
-    try {
-      set({ transfers: await api.transferList(200), transfersLoaded: true });
-    } catch (e) {
-      get().showToast(String(e), "error");
-    }
+    await guarded(async () => set({ transfers: await api.transferList(200), transfersLoaded: true }));
   },
   async pickFile(folder = false) {
-    try {
-      const picked = await api.transferPickFile(folder);
-      if (picked.cancelled || picked.files.length === 0) return;
-      set({ pendingFiles: picked.files.map((f) => ({ path: f.uri, name: f.name, size: f.size, dir: f.dir })) });
-    } catch (e) {
-      get().showToast(String(e), "error");
-    }
+    const picked = await guarded(() => api.transferPickFile(folder));
+    if (!picked || picked.cancelled || picked.files.length === 0) return;
+    set({ pendingFiles: picked.files.map((f) => ({ path: f.uri, name: f.name, size: f.size, dir: f.dir })) });
   },
   setPendingFiles: (pendingFiles) => set({ pendingFiles }),
   async sendFiles(deviceId, files) {
@@ -429,35 +427,31 @@ export const useApp = create<AppStore>((set, get) => ({
     }
   },
   async resumeTransfer(id) {
-    try {
-      const rec = await api.transferResume(id);
-      set((s) => ({ transfers: [rec, ...s.transfers.filter((t) => t.id !== rec.id && t.id !== id)] }));
-    } catch (e) {
-      get().showToast(String(e), "error");
-    }
+    const rec = await guarded(() => api.transferResume(id));
+    if (rec) set((s) => ({ transfers: [rec, ...s.transfers.filter((t) => t.id !== rec.id && t.id !== id)] }));
   },
   async openTransfer(id) {
-    try { await api.transferOpen(id); } catch (e) { get().showToast(String(e), "error"); }
+    await guarded(() => api.transferOpen(id));
   },
   async revealTransfer(id) {
-    try { await api.transferReveal(id); } catch (e) { get().showToast(String(e), "error"); }
+    await guarded(() => api.transferReveal(id));
+  },
+  async removeTransfer(id) {
+    await guarded(async () => {
+      await api.transferRemove(id);
+      set((s) => ({ transfers: s.transfers.filter((t) => t.id !== id) }));
+    });
   },
   async clearFinishedTransfers() {
-    try {
+    await guarded(async () => {
       await api.transferClearFinished();
       set((s) => ({ transfers: s.transfers.filter(isTransferActive) }));
-    } catch (e) {
-      get().showToast(String(e), "error");
-    }
+    });
   },
 
   async checkShare() {
-    try {
-      const share = await api.shareTake();
-      if (share && (share.files.length > 0 || share.text)) set({ pendingShare: share });
-    } catch (e) {
-      get().showToast(String(e), "error");
-    }
+    const share = await guarded(api.shareTake);
+    if (share && (share.files.length > 0 || share.text)) set({ pendingShare: share });
   },
   async sendShare(deviceId) {
     const share = get().pendingShare;
@@ -493,22 +487,18 @@ export const useApp = create<AppStore>((set, get) => ({
   async requestNotifyPerm() {
     const cur = get().notifyPerm;
     if (cur !== "prompt" && cur !== "blocked") return;
-    try { await api.notifyPermissionRequest(cur === "blocked"); } catch (e) { get().showToast(String(e), "error"); }
+    await guarded(() => api.notifyPermissionRequest(cur === "blocked"));
     // O diálogo/Configurações são do sistema: relê ao voltar (visibilitychange) e um pouco depois.
     setTimeout(() => void get().refreshNotifyPerm(), 1500);
   },
   async acceptTransfer(id) {
     set((s) => ({ asks: s.asks.filter((x) => x !== id) }));
-    try { await api.transferAccept(id); } catch (e) { get().showToast(String(e), "error"); }
+    await guarded(() => api.transferAccept(id));
   },
   async declineTransfer(id) {
     set((s) => ({ asks: s.asks.filter((x) => x !== id) }));
-    try {
-      const rec = await api.transferDecline(id);
-      set((s) => ({ transfers: s.transfers.map((t) => (t.id === id ? rec : t)) }));
-    } catch (e) {
-      get().showToast(String(e), "error");
-    }
+    const rec = await guarded(() => api.transferDecline(id));
+    if (rec) set((s) => ({ transfers: s.transfers.map((t) => (t.id === id ? rec : t)) }));
   },
 
   showToast(text, kind) {

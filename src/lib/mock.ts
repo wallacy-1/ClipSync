@@ -290,6 +290,10 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
         { uri: "C:\\Users\\wallacy\\Documents\\relatório-métricas-Q3.pdf", name: "relatório-métricas-Q3.pdf", size: 12.4 * MB, mime: "application/pdf" },
         { uri: "C:\\Users\\wallacy\\Documents\\planilha.xlsx", name: "planilha.xlsx", size: 0.8 * MB, mime: null },
       ] };
+    case "transfer_remove": {
+      transfers = transfers.filter((t) => t.id !== args.id || !["completed", "failed", "cancelled"].includes(t.state.kind));
+      return;
+    }
     case "transfer_clear_finished": {
       const before = transfers.length;
       transfers = transfers.filter((t) => !["completed", "failed", "cancelled"].includes(t.state.kind));

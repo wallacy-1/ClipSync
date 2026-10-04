@@ -167,6 +167,7 @@ pub fn run() {
             commands::transfer_send,
             commands::transfer_list,
             commands::transfer_clear_finished,
+            commands::transfer_remove,
             commands::transfer_cancel,
             commands::transfer_resume,
             commands::transfer_asks,

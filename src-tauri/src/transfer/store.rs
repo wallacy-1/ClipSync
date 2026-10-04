@@ -273,6 +273,13 @@ impl Db {
         Ok(conn.execute("DELETE FROM file_transfers WHERE state IN ('completed','failed','cancelled')", [])? as u32)
     }
 
+    /// Só apaga se terminada: linha ativa nunca some debaixo de uma task.
+    pub fn transfer_delete(&self, id: &str) -> Result<()> {
+        let conn = self.conn.lock().unwrap();
+        conn.execute("DELETE FROM file_transfers WHERE id = ?1 AND state IN ('completed','failed','cancelled')", [id])?;
+        Ok(())
+    }
+
     /// Abandona `waiting` velhas e apaga terminadas fora da retenção. Retorna
     /// `(expiradas, apagadas)`; as expiradas ainda têm `.part` para o chamador limpar.
     pub fn transfer_purge(&self, now: i64) -> Result<(Vec<TransferRecord>, u32)> {
@@ -321,6 +328,19 @@ mod tests {
             temp_path: None,
             purpose: None,
         }
+    }
+
+    #[test]
+    fn delete_only_removes_finished() {
+        let (db, dir) = temp_db();
+        db.transfer_insert(&new("live", Direction::Out, "devA", &TransferState::Queued)).unwrap();
+        db.transfer_insert(&new("done", Direction::Out, "devA", &TransferState::Completed)).unwrap();
+        db.transfer_delete("live").unwrap();
+        db.transfer_delete("done").unwrap();
+        assert!(db.transfer_get("live").unwrap().is_some());
+        assert!(db.transfer_get("done").unwrap().is_none());
+        drop(db);
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

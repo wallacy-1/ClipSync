@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { File, More, Transfers, Upload } from "../components/Icons";
-import { bytes, deviceName, isClipImage, isTransferActive, percent, pluralize, transferDetail, TRANSFER_LABEL, TRANSFER_TAG } from "../lib/format";
+import { useTransferRow } from "../components/transfer";
+import { bytes, isClipImage, isTransferActive, pluralize, transferDetail, TRANSFER_LABEL, TRANSFER_TAG } from "../lib/format";
 import { onFileDrop } from "../lib/ipc";
 import type { TransferRecord } from "../lib/types";
 import { useApp } from "../store/app";
@@ -79,16 +80,9 @@ export function TransfersView() {
 }
 
 function TransferRow({ t }: { t: TransferRecord }) {
-  const devices = useApp((s) => s.devices);
-  const selfId = useApp((s) => s.me?.deviceId ?? "");
-  const busy = useApp((s) => !!s.transferBusy[t.id]);
-  const asked = useApp((s) => s.asks.includes(t.id));
-  const accept = useApp((s) => s.acceptTransfer);
-  const decline = useApp((s) => s.declineTransfer);
-  const cancel = useApp((s) => s.cancelTransfer);
-  const resume = useApp((s) => s.resumeTransfer);
-  const open = useApp((s) => s.openTransfer);
+  const { kind, dev, incoming, active, busy, hasBar, pct, primary, asked, accept, decline, cancel, resume, open } = useTransferRow(t, true);
   const reveal = useApp((s) => s.revealTransfer);
+  const removeTransfer = useApp((s) => s.removeTransfer);
   const [menu, setMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -98,19 +92,6 @@ function TransferRow({ t }: { t: TransferRecord }) {
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
   }, [menu]);
-
-  const kind = t.state.kind;
-  const dev = deviceName(devices, t.deviceId, selfId);
-  const incoming = t.direction === "in";
-  const hasBar = ["transferring", "verifying", "waiting", "cancelled"].includes(kind);
-  const pct = kind === "verifying" ? 100 : percent(t);
-  const primary = isTransferActive(t)
-    ? (kind === "verifying" ? null : { label: busy ? "Cancelando…" : "Cancelar", run: () => cancel(t.id), disabled: busy })
-    : kind === "failed" && !incoming
-      ? { label: "Tentar de novo", run: () => resume(t.id), disabled: false }
-      : kind === "completed"
-        ? { label: "Abrir", run: () => open(t.id), disabled: false }
-        : null;
 
   return (
     <div className="tr-row">
@@ -131,8 +112,8 @@ function TransferRow({ t }: { t: TransferRecord }) {
       <div className="tr-actions">
         {asked ? (
           <div className="row-flex" style={{ gap: 6 }}>
-            <button className="btn btn-secondary" onClick={() => void decline(t.id)}>Recusar</button>
-            <button className="btn btn-primary" onClick={() => void accept(t.id)}>Aceitar</button>
+            <button className="btn btn-secondary" onClick={decline}>Recusar</button>
+            <button className="btn btn-primary" onClick={accept}>Aceitar</button>
           </div>
         ) : primary && <button className="btn btn-secondary" disabled={primary.disabled} onClick={primary.run}>{primary.label}</button>}
         <div className="menu-wrap" ref={menuRef}>
@@ -140,10 +121,10 @@ function TransferRow({ t }: { t: TransferRecord }) {
           {menu && (
             <div className="tr-menu">
               {kind === "completed" && <button onClick={() => { setMenu(false); void reveal(t.id); }}>Mostrar na pasta</button>}
-              {kind === "completed" && <button onClick={() => { setMenu(false); void open(t.id); }}>Abrir</button>}
-              {(kind === "cancelled" || kind === "failed") && !incoming && <button onClick={() => { setMenu(false); void resume(t.id); }}>Tentar de novo</button>}
-              {isTransferActive(t) && kind !== "verifying" && <button className="danger" disabled={busy} onClick={() => { setMenu(false); void cancel(t.id); }}>Cancelar</button>}
-              {!isTransferActive(t) && <button onClick={() => { setMenu(false); useApp.setState((s) => ({ transfers: s.transfers.filter((x) => x.id !== t.id) })); }}>Remover da lista</button>}
+              {kind === "completed" && <button onClick={() => { setMenu(false); open(); }}>Abrir</button>}
+              {(kind === "cancelled" || kind === "failed") && !incoming && <button onClick={() => { setMenu(false); resume(); }}>Tentar de novo</button>}
+              {active && kind !== "verifying" && <button className="danger" disabled={busy} onClick={() => { setMenu(false); cancel(); }}>Cancelar</button>}
+              {!active && <button onClick={() => { setMenu(false); void removeTransfer(t.id); }}>Remover da lista</button>}
               <div style={{ padding: "6px 12px 4px", fontSize: 11, color: "var(--color-neutral-600)" }}>{pluralize(t.attempts, "tentativa", "tentativas")} · {t.chunkSize ? `${bytes(t.chunkSize)} por bloco` : ""}</div>
             </div>
           )}
