@@ -9,8 +9,8 @@ o teclado do usuário: os botões levam às telas oficiais do Android (`ACTION_I
 `InputMethodManager.showInputMethodPicker()`), e o usuário decide lá.
 
 Motivo de existir: a partir do Android 10 só o app com foco **ou o IME padrão** lê o clipboard
-(ver `pesquisa-clipboard-background-android.md` §1 e §9). Com o ClipSync Keyboard selecionado, uma
-etapa futura poderá detectar cópias com o app em segundo plano. Hoje ele é só um teclado.
+(ver `pesquisa-clipboard-background-android.md` §1 e §9). Com o ClipSync Keyboard selecionado, as
+cópias feitas com o app em segundo plano são detectadas e entregues ao núcleo (`ime-bridge.md`).
 
 ## Onde está
 
