@@ -164,8 +164,8 @@ if (params.get("copied")) {
     files: [
       { path: "C:\Users\wallacy\Desktop\contrato-assinado.pdf", name: "contrato-assinado.pdf", size: 2.4 * MB },
       { path: "C:\Users\wallacy\Desktop\fotos-obra.zip", name: "fotos-obra.zip", size: 148 * MB },
+      { path: "C:\Users\wallacy\Desktop\projeto", name: "projeto", size: 0, dir: true },
     ],
-    skippedDirs: 1,
     skippedFiles: 0,
     copiedAt: Date.now(),
   }), 1200);
@@ -289,7 +289,16 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
     case "transfer_peer_supports": return args.deviceId !== "notebook";
     case "transfer_pick_file":
       await sleep(400);
-      return { uri: "C:\\Users\\wallacy\\Documents\\relatório-métricas-Q3.pdf", name: "relatório-métricas-Q3.pdf", size: 12.4 * MB, mime: "application/pdf" };
+      if (args.folder) return { files: [{ uri: "C:\\Users\\wallacy\\Documents\\projeto", name: "projeto", size: 0, mime: null, dir: true }] };
+      return { files: [
+        { uri: "C:\\Users\\wallacy\\Documents\\relatório-métricas-Q3.pdf", name: "relatório-métricas-Q3.pdf", size: 12.4 * MB, mime: "application/pdf" },
+        { uri: "C:\\Users\\wallacy\\Documents\\planilha.xlsx", name: "planilha.xlsx", size: 0.8 * MB, mime: null },
+      ] };
+    case "transfer_clear_finished": {
+      const before = transfers.length;
+      transfers = transfers.filter((t) => !["completed", "failed", "cancelled"].includes(t.state.kind));
+      return before - transfers.length;
+    }
     case "transfer_send": {
       const rec = mkT({ originalName: String(args.path).split(/[\\/]/).pop() ?? "arquivo", size: 12.4 * MB, deviceId: args.deviceId as string, direction: "out", state: { kind: "queued" } });
       transfers = [rec, ...transfers];

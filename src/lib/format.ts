@@ -1,4 +1,4 @@
-import type { ClipboardItem, ContentType, Device, SyncState, TransferKind, TransferRecord } from "./types";
+import type { ClipboardItem, ContentType, Device, LocalFile, SyncState, TransferKind, TransferRecord } from "./types";
 
 export const TYPE_LABEL: Record<ContentType, string> = {
   text: "Texto",
@@ -178,4 +178,18 @@ export function transferDetail(t: TransferRecord, device: string): string {
     case "cancelled": return `Cancelado em ${pct}% · ${bytes(t.size)}`;
     case "failed": return transferError(t.state.error, device);
   }
+}
+
+/** Título e linha de detalhe de uma seleção para enviar (pastas vão como .zip). */
+export function filesSummary(files: LocalFile[]): { title: string; meta: string } {
+  const dirs = files.filter((f) => f.dir).length;
+  const total = files.reduce((n, f) => n + (f.dir ? 0 : f.size), 0);
+  const title = files.length === 1
+    ? files[0].name
+    : dirs > 0 ? pluralize(files.length, "item", "itens") : pluralize(files.length, "arquivo", "arquivos");
+  const meta = [
+    total > 0 ? bytes(total) : null,
+    dirs > 0 ? (dirs === 1 && files.length === 1 ? "pasta · vai como .zip" : `${pluralize(dirs, "pasta vai", "pastas vão")} como .zip`) : null,
+  ].filter(Boolean).join(" · ");
+  return { title, meta };
 }

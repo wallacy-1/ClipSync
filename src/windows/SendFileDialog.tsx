@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 import { File, MonitorOff, Shield } from "../components/Icons";
 import { Avatar } from "../components/ui";
-import { PLATFORM_LABEL, bytes } from "../lib/format";
+import { PLATFORM_LABEL, filesSummary } from "../lib/format";
 import { api } from "../lib/ipc";
-import type { Device } from "../lib/types";
+import type { Device, LocalFile } from "../lib/types";
 import { usePeers, useApp } from "../store/app";
 
 export interface Target {
@@ -44,9 +44,10 @@ export function useFileTargets(): { targets: Target[]; loading: boolean } {
   return { targets, loading };
 }
 
-export function SendFileDialog({ file, onClose }: { file: { path: string; name: string; size: number }; onClose: () => void }) {
+export function SendFileDialog({ files, onClose }: { files: LocalFile[]; onClose: () => void }) {
   const { targets, loading } = useFileTargets();
-  const sendFile = useApp((s) => s.sendFile);
+  const sendFiles = useApp((s) => s.sendFiles);
+  const summary = filesSummary(files);
   const setView = useApp((s) => s.setView);
   const [selected, setSelected] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -65,8 +66,8 @@ export function SendFileDialog({ file, onClose }: { file: { path: string; name: 
         <div className="head">
           <div className="tr-icon"><File size={20} /></div>
           <div style={{ minWidth: 0 }}>
-            <h3>Enviar arquivo</h3>
-            <div className="file" title={file.path}>{file.name}{file.size ? ` · ${bytes(file.size)}` : ""}</div>
+            <h3>{files.length === 1 && !files[0].dir ? "Enviar arquivo" : "Enviar"}</h3>
+            <div className="file" title={files.map((f) => f.path).join("\n")}>{summary.title}{summary.meta ? ` · ${summary.meta}` : ""}</div>
           </div>
         </div>
 
@@ -74,7 +75,7 @@ export function SendFileDialog({ file, onClose }: { file: { path: string; name: 
           <div className="none">
             <div className="orb"><MonitorOff size={32} /></div>
             <h3>Nenhum dispositivo disponível</h3>
-            <p>Seus dispositivos pareados estão offline ou não têm suporte a transferência de arquivos. O arquivo não foi enfileirado — tente novamente quando algum deles voltar.</p>
+            <p>Seus dispositivos pareados estão offline ou não têm suporte a transferência de arquivos. Nada foi enfileirado — tente novamente quando algum deles voltar.</p>
             <div className="btns">
               <button className="btn btn-secondary" onClick={() => { onClose(); setView("devices"); }}>Ver dispositivos</button>
               <button className="btn btn-primary" onClick={onClose}>Tentar novamente</button>
@@ -110,7 +111,7 @@ export function SendFileDialog({ file, onClose }: { file: { path: string; name: 
                 onClick={async () => {
                   if (!chosen) return;
                   setSending(true);
-                  await sendFile(chosen.device.deviceId, file.path);
+                  await sendFiles(chosen.device.deviceId, files);
                   setSending(false);
                   onClose();
                 }}

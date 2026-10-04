@@ -11,8 +11,8 @@ export function TransfersView() {
   const loaded = useApp((s) => s.transfersLoaded);
   const refresh = useApp((s) => s.refreshTransfers);
   const pickFile = useApp((s) => s.pickFile);
-  const setPendingFile = useApp((s) => s.setPendingFile);
-  const pendingFile = useApp((s) => s.pendingFile);
+  const setPendingFiles = useApp((s) => s.setPendingFiles);
+  const pendingFiles = useApp((s) => s.pendingFiles);
   const clearFinished = useApp((s) => s.clearFinishedTransfers);
   const [dragging, setDragging] = useState(false);
 
@@ -24,10 +24,9 @@ export function TransfersView() {
   useEffect(() => {
     let off: (() => void) | undefined;
     void onFileDrop((paths) => {
-      const path = paths[0];
-      const name = path.split(/[\\/]/).pop() ?? path;
-      setPendingFile({ path, name, size: 0 });
       setDragging(false);
+      if (paths.length === 0) return;
+      setPendingFiles(paths.map((path) => ({ path, name: path.split(/[\\/]/).pop() ?? path, size: 0 })));
     }).then((u) => { off = u; });
     const onEnter = (e: DragEvent) => { e.preventDefault(); setDragging(true); };
     const onLeave = () => setDragging(false);
@@ -40,7 +39,7 @@ export function TransfersView() {
       window.removeEventListener("dragleave", onLeave);
       window.removeEventListener("drop", onLeave);
     };
-  }, [setPendingFile]);
+  }, [setPendingFiles]);
 
   const active = transfers.filter(isTransferActive).length;
   const finished = transfers.length - active;
@@ -54,8 +53,9 @@ export function TransfersView() {
           <span className="count">{transfers.length === 0 ? "nenhuma" : `${active} ativas · ${transfers.length} na lista`}</span>
           <div className="spacer" />
           <div className="btns">
-            <button className="btn btn-secondary" style={{ fontSize: 13 }} disabled={finished === 0} onClick={clearFinished}>Limpar concluídas</button>
-            <button className="btn btn-primary" onClick={pickFile}><Upload size={15} /> Enviar arquivo</button>
+            <button className="btn btn-secondary" style={{ fontSize: 13 }} disabled={finished === 0} onClick={() => void clearFinished()}>Limpar concluídas</button>
+            <button className="btn btn-secondary" style={{ fontSize: 13 }} onClick={() => void pickFile(true)}>Enviar pasta</button>
+            <button className="btn btn-primary" onClick={() => void pickFile()}><Upload size={15} /> Enviar arquivo</button>
           </div>
         </div>
       </div>
@@ -64,8 +64,8 @@ export function TransfersView() {
         <div className="empty">
           <div className="orb"><Transfers size={40} /></div>
           <h3>Nenhuma transferência</h3>
-          <p style={{ maxWidth: 420 }}>Envie um arquivo pelo botão acima ou arraste-o para esta janela. Arquivos recebidos aparecem aqui automaticamente.</p>
-          <button className="btn btn-primary" onClick={pickFile}>Enviar arquivo</button>
+          <p style={{ maxWidth: 420 }}>Envie arquivos ou pastas pelos botões acima ou arraste-os para esta janela (pastas vão como .zip). Arquivos recebidos aparecem aqui automaticamente.</p>
+          <button className="btn btn-primary" onClick={() => void pickFile()}>Enviar arquivo</button>
         </div>
       ) : (
         <div className="list tr-list">
@@ -73,7 +73,7 @@ export function TransfersView() {
         </div>
       )}
 
-      {pendingFile && <SendFileDialog file={pendingFile} onClose={() => setPendingFile(null)} />}
+      {pendingFiles && <SendFileDialog files={pendingFiles} onClose={() => setPendingFiles(null)} />}
     </div>
   );
 }

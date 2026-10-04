@@ -168,6 +168,7 @@ pub fn run() {
             ime::ime_set_theme,
             commands::transfer_send,
             commands::transfer_list,
+            commands::transfer_clear_finished,
             commands::transfer_cancel,
             commands::transfer_resume,
             commands::transfer_asks,

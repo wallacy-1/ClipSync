@@ -17,14 +17,14 @@ pub struct CopiedFile {
     pub path: String,
     pub name: String,
     pub size: u64,
+    /// Pasta: vai como `.zip` (`transfer::folder`).
+    pub dir: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CopiedFiles {
     pub files: Vec<CopiedFile>,
-    /// Pastas copiadas junto (não enviadas: transferência é por arquivo).
-    pub skipped_dirs: u32,
     /// Arquivos além de [`MAX_FILES`].
     pub skipped_files: u32,
     pub copied_at: i64,
@@ -46,7 +46,7 @@ pub fn poll(app: &AppHandle) -> bool {
     log::info!(
         "[CLIPBOARD] Files copied count={} dirs={} skipped={}",
         offer.files.len(),
-        offer.skipped_dirs,
+        offer.files.iter().filter(|f| f.dir).count(),
         offer.skipped_files
     );
     if !offer.files.is_empty() {
@@ -71,21 +71,18 @@ fn read() -> Option<Vec<PathBuf>> {
 
 fn describe(paths: Vec<PathBuf>) -> CopiedFiles {
     let mut files = Vec::new();
-    let (mut skipped_dirs, mut skipped_files) = (0u32, 0u32);
+    let mut skipped_files = 0u32;
     for p in paths {
         let Ok(meta) = std::fs::metadata(&p) else { continue };
-        if meta.is_dir() {
-            skipped_dirs += 1;
-            continue;
-        }
         if files.len() >= MAX_FILES {
             skipped_files += 1;
             continue;
         }
         let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("arquivo").to_string();
-        files.push(CopiedFile { path: p.to_string_lossy().into_owned(), name, size: meta.len() });
+        let size = if meta.is_dir() { 0 } else { meta.len() };
+        files.push(CopiedFile { path: p.to_string_lossy().into_owned(), name, size, dir: meta.is_dir() });
     }
-    CopiedFiles { files, skipped_dirs, skipped_files, copied_at: now_ms() }
+    CopiedFiles { files, skipped_files, copied_at: now_ms() }
 }
 
 #[cfg(test)]
@@ -93,7 +90,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn describe_skips_dirs_and_caps_count() {
+    fn describe_keeps_dirs_and_caps_count() {
         let dir = std::env::temp_dir().join(format!("clipsync-files-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir_all(dir.join("sub")).unwrap();
         let mut paths = vec![dir.join("sub"), dir.join("nao-existe.txt")];
@@ -105,9 +102,9 @@ mod tests {
         let d = describe(paths);
         let _ = std::fs::remove_dir_all(&dir);
         assert_eq!(d.files.len(), MAX_FILES);
-        assert_eq!(d.skipped_dirs, 1);
-        assert_eq!(d.skipped_files, 2);
-        assert_eq!(d.files[3].size, 3);
-        assert_eq!(d.files[3].name, "f3.bin");
+        assert_eq!(d.skipped_files, 3);
+        assert!(d.files[0].dir && d.files[0].name == "sub");
+        assert_eq!(d.files[4].size, 3);
+        assert_eq!(d.files[4].name, "f3.bin");
     }
 }

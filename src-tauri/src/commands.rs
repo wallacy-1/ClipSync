@@ -419,14 +419,29 @@ pub fn quit(app: AppHandle) {
     app.exit(0);
 }
 
+/// Pasta vira .zip antes (fora da thread principal: zipar pode demorar).
 #[tauri::command]
-pub fn transfer_send(app: AppHandle, device_id: String, path: String) -> Result<crate::transfer::store::TransferRecord> {
-    crate::transfer::manager::send_file(&app, &device_id, &path)
+pub async fn transfer_send(app: AppHandle, device_id: String, path: String) -> Result<crate::transfer::store::TransferRecord> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let src = crate::transfer::folder::prepare(&app, &path)?;
+        let r = crate::transfer::manager::send_file(&app, &device_id, &src);
+        if r.is_err() && src != path {
+            crate::transfer::folder::release(&app, &src);
+        }
+        r
+    })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?
 }
 
 #[tauri::command]
 pub fn transfer_list(app: AppHandle, limit: Option<u32>) -> Result<Vec<crate::transfer::store::TransferRecord>> {
     crate::transfer::manager::list(&app, limit.unwrap_or(100))
+}
+
+#[tauri::command]
+pub fn transfer_clear_finished(app: AppHandle) -> Result<u32> {
+    crate::transfer::manager::clear_finished(&app)
 }
 
 #[tauri::command]
@@ -455,13 +470,13 @@ pub fn transfer_resume(app: AppHandle, id: String) -> Result<crate::transfer::st
     crate::transfer::manager::resume(&app, &id)
 }
 
-/// Android: abre o seletor de documentos (SAF) e espera a escolha. Retorna
-/// `{uri, name, size, mime}`, `{cancelled: true}` ou erro. Fora do Android, erro.
+/// Seletor de arquivos (vários). Retorna `{files: [{uri, name, size, mime}]}` ou
+/// `{cancelled: true}`. `folder` (só PC) escolhe uma pasta, enviada como .zip.
 #[tauri::command]
-pub async fn transfer_pick_file(app: AppHandle) -> Result<serde_json::Value> {
+pub async fn transfer_pick_file(app: AppHandle, folder: Option<bool>) -> Result<serde_json::Value> {
     #[cfg(target_os = "android")]
     {
-        let _ = app;
+        let _ = (app, folder);
         if !crate::transfer::android::pick_file()? {
             return Err(AppError::Other("sem Activity para abrir o seletor".into()));
         }
@@ -475,23 +490,35 @@ pub async fn transfer_pick_file(app: AppHandle) -> Result<serde_json::Value> {
     }
     #[cfg(all(not(target_os = "android"), target_os = "ios"))]
     {
-        let _ = app;
+        let _ = (app, folder);
         Err(AppError::Other("seletor de arquivos indisponível nesta plataforma".into()))
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
         use tauri_plugin_dialog::DialogExt;
         let (tx, rx) = tokio::sync::oneshot::channel();
-        app.dialog().file().set_title("Enviar arquivo").pick_file(move |f| {
-            let _ = tx.send(f);
-        });
+        let dialog = app.dialog().file();
+        if folder.unwrap_or(false) {
+            dialog.set_title("Enviar pasta").pick_folder(move |f| {
+                let _ = tx.send(f.map(|f| vec![f]));
+            });
+        } else {
+            dialog.set_title("Enviar arquivos").pick_files(move |f| {
+                let _ = tx.send(f);
+            });
+        }
         let Some(picked) = rx.await.map_err(|_| AppError::Other("seletor não respondeu".into()))? else {
             return Ok(serde_json::json!({ "cancelled": true }));
         };
-        let path = picked.into_path().map_err(|e| AppError::Other(e.to_string()))?;
-        let meta = std::fs::metadata(&path)?;
-        let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("arquivo").to_string();
-        Ok(serde_json::json!({ "uri": path.to_string_lossy(), "name": name, "size": meta.len(), "mime": serde_json::Value::Null }))
+        let mut files = Vec::new();
+        for p in picked {
+            let path = p.into_path().map_err(|e| AppError::Other(e.to_string()))?;
+            let meta = std::fs::metadata(&path)?;
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("arquivo").to_string();
+            let size = if meta.is_dir() { 0 } else { meta.len() };
+            files.push(serde_json::json!({ "uri": path.to_string_lossy(), "name": name, "size": size, "mime": serde_json::Value::Null, "dir": meta.is_dir() }));
+        }
+        Ok(serde_json::json!({ "files": files }))
     }
 }
 

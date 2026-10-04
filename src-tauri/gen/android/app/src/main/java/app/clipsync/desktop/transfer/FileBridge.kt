@@ -14,6 +14,7 @@ import android.os.StatFs
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.io.FileInputStream
@@ -40,6 +41,7 @@ object FileBridge {
         val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = "*/*"
+            putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
         }
         Handler(Looper.getMainLooper()).post {
@@ -53,20 +55,29 @@ object FileBridge {
 
     /** Chamado pela Activity. Persiste a permissão de leitura para retomar depois. */
     fun onPickResult(context: Context, resultCode: Int, data: Intent?) {
-        val uri = if (resultCode == Activity.RESULT_OK) data?.data else null
-        if (uri == null) {
+        val uris = mutableListOf<Uri>()
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            val clip = data.clipData
+            if (clip != null) for (i in 0 until clip.itemCount) clip.getItemAt(i).uri?.let { uris += it }
+            else data.data?.let { uris += it }
+        }
+        if (uris.isEmpty()) {
             pickResult = JSONObject().put("cancelled", true).toString()
             pickPending = false
             return
         }
-        runCatching {
-            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val files = JSONArray()
+        for (uri in uris) {
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            files.put(JSONObject(describe(context, uri.toString())))
         }
-        pickResult = describe(context, uri.toString())
+        pickResult = JSONObject().put("files", files).toString()
         pickPending = false
     }
 
-    /** JSON do resultado (`{uri,name,size,mime}` | `{cancelled}` | `{error}`), ou null se ainda aguardando. */
+    /** JSON do resultado (`{files: [{uri,name,size,mime}]}` | `{cancelled}` | `{error}`), ou null se ainda aguardando. */
     @JvmStatic
     fun takePickResult(): String? {
         val r = pickResult ?: return null

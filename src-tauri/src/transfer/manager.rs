@@ -85,6 +85,11 @@ pub fn apply(app: &AppHandle, id: &str, event: Event) -> Result<TransferRecord> 
     let rec = state.db.transfer_get(id)?.unwrap_or(rec);
     log::info!("[FILE] {} id={} dir={} state={} reason={:?} bytes={}/{}", rec.safe_name, id, rec.direction.as_str(), next.kind(), next.reason(), rec.bytes_done, rec.size);
     events::emit(app, events::TRANSFER_STATE, &rec);
+    if rec.direction == Direction::Out && matches!(next, TransferState::Completed | TransferState::Cancelled { .. }) {
+        if let Some(src) = rec.source.as_deref() {
+            super::folder::release(app, src);
+        }
+    }
     Ok(rec)
 }
 
@@ -286,6 +291,13 @@ pub fn list(app: &AppHandle, limit: u32) -> Result<Vec<TransferRecord>> {
     mgr(app).db.transfer_list(limit)
 }
 
+pub fn clear_finished(app: &AppHandle) -> Result<u32> {
+    let n = mgr(app).db.transfer_clear_finished()?;
+    log::info!("[FILE] Cleared finished count={n}");
+    super::folder::purge(app);
+    Ok(n)
+}
+
 /// Cancelamento local (usuário). Avisa o peer se houver conexão.
 pub fn cancel(app: &AppHandle, id: &str) -> Result<TransferRecord> {
     let state = mgr(app);
@@ -381,6 +393,7 @@ pub fn startup(app: &AppHandle) {
         }
     }
     crate::clipboard::image::purge_old(app);
+    super::folder::purge(app);
 }
 
 pub fn on_connected(app: &AppHandle, device_id: &str) {

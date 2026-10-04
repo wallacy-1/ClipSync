@@ -13,6 +13,7 @@ import type {
   Settings,
   SharedPayload,
   CopiedFiles,
+  LocalFile,
   NotifyPermission,
   SyncStatus,
   TransferRecord,
@@ -56,7 +57,8 @@ interface AppStore {
   /** Linhas ocupadas ("Cancelando…") até o evento de estado chegar. */
   transferBusy: Record<string, true>;
   /** Arquivo escolhido aguardando destino (diálogo/folha "escolher destino"). */
-  pendingFile: { path: string; name: string; size: number } | null;
+  /** Escolhidos (seletor ou arrastar) esperando o destino. */
+  pendingFiles: LocalFile[] | null;
   /** "Compartilhar → ClipSync" aguardando destino (Android). */
   pendingShare: SharedPayload | null;
   /** Arquivos copiados no Explorer aguardando "Enviar para…" (Windows). */
@@ -97,14 +99,14 @@ interface AppStore {
   showToast: (text: string, kind?: "error") => void;
 
   refreshTransfers: () => Promise<void>;
-  pickFile: () => Promise<void>;
-  setPendingFile: (f: { path: string; name: string; size: number } | null) => void;
-  sendFile: (deviceId: string, path: string) => Promise<void>;
+  pickFile: (folder?: boolean) => Promise<void>;
+  setPendingFiles: (f: LocalFile[] | null) => void;
+  sendFiles: (deviceId: string, files: LocalFile[]) => Promise<void>;
   cancelTransfer: (id: string) => Promise<void>;
   resumeTransfer: (id: string) => Promise<void>;
   openTransfer: (id: string) => Promise<void>;
   revealTransfer: (id: string) => Promise<void>;
-  clearFinishedTransfers: () => void;
+  clearFinishedTransfers: () => Promise<void>;
   checkShare: () => Promise<void>;
   sendShare: (deviceId: string) => Promise<void>;
   dismissShare: () => void;
@@ -152,7 +154,7 @@ export const useApp = create<AppStore>((set, get) => ({
   transfers: [],
   transfersLoaded: false,
   transferBusy: {},
-  pendingFile: null,
+  pendingFiles: null,
   pendingShare: null,
   copiedFiles: null,
   asks: [],
@@ -386,26 +388,34 @@ export const useApp = create<AppStore>((set, get) => ({
       get().showToast(String(e), "error");
     }
   },
-  async pickFile() {
+  async pickFile(folder = false) {
     try {
-      const picked = await api.transferPickFile();
-      if (picked.cancelled) return;
-      set({ pendingFile: { path: picked.uri, name: picked.name, size: picked.size } });
+      const picked = await api.transferPickFile(folder);
+      if (picked.cancelled || picked.files.length === 0) return;
+      set({ pendingFiles: picked.files.map((f) => ({ path: f.uri, name: f.name, size: f.size, dir: f.dir })) });
     } catch (e) {
       get().showToast(String(e), "error");
     }
   },
-  setPendingFile: (pendingFile) => set({ pendingFile }),
-  async sendFile(deviceId, path) {
+  setPendingFiles: (pendingFiles) => set({ pendingFiles }),
+  async sendFiles(deviceId, files) {
     if (get().notifyPerm === "prompt") void get().requestNotifyPerm();
-    try {
-      const rec = await api.transferSend(deviceId, path);
-      set((s) => ({ transfers: [rec, ...s.transfers.filter((t) => t.id !== rec.id)], pendingFile: null }));
-      const name = get().devices.find((d) => d.deviceId === deviceId)?.name ?? deviceId;
-      get().showToast(`Enviando ${rec.safeName} para ${name}`);
-    } catch (e) {
-      get().showToast(String(e), "error");
+    const name = get().devices.find((d) => d.deviceId === deviceId)?.name ?? deviceId;
+    const recs: TransferRecord[] = [];
+    const errors: string[] = [];
+    // Um por vez: pasta vira zip no backend; um erro não impede os demais.
+    for (const f of files) {
+      try {
+        const rec = await api.transferSend(deviceId, f.path);
+        recs.push(rec);
+        set((s) => ({ transfers: [rec, ...s.transfers.filter((t) => t.id !== rec.id)] }));
+      } catch (e) {
+        errors.push(`${f.name}: ${String(e)}`);
+      }
     }
+    set({ pendingFiles: null });
+    if (errors.length > 0) get().showToast(errors.join(" · "), "error");
+    else if (recs.length > 0) get().showToast(recs.length === 1 ? `Enviando ${recs[0].safeName} para ${name}` : `Enviando ${recs.length} arquivos para ${name}`);
   },
   async cancelTransfer(id) {
     set((s) => ({ transferBusy: { ...s.transferBusy, [id]: true } }));
@@ -432,8 +442,14 @@ export const useApp = create<AppStore>((set, get) => ({
   async revealTransfer(id) {
     try { await api.transferReveal(id); } catch (e) { get().showToast(String(e), "error"); }
   },
-  // Só esconde na sessão: o backend mantém 30 dias de retenção.
-  clearFinishedTransfers: () => set((s) => ({ transfers: s.transfers.filter(isTransferActive) })),
+  async clearFinishedTransfers() {
+    try {
+      await api.transferClearFinished();
+      set((s) => ({ transfers: s.transfers.filter(isTransferActive) }));
+    } catch (e) {
+      get().showToast(String(e), "error");
+    }
+  },
 
   async checkShare() {
     try {
@@ -468,15 +484,7 @@ export const useApp = create<AppStore>((set, get) => ({
     const offer = get().copiedFiles;
     if (!offer) return;
     set({ copiedFiles: null });
-    const name = get().devices.find((d) => d.deviceId === deviceId)?.name ?? deviceId;
-    try {
-      const recs: TransferRecord[] = [];
-      for (const f of offer.files) recs.push(await api.transferSend(deviceId, f.path));
-      set((s) => ({ transfers: [...recs.reverse(), ...s.transfers.filter((t) => !recs.some((r) => r.id === t.id))] }));
-      get().showToast(recs.length === 1 ? `Enviando ${recs[0].safeName} para ${name}` : `Enviando ${recs.length} arquivos para ${name}`);
-    } catch (e) {
-      get().showToast(String(e), "error");
-    }
+    await get().sendFiles(deviceId, offer.files);
   },
   dismissCopiedFiles: () => set({ copiedFiles: null }),
   async refreshNotifyPerm() {

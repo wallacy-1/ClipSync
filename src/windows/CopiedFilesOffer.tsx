@@ -1,5 +1,5 @@
 import { File } from "../components/Icons";
-import { bytes, pluralize } from "../lib/format";
+import { filesSummary } from "../lib/format";
 import { useApp } from "../store/app";
 import { useFileTargets } from "./SendFileDialog";
 
@@ -23,12 +23,8 @@ export function CopiedFilesOffer({ variant }: { variant: "float" | "inline" }) {
   const options = [...targets.filter((t) => t.selectable), ...targets.filter((t) => !t.selectable && t.cap === "Offline")].slice(0, MAX_TARGETS);
   if (options.length === 0) return null;
 
-  const total = offer.files.reduce((n, f) => n + f.size, 0);
-  const title = offer.files.length === 1 ? offer.files[0].name : `${pluralize(offer.files.length, "arquivo copiado", "arquivos copiados")}`;
-  const notes = [
-    offer.skippedDirs > 0 ? `${pluralize(offer.skippedDirs, "pasta fica", "pastas ficam")} de fora` : null,
-    offer.skippedFiles > 0 ? `+${offer.skippedFiles} além do limite` : null,
-  ].filter(Boolean).join(" · ");
+  const { title, meta } = filesSummary(offer.files);
+  const notes = [meta || null, offer.skippedFiles > 0 ? `+${offer.skippedFiles} além do limite` : null].filter(Boolean).join(" · ");
 
   return (
     <div className={`copied-offer ${variant}`} role="status">
@@ -36,7 +32,7 @@ export function CopiedFilesOffer({ variant }: { variant: "float" | "inline" }) {
         <div className="co-icon"><File size={16} /></div>
         <div className="co-body">
           <div className="co-title" title={offer.files.map((f) => f.name).join("\n")}>{title}</div>
-          <div className="co-meta">{bytes(total)}{notes ? ` · ${notes}` : ""}</div>
+          <div className="co-meta">{offer.files.length > 1 ? "copiados · " : "copiado · "}{notes}</div>
         </div>
         <button className="co-close" title="Dispensar" onClick={dismiss}>
           <svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" strokeWidth="1.4"><path d="M2 2l8 8M10 2l-8 8" /></svg>

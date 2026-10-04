@@ -3,6 +3,7 @@
 #[cfg(target_os = "android")]
 pub mod android;
 pub mod dest;
+pub mod folder;
 pub mod hash;
 pub mod manager;
 pub mod names;

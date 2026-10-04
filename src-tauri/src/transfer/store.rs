@@ -267,6 +267,12 @@ impl Db {
         Ok(ids)
     }
 
+    /// "Limpar concluídas": tira da lista o que já terminou (os arquivos recebidos ficam).
+    pub fn transfer_clear_finished(&self) -> Result<u32> {
+        let conn = self.conn.lock().unwrap();
+        Ok(conn.execute("DELETE FROM file_transfers WHERE state IN ('completed','failed','cancelled')", [])? as u32)
+    }
+
     /// Abandona `waiting` velhas e apaga terminadas fora da retenção. Retorna
     /// `(expiradas, apagadas)`; as expiradas ainda têm `.part` para o chamador limpar.
     pub fn transfer_purge(&self, now: i64) -> Result<(Vec<TransferRecord>, u32)> {

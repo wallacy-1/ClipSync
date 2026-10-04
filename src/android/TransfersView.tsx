@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Bell, File, Shield, Transfers, Upload } from "../components/Icons";
 import { Avatar } from "../components/ui";
-import { bytes, deviceName, isClipImage, isTransferActive, percent, transferDetail, TRANSFER_LABEL, TRANSFER_TAG } from "../lib/format";
-import type { TransferRecord } from "../lib/types";
+import { deviceName, filesSummary, isClipImage, isTransferActive, percent, transferDetail, TRANSFER_LABEL, TRANSFER_TAG } from "../lib/format";
+import type { LocalFile, TransferRecord } from "../lib/types";
 import { useApp } from "../store/app";
 import { useFileTargets } from "../windows/SendFileDialog";
 
@@ -11,14 +11,16 @@ export function TransfersView() {
   const loaded = useApp((s) => s.transfersLoaded);
   const refresh = useApp((s) => s.refreshTransfers);
   const pickFile = useApp((s) => s.pickFile);
-  const pendingFile = useApp((s) => s.pendingFile);
-  const setPendingFile = useApp((s) => s.setPendingFile);
+  const pendingFiles = useApp((s) => s.pendingFiles);
+  const setPendingFiles = useApp((s) => s.setPendingFiles);
+  const clearFinished = useApp((s) => s.clearFinishedTransfers);
 
   useEffect(() => {
     if (!loaded) void refresh();
   }, [loaded, refresh]);
 
   const active = transfers.filter(isTransferActive).length;
+  const finished = transfers.length - active;
   const failed = transfers.filter((t) => t.state.kind === "failed").length;
   const waiting = transfers.filter((t) => t.state.kind === "waiting").length;
   const pill = failed > 0
@@ -42,20 +44,21 @@ export function TransfersView() {
           <div className="and-empty">
             <div className="orb"><Transfers size={36} /></div>
             <h3>Nenhuma transferência</h3>
-            <p style={{ lineHeight: 1.5 }}>Toque em Enviar arquivo para escolher um arquivo do dispositivo.</p>
+            <p style={{ lineHeight: 1.5 }}>Toque em Enviar arquivo para escolher um ou mais arquivos do dispositivo.</p>
           </div>
         ) : (
           <div className="and-tr-list">
+            {finished > 0 && <button className="btn btn-ghost and-clear" onClick={() => void clearFinished()}>Limpar concluídas</button>}
             {transfers.map((t) => <TransferCard key={t.id} t={t} />)}
           </div>
         )}
       </div>
 
       <div className="and-tr-cta">
-        <button className="btn btn-primary btn-block" onClick={pickFile}><Upload size={18} /> Enviar arquivo</button>
+        <button className="btn btn-primary btn-block" onClick={() => void pickFile()}><Upload size={18} /> Enviar arquivo</button>
       </div>
 
-      {pendingFile && <SendFileSheet file={pendingFile} onClose={() => setPendingFile(null)} />}
+      {pendingFiles && <SendFileSheet files={pendingFiles} onClose={() => setPendingFiles(null)} />}
     </>
   );
 }
@@ -129,9 +132,10 @@ function TransferCard({ t }: { t: TransferRecord }) {
   );
 }
 
-function SendFileSheet({ file, onClose }: { file: { path: string; name: string; size: number }; onClose: () => void }) {
+function SendFileSheet({ files, onClose }: { files: LocalFile[]; onClose: () => void }) {
   const { targets, loading } = useFileTargets();
-  const sendFile = useApp((s) => s.sendFile);
+  const sendFiles = useApp((s) => s.sendFiles);
+  const summary = filesSummary(files);
   const [selected, setSelected] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
   const available = targets.filter((t) => t.selectable);
@@ -144,9 +148,9 @@ function SendFileSheet({ file, onClose }: { file: { path: string; name: string; 
     <div className="sheet-backdrop" onClick={onClose}>
       <div className="sheet" onClick={(e) => e.stopPropagation()}>
         <div className="handle" />
-        <h3>Enviar arquivo</h3>
-        <div className="sub">Escolha o dispositivo que recebe este arquivo.</div>
-        <div className="preview">{file.name}{file.size ? ` · ${bytes(file.size)}` : ""}</div>
+        <h3>{files.length === 1 ? "Enviar arquivo" : "Enviar arquivos"}</h3>
+        <div className="sub">Escolha o dispositivo que {files.length === 1 ? "recebe este arquivo" : "recebe estes arquivos"}.</div>
+        <div className="preview">{summary.title}{summary.meta ? ` · ${summary.meta}` : ""}</div>
         <div className="targets">
           {!loading && available.length === 0 && (
             <div className="muted" style={{ fontSize: 13.5 }}>Nenhum dispositivo disponível: os pareados estão offline ou não aceitam arquivos.</div>
@@ -173,7 +177,7 @@ function SendFileSheet({ file, onClose }: { file: { path: string; name: string; 
           onClick={async () => {
             if (!chosen) return;
             setSending(true);
-            await sendFile(chosen.device.deviceId, file.path);
+            await sendFiles(chosen.device.deviceId, files);
             setSending(false);
             onClose();
           }}

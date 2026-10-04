@@ -249,6 +249,7 @@ button { font-family: inherit; }
 .and { height: 100%; display: flex; flex-direction: column; background: var(--color-bg); padding-top: env(safe-area-inset-top); }
 .and-head { padding: 14px 18px 10px; display: flex; align-items: center; gap: 11px; }
 .and-head .logo { width: 30px; height: 30px; border-radius: 999px; background: var(--color-accent); display: flex; align-items: center; justify-content: center; color: #f5ead8; flex-shrink: 0; }
+.and-clear { align-self: flex-end; font-size: 12.5px; font-weight: 700; color: var(--color-accent-800); padding: 4px 6px; }
 .and-head .brand { font-family: var(--font-heading); font-size: 22px; }
 .and-head .page-title { font-family: var(--font-heading); font-size: 25px; }
 .and-head .icon-btn.lg { margin-left: auto; }
