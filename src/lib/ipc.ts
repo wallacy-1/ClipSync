@@ -13,6 +13,7 @@ import type {
   Settings,
   SyncStatus,
   TransferRecord,
+  UpdateInfo,
 } from "./types";
 
 export const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
@@ -107,6 +108,9 @@ export const api = {
   notifyPermissionRequest: (openSettings: boolean) => call<void>("notify_permission_request", { openSettings }),
   shareTake: () => call<SharedPayload | null>("share_take"),
   shareText: (text: string, deviceIds: string[]) => call<ClipboardItem>("share_text", { text, deviceIds }),
+  updateStatus: () => call<UpdateInfo | null>("update_status"),
+  updateCheck: () => call<UpdateInfo | null>("update_check"),
+  updateInstall: () => call<void>("update_install"),
 };
 
 /** Abre a câmera e devolve o conteúdo do QR (só Android/iOS). */

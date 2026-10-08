@@ -347,6 +347,11 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
       return null;
     }
     case "share_text": return items[0];
+    case "update_status": return null;
+    case "update_check":
+      await sleep(600);
+      return { version: "1.1.0", currentVersion: "1.0.0", notes: null };
+    case "update_install": await sleep(1200); return;
     default:
       throw new Error(`mock: comando desconhecido ${cmd}`);
   }

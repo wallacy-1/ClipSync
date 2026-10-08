@@ -39,6 +39,10 @@ pub const TRANSFER_ASK: &str = "transfer:ask";
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub const SHARE_RECEIVED: &str = "share:received";
 
+/// Nova versão encontrada pelo updater (desktop): `{ version, currentVersion, notes }`.
+#[cfg_attr(any(target_os = "android", target_os = "ios"), allow(dead_code))]
+pub const UPDATE_AVAILABLE: &str = "update:available";
+
 pub fn emit<P: Serialize + Clone>(app: &AppHandle, name: &str, payload: P) {
     if let Err(e) = app.emit(name, payload) {
         log::warn!("falha ao emitir {name}: {e}");

@@ -147,8 +147,34 @@ export function AboutRows() {
   const [version, setVersion] = useState<string | null>(null);
   useEffect(() => { void appVersion().then(setVersion).catch(() => setVersion("?")); }, []);
   return (
-    <Row label="Versão" help={`ClipSync para ${PLATFORM_LABEL[platform] ?? platform}`}>
-      <span className="tag">{version ?? "…"}</span>
+    <>
+      <Row label="Versão" help={`ClipSync para ${PLATFORM_LABEL[platform] ?? platform}`}>
+        <span className="tag">{version ?? "…"}</span>
+      </Row>
+      {platform === "windows" && <UpdateRow />}
+    </>
+  );
+}
+
+function UpdateRow() {
+  const update = useApp((st) => st.update);
+  const updateBusy = useApp((st) => st.updateBusy);
+  const checkUpdate = useApp((st) => st.checkUpdate);
+  const installUpdate = useApp((st) => st.installUpdate);
+  if (update) {
+    return (
+      <Row label="Atualização" help={`Versão ${update.version} disponível; o app reinicia ao instalar`}>
+        <button className="chip" disabled={updateBusy !== null} onClick={() => void installUpdate()}>
+          {updateBusy === "install" ? "Instalando…" : "Atualizar e reiniciar"}
+        </button>
+      </Row>
+    );
+  }
+  return (
+    <Row label="Atualização" help="Procura novas versões sozinho a cada poucas horas">
+      <button className="chip" disabled={updateBusy !== null} onClick={() => void checkUpdate()}>
+        {updateBusy === "check" ? "Procurando…" : "Procurar agora"}
+      </button>
     </Row>
   );
 }

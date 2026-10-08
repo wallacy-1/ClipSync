@@ -195,3 +195,10 @@ export interface CopiedFiles {
 export type PickedFiles =
   | { cancelled: true }
   | { cancelled?: false; files: { uri: string; name: string; size: number; mime: string | null; dir?: boolean }[] };
+
+/** Nova versão encontrada pelo updater (só desktop). */
+export interface UpdateInfo {
+  version: string;
+  currentVersion: string;
+  notes: string | null;
+}

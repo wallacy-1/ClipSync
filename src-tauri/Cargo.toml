@@ -60,6 +60,7 @@ zip = { version = "2", default-features = false, features = ["deflate"] }
 tauri-plugin-autostart = "~2.5"
 tauri-plugin-single-instance = "~2.4"
 keyring = { version = "3", features = ["windows-native", "apple-native", "sync-secret-service"] }
+tauri-plugin-updater = "~2.10"
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_DataExchange", "Win32_Storage_FileSystem"] }

@@ -36,9 +36,17 @@ Sem servidor, sem conta, sem nuvem. Uma base de código: **Tauri 2 + React + Typ
 
 ### Segurança
 
-- Nenhum clipboard trafega em texto puro; o único quadro em claro é o `PreHello` (versão + modo).
+- Nenhum clipboard trafega em texto puro; em claro só vão o `PreHello` (versão + modo) e, no pareamento, as mensagens do SPAKE2 (não revelam o segredo).
 - Chave privada cifrada em repouso com ChaCha20-Poly1305. A KEK fica no **Credential Manager** (Windows) ou cifrada pelo **Android Keystore** (Android, `KeyGuard.kt`).
-- Criptografia só via bibliotecas consolidadas: `snow`, `chacha20poly1305`, `sha2`.
+- Criptografia só via bibliotecas consolidadas: `snow`, `spake2`, `chacha20poly1305`, `sha2`.
+- Panic no núcleo (o release usa `panic = "abort"`) é gravado em `crash.log` no diretório de dados do app
+  (`%APPDATA%\app.clipsync.desktop\` no Windows) antes de o processo encerrar.
+
+### Atualização automática (Windows)
+
+`tauri-plugin-updater` procura uma versão nova 15 s após abrir e a cada 6 h; Ajustes → Atualização mostra/instala.
+O pacote só é instalado se a assinatura bater com `plugins.updater.pubkey` (`tauri.conf.json`); com a chave vazia o
+updater fica desligado. Android atualiza pela loja/APK.
 
 ### Eventos (Rust → React)
 

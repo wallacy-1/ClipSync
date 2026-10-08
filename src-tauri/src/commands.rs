@@ -602,3 +602,42 @@ pub fn share_text(app: AppHandle, text: String, device_ids: Vec<String>) -> Resu
 pub fn transfer_peer_supports(app: AppHandle, device_id: String) -> bool {
     crate::transfer::manager::peer_supports_files(&app, &device_id)
 }
+
+/// Atualização pendente já encontrada pela verificação em segundo plano (só desktop).
+#[tauri::command]
+pub fn update_status() -> Option<serde_json::Value> {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        crate::updater::pending().and_then(|u| serde_json::to_value(u).ok())
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        None
+    }
+}
+
+#[tauri::command]
+pub async fn update_check(app: AppHandle) -> Result<Option<serde_json::Value>> {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        Ok(crate::updater::check(&app).await?.and_then(|u| serde_json::to_value(u).ok()))
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let _ = app;
+        Ok(None)
+    }
+}
+
+#[tauri::command]
+pub async fn update_install(app: AppHandle) -> Result<()> {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    {
+        crate::updater::install(&app).await
+    }
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let _ = app;
+        Err(AppError::Other("atualização pelo app só no desktop".into()))
+    }
+}

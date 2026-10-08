@@ -17,6 +17,7 @@ import type {
   NotifyPermission,
   SyncStatus,
   TransferRecord,
+  UpdateInfo,
 } from "../lib/types";
 
 export type View = "history" | "pinned" | "devices" | "transfers" | "settings";
@@ -66,6 +67,9 @@ interface AppStore {
   asks: string[];
   /** Android 13+: sem ela o progresso/Cancelar da transferência não aparece. null = não consultado. */
   notifyPerm: NotifyPermission | null;
+  /** Nova versão disponível (desktop). */
+  update: UpdateInfo | null;
+  updateBusy: "check" | "install" | null;
 
   init: () => Promise<void>;
   setView: (v: View) => void;
@@ -117,6 +121,8 @@ interface AppStore {
   /** Pede (diálogo do sistema) ou, se negada de vez, abre as configurações. */
   requestNotifyPerm: () => Promise<void>;
   declineTransfer: (id: string) => Promise<void>;
+  checkUpdate: () => Promise<void>;
+  installUpdate: () => Promise<void>;
 }
 
 let toastSeq = 0;
@@ -169,6 +175,8 @@ export const useApp = create<AppStore>((set, get) => ({
   copiedFiles: null,
   asks: [],
   notifyPerm: null,
+  update: null,
+  updateBusy: null,
 
   async init() {
     // StrictMode monta duas vezes em dev: registrar listeners só uma vez.
@@ -232,6 +240,14 @@ export const useApp = create<AppStore>((set, get) => ({
       }),
       listen<{ reason: string }>("pairing:failed", ({ reason }) => {
         if (reason === "expired") set({ pairing: null });
+        if (reason === "too_many_attempts") {
+          set({ pairing: null });
+          get().showToast("Muitas tentativas com código errado. Gere um novo código.", "error");
+        }
+      }),
+      listen<UpdateInfo>("update:available", (update) => {
+        set({ update });
+        get().showToast(`ClipSync ${update.version} disponível (Ajustes)`);
       }),
       listen("tray:shown", () => set({ query: "" })),
       listen<TransferRecord>("transfer:state", (rec) => {
@@ -262,6 +278,14 @@ export const useApp = create<AppStore>((set, get) => ({
         set((s) => ({ transfers: [...asks, ...s.transfers.filter((t) => !asks.some((a) => a.id === t.id))], asks: asks.map((a) => a.id) }));
       }
     } catch { /* núcleo antigo sem o comando */ }
+
+    // Atualização achada pela verificação em segundo plano antes de a janela abrir.
+    if (b.platform === "windows") {
+      try {
+        const update = await api.updateStatus();
+        if (update) set({ update });
+      } catch { /* sem updater */ }
+    }
   },
 
   setView: (view) => set({ view, filter: view === "pinned" ? "pinned" : get().filter === "pinned" ? "all" : get().filter }),
@@ -499,6 +523,22 @@ export const useApp = create<AppStore>((set, get) => ({
     set((s) => ({ asks: s.asks.filter((x) => x !== id) }));
     const rec = await guarded(() => api.transferDecline(id));
     if (rec) set((s) => ({ transfers: s.transfers.map((t) => (t.id === id ? rec : t)) }));
+  },
+
+  async checkUpdate() {
+    set({ updateBusy: "check" });
+    const res = await guarded(() => api.updateCheck());
+    set({ updateBusy: null });
+    if (res === undefined) return;
+    set({ update: res });
+    if (!res) get().showToast("Você já tem a versão mais recente");
+  },
+
+  async installUpdate() {
+    set({ updateBusy: "install" });
+    // Sucesso reinicia o app; só volta aqui em erro.
+    await guarded(() => api.updateInstall());
+    set({ updateBusy: null });
   },
 
   showToast(text, kind) {

@@ -29,9 +29,21 @@
       "csp": null
     }
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlGREEyQUU1RTg3MjQ1MUEKUldRYVJYTG81U3JhbjJnM1UvY3Zvcm9meldsdFVxczVNc2xMZHRLbjlIcXM2SUswbzZCZzMvWEsK",
+      "endpoints": [
+        "https://github.com/wallacy/ClipSync/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

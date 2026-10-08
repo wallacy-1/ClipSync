@@ -21,6 +21,8 @@ mod transport;
 mod notify;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod tray;
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+mod updater;
 
 use state::AppState;
 use std::collections::{HashMap, HashSet};
@@ -50,6 +52,7 @@ pub fn run() {
         }
         builder = builder
             .plugin(tauri_plugin_dialog::init())
+            .plugin(tauri_plugin_updater::Builder::new().build())
             .plugin(tauri_plugin_autostart::init(tauri_plugin_autostart::MacosLauncher::LaunchAgent, Some(vec![autostart::ARG])));
     }
 
@@ -108,6 +111,7 @@ pub fn run() {
             {
                 tray::setup(&handle)?;
                 autostart::sync_on_startup(&handle);
+                updater::spawn(&handle);
                 // A janela nasce escondida (tauri.conf.json); no login do Windows fica só a bandeja.
                 if autostart::launched_at_login() {
                     log::info!("[AUTOSTART] started at login: tray only");
@@ -183,6 +187,9 @@ pub fn run() {
             commands::notify_permission,
             commands::notify_permission_request,
             commands::share_text,
+            commands::update_status,
+            commands::update_check,
+            commands::update_install,
         ]);
 
     builder
