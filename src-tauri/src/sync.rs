@@ -126,8 +126,8 @@ pub fn on_clip_received(app: &AppHandle, from_device_id: &str, mut item: Clipboa
         return;
     }
 
-    // O item mantém a origem verdadeira e nunca é reenviado daqui — isso, mais o
-    // hash guardado ao escrever no clipboard, impede o ping-pong entre dispositivos.
+    // Anti-loop: o repasse abaixo só acontece na primeira vez que o id chega (o banco
+    // recusa repetido) e o hash guardado ao escrever no clipboard impede o eco local.
     item.source_device_id = from_device_id.to_string();
     item.sync_state = SyncState::Synced;
     item.is_pinned = false;
@@ -154,6 +154,13 @@ pub fn on_clip_received(app: &AppHandle, from_device_id: &str, mut item: Clipboa
         events::CLIPBOARD_RECEIVED,
         serde_json::json!({ "item": item, "fromDeviceId": from_device_id, "applied": apply }),
     );
+
+    // Repasse: celulares pareados só com o PC recebem o que o outro copiou.
+    let targets: Vec<String> = auto_targets(&state, &item).into_iter().filter(|d| d != from_device_id).collect();
+    if !targets.is_empty() {
+        log::info!("[SYNC] Relaying id={} from={from_device_id} to={targets:?}", item.id);
+        dispatch(app, &item, &targets);
+    }
 }
 
 pub fn expiry_for(settings: &crate::models::Settings, sensitive: bool, from: i64) -> Option<i64> {
