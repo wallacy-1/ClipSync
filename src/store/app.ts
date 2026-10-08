@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { isTransferActive, transferError } from "../lib/format";
-import { api, listen } from "../lib/ipc";
+import { api, errorText, listen } from "../lib/ipc";
 import type {
   ClipboardItem,
   Device,
@@ -134,7 +134,7 @@ async function guarded<T>(fn: () => Promise<T>): Promise<T | undefined> {
   try {
     return await fn();
   } catch (e) {
-    useApp.getState().showToast(String(e), "error");
+    useApp.getState().showToast(errorText(e), "error");
     return undefined;
   }
 }
@@ -358,7 +358,7 @@ export const useApp = create<AppStore>((set, get) => ({
       set({ settings: await api.setSettings(next) });
     } catch (e) {
       set({ settings: cur });
-      get().showToast(String(e), "error");
+      get().showToast(errorText(e), "error");
     }
   },
   async setDeviceFlags(deviceId, flags) {
@@ -395,7 +395,7 @@ export const useApp = create<AppStore>((set, get) => ({
       set({ ime });
       return ime;
     } catch (e) {
-      get().showToast(String(e), "error");
+      get().showToast(errorText(e), "error");
       return null;
     }
   },
@@ -432,7 +432,7 @@ export const useApp = create<AppStore>((set, get) => ({
         recs.push(rec);
         set((s) => ({ transfers: [rec, ...s.transfers.filter((t) => t.id !== rec.id)] }));
       } catch (e) {
-        errors.push(`${f.name}: ${String(e)}`);
+        errors.push(`${f.name}: ${errorText(e)}`);
       }
     }
     set({ pendingFiles: null });
@@ -445,7 +445,7 @@ export const useApp = create<AppStore>((set, get) => ({
       const rec = await api.transferCancel(id);
       set((s) => ({ transfers: s.transfers.map((t) => (t.id === id ? rec : t)) }));
     } catch (e) {
-      get().showToast(String(e), "error");
+      get().showToast(errorText(e), "error");
     } finally {
       set((s) => { const b = { ...s.transferBusy }; delete b[id]; return { transferBusy: b }; });
     }
@@ -494,7 +494,7 @@ export const useApp = create<AppStore>((set, get) => ({
         get().showToast(`Texto enviado para ${name}`);
       }
     } catch (e) {
-      get().showToast(String(e), "error");
+      get().showToast(errorText(e), "error");
     }
   },
   dismissShare: () => set({ pendingShare: null }),

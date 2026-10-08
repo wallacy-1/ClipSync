@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { AndroidShell } from "./android/AndroidShell";
+import { errorText } from "./lib/ipc";
 import { useApp } from "./store/app";
 import { TrayPanel } from "./windows/TrayPanel";
 import { WinShell } from "./windows/WinShell";
@@ -13,7 +14,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    init().catch((e) => setError(String(e)));
+    init().catch((e) => setError(errorText(e)));
   }, [init]);
 
   if (error) {

@@ -32,6 +32,18 @@ async function ensureTauri() {
   tauriListen = event.listen;
 }
 
+/** Texto legível de um erro: comandos rejeitam com string; plugins, com `{ message }`. */
+export function errorText(e: unknown): string {
+  if (typeof e === "string") return e;
+  if (e instanceof Error) return e.message;
+  if (e && typeof e === "object" && "message" in e && typeof e.message === "string") return e.message;
+  try {
+    return JSON.stringify(e);
+  } catch {
+    return String(e);
+  }
+}
+
 /** Versão do app (`tauri.conf.json`); no navegador com mock, "dev". */
 export async function appVersion(): Promise<string> {
   if (!inTauri) return "dev";

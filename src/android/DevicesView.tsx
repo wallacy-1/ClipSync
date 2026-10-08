@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Back, Plus, Shield } from "../components/Icons";
 import { Avatar, Confirm, DeviceBadge, Toggle } from "../components/ui";
 import { PLATFORM_LABEL, relTime } from "../lib/format";
-import { api, cancelScan, inTauri, scanQr } from "../lib/ipc";
+import { api, cancelScan, errorText, inTauri, scanQr } from "../lib/ipc";
 import type { Device } from "../lib/types";
 import { usePeers, useApp } from "../store/app";
 
@@ -94,7 +94,7 @@ function usePair() {
       showToast(`${id.name} pareado`);
       return true;
     } catch (e) {
-      setError(String(e));
+      setError(errorText(e));
       return false;
     } finally {
       setBusy(false);
@@ -121,7 +121,7 @@ function ScanView({ onBack, onManual }: { onBack: () => void; onManual: () => vo
         const ok = await run(() => api.pairWithPayload(raw));
         if (ok && alive.current) onBack();
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : String(e));
+        if (!cancelled) setError(errorText(e));
       } finally {
         if (!cancelled) setScanning(false);
       }
