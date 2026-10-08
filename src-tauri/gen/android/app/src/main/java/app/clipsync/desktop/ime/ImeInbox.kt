@@ -8,14 +8,10 @@ import java.io.File
 import java.util.UUID
 
 /**
- * Fila local para clips detectados pelo IME enquanto o núcleo Rust não está
- * vivo. Cada item é um arquivo em `files/ime_inbox/`, selado com a mesma chave
- * AES-GCM não exportável do Android Keystore que protege a KEK ([KeyGuard]).
- * Nada em texto puro em disco; nenhuma chave nova.
- *
- * Itens expiram em [TTL_MS] (espelha a limpeza automática do clipboard do
- * Android 13+, ~1 h) e a fila é limitada a [MAX_ITEMS]. O núcleo remove cada
- * item **depois** de processá-lo (`CoreBridge.removeInbox`).
+ * Fila de clips detectados pelo IME com o núcleo Rust morto. Um arquivo por item em
+ * `files/ime_inbox/`, selado com a chave do Keystore que protege a KEK ([KeyGuard]).
+ * Expira em [TTL_MS] (como a limpeza do clipboard do Android 13+) e limita a
+ * [MAX_ITEMS]. O núcleo só remove cada item depois de processá-lo.
  */
 object ImeInbox {
     private const val DIR = "ime_inbox"

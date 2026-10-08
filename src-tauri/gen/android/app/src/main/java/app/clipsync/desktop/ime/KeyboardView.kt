@@ -20,11 +20,8 @@ import kotlin.math.max
 enum class ShiftState { OFF, ON, LOCKED }
 
 /**
- * Renderiza uma [KeyboardLayer] com um [KeyboardTheme] e traduz toques em
- * [KeyAction]. Não conhece o campo de texto: só avisa o [listener].
- *
- * O `android.inputmethodservice.KeyboardView` do SDK é deprecated (API 29),
- * por isso a view é própria. Não registra nem persiste nada do que é digitado.
+ * Renderiza uma [KeyboardLayer] com um [KeyboardTheme] e traduz toques em [KeyAction].
+ * View própria porque o `KeyboardView` do SDK é deprecated (API 29).
  */
 class KeyboardView(context: Context) : View(context) {
 

@@ -1,9 +1,7 @@
 package app.clipsync.desktop.ime
 
 /**
- * Descrição pura do teclado (o quê e onde). Não sabe nada de cor, fonte ou
- * tamanho em pixels — isso é do [KeyboardTheme]. O mesmo layout é desenhado
- * por qualquer tema.
+ * Descrição pura do teclado (o quê e onde); a aparência fica no [KeyboardTheme].
  */
 sealed class KeyAction {
     /** Insere texto no campo. [shifted] é a versão com shift (null = uppercase do próprio). */
@@ -12,7 +10,6 @@ sealed class KeyAction {
     object Backspace : KeyAction()
     object Enter : KeyAction()
     object Space : KeyAction()
-    /** Troca para outra camada do layout (letras, símbolos...). */
     data class Layer(val id: String) : KeyAction()
     /** Troca para o próximo teclado do sistema (🌐). */
     object SwitchIme : KeyAction()

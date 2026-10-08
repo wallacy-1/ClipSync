@@ -25,7 +25,6 @@ pub struct CopiedFile {
 #[serde(rename_all = "camelCase")]
 pub struct CopiedFiles {
     pub files: Vec<CopiedFile>,
-    /// Arquivos além de [`MAX_FILES`].
     pub skipped_files: u32,
     pub copied_at: i64,
 }

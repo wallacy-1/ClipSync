@@ -1,7 +1,7 @@
 # Teste 3/4: B cai, A copia (vai para a fila), B volta, fila é entregue.
 Set-Location $PSScriptRoot\..
 $procs = Get-CimInstance Win32_Process -Filter "Name = 'clipsync.exe'"
-# B é a instância cuja variável de ambiente CLIPSYNC_PROFILE=b: identifico pelo log de B (pid registrado no run.ps1 não é salvo), então uso a porta CDP: A tem 9222.
+# A é a instância com CDP na porta 9222.
 $pidA = (Get-NetTCPConnection -LocalPort 9222 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1).OwningProcess
 # 9222 pertence ao msedgewebview2 filho de A; subo até o clipsync pai
 $pidAclip = $pidA

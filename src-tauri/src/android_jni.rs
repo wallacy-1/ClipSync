@@ -36,7 +36,6 @@ pub fn with_class<T>(class: &str, f: impl FnOnce(&mut JNIEnv, &JClass, &JObject)
     out
 }
 
-/// Converte um `jstring` devolvido por um método estático em `String`.
 pub fn jstring_to_string(env: &mut JNIEnv, obj: JObject) -> Result<String> {
     let js = jni::objects::JString::from(obj);
     let s: String = env.get_string(&js).map_err(|e| AppError::Other(e.to_string()))?.into();

@@ -9,10 +9,8 @@ import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
 /**
- * Cifra/decifra pequenos blobs com uma chave AES-256-GCM que vive no Android
- * Keystore (não exportável; hardware-backed quando o aparelho suporta).
- * Usado pelo núcleo Rust para proteger a chave-de-encriptação-de-chaves (KEK).
- * Chamado via JNI a partir de qualquer thread.
+ * Cifra/decifra blobs com uma chave AES-256-GCM não exportável do Android Keystore.
+ * Protege a KEK do núcleo Rust; chamado via JNI de qualquer thread.
  */
 object KeyGuard {
     private const val ALIAS = "clipsync-kek-v1"

@@ -10,9 +10,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * "Compartilhar → ClipSync". A Activity entrega o `Intent` aqui; a UI busca o
- * pendente pelo Rust (`share_take`) ao abrir e ao voltar ao primeiro plano.
- * Sem regra de envio aqui: só traduz o Intent em `{files:[{uri,name,size,mime}], text}`.
+ * "Compartilhar → ClipSync": traduz o Intent em `{files:[{uri,name,size,mime}], text}`
+ * pendente; a UI busca via `share_take` ao abrir e ao voltar ao primeiro plano.
  */
 object ShareBridge {
     @Volatile private var pending: String? = null

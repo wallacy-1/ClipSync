@@ -99,7 +99,6 @@ pub fn run() {
             clipboard::spawn_watcher(handle.clone());
             sync::spawn_expiry_task(handle.clone());
             transfer::manager::startup(&handle);
-            // ClipSync Keyboard: núcleo pronto para receber clips do IME + drena o inbox.
             ime::attach(&handle);
 
             #[cfg(not(any(target_os = "android", target_os = "ios")))]

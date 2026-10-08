@@ -243,9 +243,8 @@ pub fn peer_has_cap(app: &AppHandle, device_id: &str, cap: &str) -> bool {
     conns.get(device_id).map(|c| c.caps.iter().any(|x| x == cap)).unwrap_or(false)
 }
 
-/// Enfileira o envio de uma origem local (caminho ou `content://` no Android) para
-/// um device pareado. Retorna a linha criada; o envio real começa quando houver
-/// conexão com `file-v1`.
+/// Enfileira o envio de uma origem local (caminho ou `content://`) para um device
+/// pareado; o envio começa quando houver conexão com `file-v1`.
 pub fn send_file(app: &AppHandle, device_id: &str, source_str: &str) -> Result<TransferRecord> {
     send_file_with(app, device_id, source_str, None)
 }

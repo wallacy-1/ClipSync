@@ -15,9 +15,8 @@ import java.io.File
 import java.io.FileOutputStream
 
 /**
- * Imagem no clipboard do Android (ponte JNI). Só funciona com o app em primeiro
- * plano (Android 10+), como o texto. Sem regra de sync aqui: o Rust decide o que
- * enviar e quando aplicar.
+ * Imagem no clipboard do Android (ponte JNI). Como o texto, só funciona com o app
+ * em primeiro plano (Android 10+).
  */
 object ClipImageBridge {
     /** Rótulo das imagens que o próprio ClipSync põe no clipboard (anti-loop). */

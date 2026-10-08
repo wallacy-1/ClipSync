@@ -11,9 +11,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Ponte Kotlin chamada pelo núcleo Rust via JNI (mesmo padrão do KeyGuard):
- * estado do IME nas configurações do sistema, atalhos para as telas oficiais
- * do Android e preferência de tema. Só APIs públicas; nada de reflection.
+ * Ponte JNI do IME: estado nas configurações do sistema, atalhos para as telas
+ * oficiais do Android e preferência de tema.
  */
 object ImeBridge {
     private fun component(context: Context) =

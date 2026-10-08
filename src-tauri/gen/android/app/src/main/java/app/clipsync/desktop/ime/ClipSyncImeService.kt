@@ -11,15 +11,9 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 
 /**
- * ClipSync Keyboard — teclado opcional do ClipSync.
- *
- * Regras de privacidade (ver docs/ime.md):
- *  - nada do que é digitado é registrado, persistido ou enviado; o serviço só
- *    repassa cada tecla ao campo via `InputConnection`;
- *  - campos de senha são tratados como qualquer outro campo, sem auto-capitalização
- *    e sem qualquer processamento adicional;
- *  - a única coisa observada fora do fluxo normal do teclado é o clipboard do
- *    sistema, via [ClipboardBridge] (conteúdo nunca vai para log; ver docs/ime.md).
+ * Teclado opcional do ClipSync. Nada do que é digitado é registrado, persistido ou
+ * enviado; a única coisa observada fora do fluxo normal do teclado é o clipboard,
+ * via [ClipboardBridge] (ver docs/ime.md).
  */
 class ClipSyncImeService : InputMethodService() {
 
@@ -67,7 +61,6 @@ class ClipSyncImeService : InputMethodService() {
         return view
     }
 
-    /** Sem modo tela cheia em paisagem: o teclado fica só na parte de baixo. */
     override fun onEvaluateFullscreenMode(): Boolean = false
 
     /**

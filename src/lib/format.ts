@@ -158,7 +158,6 @@ export function transferError(error: string, device: string): string {
   return error;
 }
 
-/** Segunda linha do item: bytes e percentual vêm do evento; nada é estimado aqui. */
 /** Imagem do clipboard (vai para a área de transferência, não para Downloads). */
 export const isClipImage = (t: TransferRecord) => t.purpose === "clipboard";
 

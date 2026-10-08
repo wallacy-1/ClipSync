@@ -17,23 +17,16 @@ import androidx.core.app.NotificationCompat
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Foreground Service `dataSync` que existe **só enquanto há transferência de
- * arquivo ativa**. Mantém o processo fora do estado *cached* (rede viva no
- * Android 15+) com notificação de progresso e ação Cancelar.
+ * Foreground Service `dataSync` que existe só enquanto há transferência ativa:
+ * mantém o processo fora do estado cached (rede viva no Android 15+). Independe do IME.
  *
- * Fronteira: IME = clipboard em segundo plano; este serviço = transferência ativa.
- * Um não depende do outro. O Rust liga/atualiza/desliga via [TransferBridge].
- *
-  * Contrato com o sistema:
- * - Só o START passa por `startForegroundService()`; cada um exige um
- *   `startForeground()` em seguida, mesmo que o pedido de parar já tenha chegado
- *   (senão `ForegroundServiceDidNotStartInTimeException`).
- * - UPDATE e STOP falam **direto com a instância** (nunca `startService()` do
- *   background — `IllegalStateException`/`ForegroundServiceStartNotAllowedException`).
- * - "Último pedido vence": [desired] é o estado que o Rust quer; START/STOP fora
- *   de ordem convergem para ele.
- * - Nada aqui lança: o sistema recusar o FGS (app em segundo plano) não é fatal,
- *   a transferência segue sem ele e o Rust tenta de novo quando a Activity volta.
+ * Contrato com o sistema:
+ * - Cada `startForegroundService()` exige um `startForeground()` em seguida, mesmo
+ *   que o stop já tenha chegado (senão `ForegroundServiceDidNotStartInTimeException`).
+ * - UPDATE e STOP falam direto com a instância; nunca `startService()` do background.
+ * - [desired] é o estado que o Rust quer: START/STOP fora de ordem convergem para ele.
+ * - Recusa do FGS em segundo plano não é fatal: a transferência segue sem ele e o
+ *   Rust tenta de novo quando a Activity volta.
  */
 class TransferService : Service() {
     companion object {
@@ -49,7 +42,6 @@ class TransferService : Service() {
         /** Piso entre `notify()` (o NotificationService descarta acima de ~5/s por pacote). */
         private const val MIN_NOTIFY_INTERVAL_MS = 250L
 
-        /** Instância viva (entre `onCreate` e `onDestroy`). */
         @Volatile private var instance: TransferService? = null
         /** O que o Rust quer: true entre o último start e o último stop. */
         @Volatile private var desired = false

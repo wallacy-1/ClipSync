@@ -154,7 +154,6 @@ impl Rx {
         let ok = computed == expected && computed == done_sha;
         let state = self.app.state::<AppState>();
         let _ = state.db.transfer_set_hashes(&self.id, Some(expected), Some(&computed));
-        // Comprimento final tem de bater com o anunciado.
         let len_ok = std::fs::metadata(&self.part).map(|m| m.len() == self.size).unwrap_or(false);
         if !ok || !len_ok {
             let why = if !len_ok { "length" } else { "mismatch" };

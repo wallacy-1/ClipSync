@@ -6,7 +6,6 @@ import android.graphics.Typeface
 import androidx.core.content.res.ResourcesCompat
 import app.clipsync.desktop.R
 
-/** Cores de um tema num modo (claro ou escuro). */
 data class Palette(
     val background: Int,
     val key: Int,
@@ -104,9 +103,7 @@ object DefaultTheme : KeyboardTheme {
 }
 
 /**
- * Tema ClipSync: tokens do design "Organic" (src/styles/tokens.css) —
- * bg #f5ead8, surface #ebddc5, texto #201e1d, accent #c67139, accent-2 #7a8a5e,
- * radius-sm 8, fonte Figtree. Identidade nos detalhes, não em logotipos.
+ * Tema ClipSync: tokens do design "Organic" (src/styles/tokens.css) e fonte Figtree.
  */
 object ClipSyncTheme : KeyboardTheme {
     override val id = "clipsync"

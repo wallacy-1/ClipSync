@@ -86,12 +86,10 @@ export const api = {
   pairWithCode: (code: string) => call<DeviceIdentity>("pair_with_code", { code }),
   windowAction: (action: string) => call<void>("window_action", { action }),
   quit: () => call<void>("quit"),
-  // ClipSync Keyboard (IME opcional)
   imeStatus: () => call<ImeStatus>("ime_status"),
   imeOpenSettings: () => call<void>("ime_open_settings"),
   imeShowPicker: () => call<void>("ime_show_picker"),
   imeSetTheme: (theme: string) => call<ImeStatus>("ime_set_theme", { theme }),
-  // Transferência de arquivos
   transferList: (limit?: number) => call<TransferRecord[]>("transfer_list", { limit }),
   transferSend: (deviceId: string, path: string) => call<TransferRecord>("transfer_send", { deviceId, path }),
   transferCancel: (id: string) => call<TransferRecord>("transfer_cancel", { id }),
@@ -105,7 +103,6 @@ export const api = {
   transferPeerSupports: (deviceId: string) => call<boolean>("transfer_peer_supports", { deviceId }),
   transferOpen: (id: string) => call<void>("transfer_open", { id }),
   transferReveal: (id: string) => call<void>("transfer_reveal", { id }),
-  // "Compartilhar → ClipSync" (Android)
   notifyPermission: () => call<NotifyPermission>("notify_permission"),
   notifyPermissionRequest: (openSettings: boolean) => call<void>("notify_permission_request", { openSettings }),
   shareTake: () => call<SharedPayload | null>("share_take"),

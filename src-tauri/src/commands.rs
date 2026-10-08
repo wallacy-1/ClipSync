@@ -106,7 +106,6 @@ pub fn clear_history(app: AppHandle, state: State<'_, AppState>, keep_pinned: bo
     Ok(n)
 }
 
-/// Revela um item sensível (a UI mostra mascarado por padrão).
 #[tauri::command]
 pub fn reveal_item(state: State<'_, AppState>, id: String) -> Result<String> {
     let Some(item) = state.db.get_item(&id)? else {
@@ -207,7 +206,6 @@ pub fn set_device_flags(
 ) -> Result<Vec<Device>> {
     state.db.set_device_flags(&device_id, auto_send, auto_receive, blocked)?;
     if blocked == Some(true) {
-        // Revogação: nenhuma transferência sobrevive ao bloqueio.
         crate::transfer::manager::cancel_all_for_device(&app, &device_id);
         state.send_to(&device_id, crate::transport::protocol::Message::Bye);
     }

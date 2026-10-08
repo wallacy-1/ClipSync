@@ -3,14 +3,9 @@ package app.clipsync.desktop.ime
 import android.content.Context
 
 /**
- * Fronteira Kotlin ↔ núcleo Rust para o clipboard do IME.
- *
- * - `nativeOnClip` (implementada em `src-tauri/src/ime.rs`): entrega um clip ao
- *   `clipboard::handle_text`. Só pode ser chamada quando [ready] é `true` — antes
- *   disso a biblioteca nativa pode nem estar carregada (processo criado só para o
- *   IME, sem a Activity do Tauri).
- * - `setReady` é chamada pelo Rust no fim do `setup`.
- * - `listInbox` / `removeInbox` são chamadas pelo Rust para drenar o [ImeInbox].
+ * Fronteira Kotlin/Rust do clipboard do IME. `nativeOnClip` (src-tauri/src/ime.rs)
+ * só pode ser chamada com [ready] `true`: antes disso a biblioteca nativa pode nem
+ * estar carregada (processo criado só para o IME, sem a Activity do Tauri).
  */
 object CoreBridge {
     @Volatile

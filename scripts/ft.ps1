@@ -1,4 +1,4 @@
-# Ferramenta de teste (3c.2): envia um arquivo de um perfil para outro via CDP,
+# Ferramenta de teste: envia um arquivo de um perfil para outro via CDP,
 # espera terminar e confere o SHA-256 do destino. Não faz parte do produto.
 # Uso: .\scripts\ft.ps1 -From a -To b -Path E:\clipsync-build\ft\10mb.bin [-TimeoutSec 600]
 param(

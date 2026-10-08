@@ -17,7 +17,6 @@ pub struct ImeStatus {
     pub supported: bool,
     /// Habilitado em Configurações → Teclados.
     pub enabled: bool,
-    /// É o teclado padrão atual.
     pub selected: bool,
     pub theme: String,
     pub themes: Vec<ImeTheme>,
@@ -131,9 +130,6 @@ mod platform {
     pub fn set_core_ready(_ready: bool) {}
     pub fn drain_inbox(_app: &tauri::AppHandle) {}
 }
-
-// Kotlin detecta a cópia e deduplica; anti-loop, classificação, SQLite e sync ficam em `clipboard::handle_text`.
-// Sem núcleo vivo (processo criado só para o IME), o Kotlin guarda no inbox selado pelo KeyGuard e o núcleo drena ao subir.
 
 use std::sync::OnceLock;
 use tauri::AppHandle;

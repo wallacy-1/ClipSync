@@ -9,19 +9,12 @@ import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 /**
- * Único leitor de clipboard do IME. Enquanto o ClipSync Keyboard é o teclado
- * padrão, o Android entrega `OnPrimaryClipChangedListener` a este processo
- * mesmo sem foco de janela (provado em docs/ime-probe-clipboard.md).
- *
- * Faz só o mínimo antes de entregar ao núcleo:
- *  1. lê o clip (texto), calcula SHA-256, lê `EXTRA_IS_SENSITIVE`;
- *  2. deduplica: o listener dispara 2–3× por cópia — o mesmo hash dentro de
- *     [DEDUPE_WINDOW_MS] não volta a cruzar o JNI;
- *  3. entrega: núcleo vivo → `CoreBridge.nativeOnClip` → `clipboard::handle_text`
- *     (anti-loop, classificação, SQLite, expiração, sync); núcleo morto → [ImeInbox].
- *
- * Nunca registra o conteúdo (log só de hash/tamanho, e só em debug). Não observa
- * teclas nem campos de texto: a única fonte é o `ClipboardManager`.
+ * Único leitor de clipboard do IME. Sendo o teclado padrão, o Android entrega
+ * `OnPrimaryClipChangedListener` a este processo mesmo sem foco de janela
+ * (docs/ime-probe-clipboard.md). O listener dispara 2–3× por cópia, por isso o
+ * dedupe por hash em [DEDUPE_WINDOW_MS]. Com o núcleo vivo entrega via
+ * `CoreBridge.nativeOnClip`; com ele morto, guarda no [ImeInbox].
+ * Nunca registra o conteúdo (log só de hash/tamanho, em debug).
  */
 object ClipboardBridge {
     private const val TAG = "ClipSyncIME"

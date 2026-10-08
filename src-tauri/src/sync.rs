@@ -131,7 +131,6 @@ pub fn on_clip_received(app: &AppHandle, from_device_id: &str, mut item: Clipboa
     item.source_device_id = from_device_id.to_string();
     item.sync_state = SyncState::Synced;
     item.is_pinned = false;
-    // Expiração local segue as regras locais.
     item.expires_at = expiry_for(&settings, item.is_sensitive, item.created_at.max(now_ms()));
 
     let inserted = state.db.insert_item(&item).unwrap_or(false);
