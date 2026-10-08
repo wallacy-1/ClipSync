@@ -6,6 +6,7 @@ use crate::models::{now_ms, DeviceState};
 use crate::state::{AppState, ConnHandle};
 use crate::sync;
 use crate::transport::noise::{handshake_initiator, handshake_responder, HandshakeResult};
+use crate::transport::pairing::{Pake, PairAuth, MAX_PAIR_FAILURES};
 use crate::transfer;
 use crate::transport::protocol::{read_frame, write_frame, DataFrame, Inbound, Message, PreHello, SecureChannel, CAP_CLIP_IMAGE_V1, CAP_FILE_ASK_V1, CAP_FILE_V1, PROTOCOL_VERSION};
 use std::time::Duration;
@@ -22,8 +23,8 @@ pub enum Role {
 pub enum Mode {
     /// Conexão normal entre dispositivos já pareados.
     Session,
-    /// Pareamento: PSK derivada do código exibido no QR.
-    Pair { psk: [u8; 32] },
+    /// Pareamento: PAKE com o segredo do QR ou o código digitado; a chave vira a PSK do Noise.
+    Pair { auth: PairAuth, password: Vec<u8> },
 }
 
 const HANDSHAKE_TIMEOUT: Duration = Duration::from_secs(15);
@@ -118,7 +119,13 @@ pub async fn connect_session(app: AppHandle, device_id: String, addr: String) {
 }
 
 /// Conexão de saída para parear (lado que escaneou o QR / digitou o código).
-pub async fn connect_pair(app: AppHandle, addr: String, pairing_id: Option<String>, psk: [u8; 32]) -> Result<DeviceIdentity> {
+pub async fn connect_pair(
+    app: AppHandle,
+    addr: String,
+    pairing_id: Option<String>,
+    auth: PairAuth,
+    password: Vec<u8>,
+) -> Result<DeviceIdentity> {
     let stream = tokio::time::timeout(Duration::from_secs(8), TcpStream::connect(&addr))
         .await
         .map_err(|_| AppError::Net(format!("não foi possível alcançar {addr}")))??;
@@ -126,7 +133,7 @@ pub async fn connect_pair(app: AppHandle, addr: String, pairing_id: Option<Strin
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
         let mut paired_tx = Some(tx);
-        let r = run_with_pairing_id(app2, stream, Role::Initiator, Mode::Pair { psk }, pairing_id, &mut paired_tx).await;
+        let r = run_with_pairing_id(app2, stream, Role::Initiator, Mode::Pair { auth, password }, pairing_id, &mut paired_tx).await;
         if let Err(e) = r {
             log::debug!("sessão de pareamento encerrada: {e}");
             // Se o pareamento não chegou a completar, devolve o erro real.
@@ -231,6 +238,33 @@ async fn complete_pairing(
     Ok((d, caps))
 }
 
+/// Handshake de pareamento recusado no lado que exibe o código. Cada conexão testa um
+/// só palpite (PAKE); após [`MAX_PAIR_FAILURES`] a sessão acaba e é preciso gerar outra.
+fn note_pairing_failure(app: &AppHandle, pairing_id: &str) {
+    let state = app.state::<AppState>();
+    let exhausted = {
+        let mut p = state.pairing.lock().unwrap();
+        match p.as_mut() {
+            Some(s) if s.id == pairing_id => {
+                s.failures += 1;
+                log::warn!("[PAIRING] Failed attempt {}/{MAX_PAIR_FAILURES} id={pairing_id}", s.failures);
+                if s.failures >= MAX_PAIR_FAILURES {
+                    *p = None;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => false,
+        }
+    };
+    if exhausted {
+        log::warn!("[PAIRING] Too many failed attempts, session closed id={pairing_id}");
+        super::reannounce(app);
+        events::emit(app, events::PAIRING_FAILED, serde_json::json!({ "pairingId": pairing_id, "reason": "too_many_attempts" }));
+    }
+}
+
 pub async fn run(app: AppHandle, stream: TcpStream, role: Role, mode: Mode) -> Result<()> {
     run_with_pairing_id(app, stream, role, mode, None, &mut None).await
 }
@@ -254,6 +288,10 @@ async fn run_with_pairing_id(
                 v: PROTOCOL_VERSION,
                 mode: if matches!(mode, Mode::Pair { .. }) { "pair".into() } else { "session".into() },
                 pairing_id: pairing_id.clone(),
+                auth: match &mode {
+                    Mode::Pair { auth, .. } => Some(auth.as_str().into()),
+                    Mode::Session => None,
+                },
             };
             write_frame(&mut stream, &serde_json::to_vec(&hello)?).await?;
             (mode, pairing_id)
@@ -267,10 +305,18 @@ async fn run_with_pairing_id(
                 return Err(AppError::Net("versão de protocolo incompatível".into()));
             }
             if hello.mode == "pair" {
+                let Some(auth) = hello.auth.as_deref().and_then(PairAuth::parse) else {
+                    log::warn!("[AUTH] Pairing from {peer_addr} without PAKE (outdated peer)");
+                    return Err(AppError::Pairing("o outro dispositivo usa uma versão antiga do ClipSync".into()));
+                };
                 let session = state.pairing.lock().unwrap().clone();
                 match session {
-                    Some(s) if !s.is_expired() && hello.pairing_id.as_deref().map_or(true, |id| id == s.id) => {
-                        (Mode::Pair { psk: s.psk }, Some(s.id))
+                    // O QR carrega o id da sessão; o código digitado não.
+                    Some(s)
+                        if !s.is_expired()
+                            && (auth == PairAuth::Code || hello.pairing_id.as_deref() == Some(s.id.as_str())) =>
+                    {
+                        (Mode::Pair { auth, password: s.password(auth) }, Some(s.id))
                     }
                     _ => return Err(AppError::Pairing("nenhuma sessão de pareamento ativa".into())),
                 }
@@ -281,23 +327,32 @@ async fn run_with_pairing_id(
     };
     let is_pairing = matches!(mode, Mode::Pair { .. });
 
-    // 2. Handshake Noise.
+    // 2. Pareamento: PAKE em claro (as mensagens não revelam o segredo) → PSK.
+    //    Depois, handshake Noise (XXpsk3 no pareamento, XX na sessão).
     let private_key = state.identity.read().unwrap().private_key().to_vec();
-    let psk = match &mode {
-        Mode::Pair { psk } => Some(*psk),
-        Mode::Session => None,
-    };
-    let hs: HandshakeResult = tokio::time::timeout(HANDSHAKE_TIMEOUT, async {
+    let hs: Result<HandshakeResult> = tokio::time::timeout(HANDSHAKE_TIMEOUT, async {
+        let psk = match &mode {
+            Mode::Pair { auth, password } => {
+                let (pake, outbound) = Pake::start(*auth, password);
+                write_frame(&mut stream, &outbound).await?;
+                let inbound = read_frame(&mut stream).await?;
+                Some(pake.finish(&inbound)?)
+            }
+            Mode::Session => None,
+        };
         match role {
             Role::Initiator => handshake_initiator(&mut stream, &private_key, psk.as_ref()).await,
             Role::Responder => handshake_responder(&mut stream, &private_key, psk.as_ref()).await,
         }
     })
     .await
-    .map_err(|_| AppError::Net("timeout no handshake".into()))?
-    .map_err(|e| {
+    .map_err(|_| AppError::Net("timeout no handshake".into()))?;
+    let hs = hs.map_err(|e| {
         log::warn!("[AUTH] Handshake failed with {peer_addr} pairing={is_pairing}: {e}");
         if is_pairing {
+            if let (Role::Responder, Some(id)) = (role, pairing_id.as_deref()) {
+                note_pairing_failure(&app, id);
+            }
             AppError::Pairing("código incorreto ou expirado".into())
         } else {
             e

@@ -250,7 +250,7 @@ pub fn start_pairing(app: AppHandle, state: State<'_, AppState>) -> Result<Pairi
     let session = pairing::PairingSession::new();
     let me = state.identity.read().unwrap().summary();
     let payload = pairing::PairingPayload {
-        v: 1,
+        v: pairing::PAYLOAD_VERSION,
         pairing_id: session.id.clone(),
         device_id: me.device_id.clone(),
         name: state.display_name(),
@@ -258,7 +258,7 @@ pub fn start_pairing(app: AppHandle, state: State<'_, AppState>) -> Result<Pairi
         public_key: me.public_key.clone(),
         addrs: transport::local_addrs(),
         port: state.port(),
-        code: session.code.clone(),
+        secret: session.secret.clone(),
     };
     let qr_svg = pairing::qr_svg(&payload)?;
     let info = PairingInfo {
@@ -305,11 +305,17 @@ pub fn cancel_pairing(app: AppHandle, state: State<'_, AppState>) -> Result<()> 
     Ok(())
 }
 
-async fn pair_at(app: &AppHandle, addrs: Vec<String>, pairing_id: Option<String>, code: &str) -> Result<DeviceIdentity> {
-    let psk = pairing::psk_from_code(code);
+async fn pair_at(
+    app: &AppHandle,
+    addrs: Vec<String>,
+    pairing_id: Option<String>,
+    auth: pairing::PairAuth,
+    secret_or_code: &str,
+) -> Result<DeviceIdentity> {
+    let password = pairing::password_for(auth, secret_or_code);
     let mut last_err = AppError::Pairing("nenhum endereço alcançável".into());
     for addr in addrs {
-        match connection::connect_pair(app.clone(), addr.clone(), pairing_id.clone(), psk).await {
+        match connection::connect_pair(app.clone(), addr.clone(), pairing_id.clone(), auth, password.clone()).await {
             // A conexão do pareamento já segue como sessão cifrada; nada a reconectar.
             Ok(id) => return Ok(id),
             Err(e) => {
@@ -340,7 +346,7 @@ pub async fn pair_with_payload(app: AppHandle, raw: String) -> Result<DeviceIden
             addrs.push(a);
         }
     }
-    pair_at(&app, addrs, Some(p.pairing_id), &p.code).await
+    pair_at(&app, addrs, Some(p.pairing_id), pairing::PairAuth::Qr, &p.secret).await
 }
 
 /// Código digitado manualmente: procura na LAN um dispositivo anunciando pareamento.
@@ -372,7 +378,7 @@ pub async fn pair_with_code(app: AppHandle, code: String) -> Result<DeviceIdenti
     }
     let mut last = AppError::Pairing("código incorreto".into());
     for (_id, addrs) in candidates {
-        match pair_at(&app, addrs, None, &code).await {
+        match pair_at(&app, addrs, None, pairing::PairAuth::Code, &code).await {
             Ok(id) => return Ok(id),
             Err(e) => last = e,
         }

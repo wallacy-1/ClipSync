@@ -1,24 +1,63 @@
 //! Pareamento: vínculo explícito entre dois dispositivos por QR Code (ou código
-//! digitado). O código vira a PSK do handshake Noise XXpsk3 — quem não tem o
-//! código não conclui o handshake, e ao final ambos guardam a chave pública
-//! estática do outro como confiável.
+//! digitado). Antes do Noise os dois lados rodam um PAKE (SPAKE2) com o segredo
+//! do pareamento; a chave que sai dele vira a PSK do handshake Noise XXpsk3.
+//!
+//! Por que PAKE: o código digitado tem ~30 bits. Usado direto como PSK, quem se
+//! passasse pelo PC (mDNS falso) receberia a 3ª mensagem do Noise e testaria
+//! todos os códigos offline em segundos. Com SPAKE2 cada conexão só testa um
+//! palpite, e o lado que exibe o código encerra a sessão após
+//! [`MAX_PAIR_FAILURES`] falhas. O QR nem usa o código: leva um segredo
+//! aleatório de 256 bits.
 use crate::error::{AppError, Result};
 use crate::models::now_ms;
-use rand::Rng;
+use rand::{Rng, RngCore};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use spake2::{Ed25519Group, Identity, Password, Spake2};
 use std::net::IpAddr;
 
 pub const PAIRING_TTL_MS: i64 = 3 * 60 * 1000;
+/// Handshakes de pareamento que falham antes de a sessão ser encerrada.
+pub const MAX_PAIR_FAILURES: u32 = 5;
+/// Versão do conteúdo do QR. v2 = segredo aleatório em vez do código.
+pub const PAYLOAD_VERSION: u32 = 2;
 const ALPHABET: &[u8] = b"23456789ABCDEFGHJKMNPQRSTUVWXYZ";
+
+/// Qual segredo da sessão o iniciador usa. Vai no `PreHello`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PairAuth {
+    /// Segredo de 256 bits lido do QR.
+    Qr,
+    /// Código de 6 caracteres digitado.
+    Code,
+}
+
+impl PairAuth {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PairAuth::Qr => "qr",
+            PairAuth::Code => "code",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<Self> {
+        match s {
+            "qr" => Some(PairAuth::Qr),
+            "code" => Some(PairAuth::Code),
+            _ => None,
+        }
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct PairingSession {
     pub id: String,
     pub code: String,
-    pub psk: [u8; 32],
+    /// Hex de 32 bytes aleatórios; só aparece no QR.
+    pub secret: String,
     pub started_at: i64,
     pub expires_at: i64,
+    pub failures: u32,
 }
 
 /// Conteúdo do QR mostrado no PC. Inclui endereço para o celular conectar
@@ -34,7 +73,7 @@ pub struct PairingPayload {
     pub public_key: String,
     pub addrs: Vec<IpAddr>,
     pub port: u16,
-    pub code: String,
+    pub secret: String,
 }
 
 pub fn generate_code() -> String {
@@ -58,31 +97,61 @@ pub fn normalize_code(code: &str) -> String {
     }
 }
 
-pub fn psk_from_code(code: &str) -> [u8; 32] {
-    let mut h = Sha256::new();
-    h.update(b"clipsync-pairing-v1|");
-    h.update(normalize_code(code).as_bytes());
-    let out = h.finalize();
-    let mut psk = [0u8; 32];
-    psk.copy_from_slice(&out);
-    psk
-}
-
 impl PairingSession {
     pub fn new() -> Self {
-        let code = generate_code();
+        let mut secret = [0u8; 32];
+        rand::rngs::OsRng.fill_bytes(&mut secret);
         let now = now_ms();
         Self {
             id: uuid::Uuid::new_v4().to_string()[..8].to_string(),
-            psk: psk_from_code(&code),
-            code,
+            code: generate_code(),
+            secret: hex::encode(secret),
             started_at: now,
             expires_at: now + PAIRING_TTL_MS,
+            failures: 0,
         }
     }
 
     pub fn is_expired(&self) -> bool {
         now_ms() > self.expires_at
+    }
+
+    /// Senha do PAKE para o modo escolhido pelo iniciador.
+    pub fn password(&self, auth: PairAuth) -> Vec<u8> {
+        match auth {
+            PairAuth::Qr => self.secret.as_bytes().to_vec(),
+            PairAuth::Code => self.code.as_bytes().to_vec(),
+        }
+    }
+}
+
+/// Senha do PAKE do lado do iniciador (o mesmo formato de [`PairingSession::password`]).
+pub fn password_for(auth: PairAuth, secret_or_code: &str) -> Vec<u8> {
+    match auth {
+        PairAuth::Qr => secret_or_code.trim().to_ascii_lowercase().into_bytes(),
+        PairAuth::Code => normalize_code(secret_or_code).into_bytes(),
+    }
+}
+
+/// SPAKE2 simétrico: os dois lados mandam uma mensagem e derivam a mesma chave
+/// só se usaram a mesma senha. O modo entra na identidade, então um segredo de
+/// QR nunca casa com um código.
+pub struct Pake(Spake2<Ed25519Group>);
+
+impl Pake {
+    pub fn start(auth: PairAuth, password: &[u8]) -> (Self, Vec<u8>) {
+        let id = format!("clipsync-pair-v2|{}", auth.as_str());
+        let (state, msg) = Spake2::<Ed25519Group>::start_symmetric(&Password::new(password), &Identity::new(id.as_bytes()));
+        (Self(state), msg)
+    }
+
+    /// PSK do Noise derivada da chave do PAKE.
+    pub fn finish(self, inbound: &[u8]) -> Result<[u8; 32]> {
+        let key = self.0.finish(inbound).map_err(|_| AppError::Crypto("mensagem de pareamento inválida".into()))?;
+        let mut h = Sha256::new();
+        h.update(b"clipsync-pair-psk-v2|");
+        h.update(&key);
+        Ok(h.finalize().into())
     }
 }
 
@@ -99,10 +168,68 @@ pub fn qr_svg(payload: &PairingPayload) -> Result<String> {
 }
 
 pub fn parse_payload(raw: &str) -> Result<PairingPayload> {
+    #[derive(Deserialize)]
+    struct Version {
+        v: u32,
+    }
+    let v = serde_json::from_str::<Version>(raw.trim()).map_err(|_| AppError::Pairing("QR Code não é do ClipSync".into()))?.v;
+    if v != PAYLOAD_VERSION {
+        return Err(AppError::Pairing("QR de outra versão do ClipSync; atualize os dois dispositivos".into()));
+    }
     let p: PairingPayload =
         serde_json::from_str(raw.trim()).map_err(|_| AppError::Pairing("QR Code não é do ClipSync".into()))?;
-    if p.v != 1 {
-        return Err(AppError::Pairing("versão de pareamento não suportada".into()));
+    if p.secret.len() != 64 || hex::decode(&p.secret).is_err() {
+        return Err(AppError::Pairing("QR Code inválido".into()));
     }
     Ok(p)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn run(a: (PairAuth, &[u8]), b: (PairAuth, &[u8])) -> (Result<[u8; 32]>, Result<[u8; 32]>) {
+        let (pa, ma) = Pake::start(a.0, a.1);
+        let (pb, mb) = Pake::start(b.0, b.1);
+        (pa.finish(&mb), pb.finish(&ma))
+    }
+
+    #[test]
+    fn pake_same_password_same_psk() {
+        let s = PairingSession::new();
+        let (a, b) = run((PairAuth::Code, &s.password(PairAuth::Code)), (PairAuth::Code, &password_for(PairAuth::Code, &s.code.to_lowercase().replace('-', ""))));
+        assert_eq!(a.unwrap(), b.unwrap());
+        let (a, b) = run((PairAuth::Qr, &s.password(PairAuth::Qr)), (PairAuth::Qr, &password_for(PairAuth::Qr, &s.secret)));
+        assert_eq!(a.unwrap(), b.unwrap());
+    }
+
+    #[test]
+    fn pake_wrong_password_or_mode_differs() {
+        let (a, b) = run((PairAuth::Code, b"ABC-DEF"), (PairAuth::Code, b"ABC-DEG"));
+        assert_ne!(a.unwrap(), b.unwrap());
+        let (a, b) = run((PairAuth::Qr, b"ABC-DEF"), (PairAuth::Code, b"ABC-DEF"));
+        assert_ne!(a.unwrap(), b.unwrap());
+    }
+
+    #[test]
+    fn payload_requires_v2_and_secret() {
+        let s = PairingSession::new();
+        let p = PairingPayload {
+            v: PAYLOAD_VERSION,
+            pairing_id: s.id.clone(),
+            device_id: "d".into(),
+            name: "n".into(),
+            platform: "windows".into(),
+            public_key: "aa".into(),
+            addrs: vec![],
+            port: 47820,
+            secret: s.secret.clone(),
+        };
+        let raw = serde_json::to_string(&p).unwrap();
+        assert_eq!(parse_payload(&raw).unwrap().secret, s.secret);
+        let v1 = raw.replace("\"v\":2", "\"v\":1");
+        assert!(parse_payload(&v1).is_err());
+        let short = raw.replace(&s.secret, "abcd");
+        assert!(parse_payload(&short).is_err());
+    }
 }

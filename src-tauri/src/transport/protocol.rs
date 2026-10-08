@@ -40,6 +40,10 @@ pub struct PreHello {
     /// "session" | "pair"
     pub mode: String,
     pub pairing_id: Option<String>,
+    /// Só no modo "pair": "qr" | "code" (ver `pairing::PairAuth`). Ausente = peer
+    /// anterior ao PAKE, que não consegue mais parear.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub auth: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

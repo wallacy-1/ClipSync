@@ -26,7 +26,11 @@ Sem servidor, sem conta, sem nuvem. Uma base de código: **Tauri 2 + React + Typ
 ### Descoberta e pareamento
 
 - Cada instância anuncia `_clip-sync._tcp.local` (mDNS/DNS-SD) com `id`, `name`, `platform`, `pk`.
-- O PC gera um QR com identidade + endereços + código de 6 caracteres. O celular escaneia (ou digita o código) e faz um handshake **Noise XXpsk3** cuja PSK deriva do código: sem o código, o handshake falha.
+- O PC gera um QR com identidade + endereços + **segredo aleatório de 256 bits**, e mostra também um código de 6 caracteres.
+  O celular escaneia (ou digita o código); os dois rodam um **PAKE (SPAKE2)** com esse segredo e a chave resultante vira a PSK
+  de um handshake **Noise XXpsk3**: sem o segredo, o handshake falha.
+- PAKE porque o código tem só ~30 bits: usado direto como PSK, quem se passasse pelo PC (mDNS falso) testaria todos os códigos
+  offline. Com SPAKE2 cada conexão testa um único palpite, e o PC encerra a sessão após **5 tentativas erradas**.
 - Ao concluir, cada lado guarda a chave pública do outro. Conexões seguintes usam Noise XX e só aceitam chaves já pareadas. Remover um dispositivo revoga a chave.
 - `deviceId = SHA-256(chave pública)[..16]`; o nome é só metadado.
 
