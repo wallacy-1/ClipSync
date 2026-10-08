@@ -12,6 +12,7 @@ mod error;
 mod events;
 mod identity;
 mod ime;
+mod keepalive;
 mod keystore;
 mod models;
 mod state;
@@ -106,6 +107,7 @@ pub fn run() {
             sync::spawn_expiry_task(handle.clone());
             transfer::manager::startup(&handle);
             ime::attach(&handle);
+            keepalive::apply(&handle);
 
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             {

@@ -10,6 +10,8 @@
     <!-- Transferência de arquivos: FGS dataSync só enquanto há transferência ativa -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- "Manter conectado"; o tipo connectedDevice exige CHANGE_WIFI_MULTICAST_STATE (acima). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-feature android:name="android.hardware.camera" android:required="false" />
 
@@ -65,6 +67,12 @@
         <service
             android:name=".transfer.TransferService"
             android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
+        <!-- Ajuste "Manter conectado": conexão viva com o app fechado (notificação fixa). -->
+        <service
+            android:name=".keepalive.KeepAliveService"
+            android:foregroundServiceType="connectedDevice"
             android:exported="false" />
 
         <provider

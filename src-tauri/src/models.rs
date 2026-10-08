@@ -110,6 +110,8 @@ pub struct Settings {
     pub notifications: bool,
     /// Também avisar texto recebido (desligado: o clipboard muda o tempo todo).
     pub notify_text: bool,
+    /// Android: serviço em primeiro plano que mantém a conexão viva fora do app.
+    pub keep_alive: bool,
 }
 
 impl Settings {
@@ -143,6 +145,7 @@ impl Default for Settings {
             file_auto_accept_mb: 100,
             notifications: true,
             notify_text: false,
+            keep_alive: false,
         }
     }
 }

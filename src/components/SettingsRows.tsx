@@ -79,6 +79,11 @@ export function SyncRows() {
           <option value="ask">Sempre perguntar</option>
         </select>
       </Row>
+      {platform === "android" && (
+        <Row label="Manter conectado" help="Recebe cópias com o app fechado; deixa uma notificação fixa e gasta um pouco mais de bateria">
+          <Toggle on={s.keepAlive} onChange={(v) => save({ keepAlive: v })} />
+        </Row>
+      )}
       {platform === "windows" && (
         <>
           <Row label="Iniciar com o Windows" help="Abre escondido na bandeja ao ligar o PC; sem ele rodando nada sincroniza">

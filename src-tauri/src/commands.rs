@@ -185,6 +185,9 @@ pub fn set_settings(app: AppHandle, state: State<'_, AppState>, settings: Settin
         transport::reannounce(&app);
         connection::announce_identity(&app);
     }
+    if old.keep_alive != settings.keep_alive {
+        crate::keepalive::apply(&app);
+    }
     events::emit(&app, events::SETTINGS_CHANGED, &settings);
     events::emit(&app, events::DEVICE_UPDATED, state.devices());
     Ok(settings)

@@ -57,6 +57,8 @@ export interface Settings {
   /** Toasts do Windows (arquivo recebido, pedido de aceite). */
   notifications: boolean;
   notifyText: boolean;
+  /** Android: notificação fixa mantém a conexão viva com o app fechado. */
+  keepAlive: boolean;
   typesRev: number;
   lanOnly: boolean;
   ignorePasswordManagers: boolean;

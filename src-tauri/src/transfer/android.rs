@@ -256,6 +256,7 @@ pub fn fgs_running() -> bool {
 pub extern "system" fn Java_app_clipsync_desktop_transfer_TransferBridge_nativeActivityResumed(_env: jni::JNIEnv, _class: jni::objects::JClass) {
     let Some(app) = crate::ime::app_handle() else { return };
     super::manager::fgs_retry_if_needed(app);
+    crate::keepalive::apply(app);
 }
 
 /// "Compartilhar → ClipSync" chegou: a UI chama `share_take`.
