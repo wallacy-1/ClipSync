@@ -1,6 +1,6 @@
 [package]
 name = "clipsync"
-version = "0.1.0"
+version = "1.0.0"
 description = "ClipSync — área de transferência sincronizada por P2P na rede local"
 authors = ["wallacy"]
 edition = "2021"

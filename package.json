@@ -1,14 +1,18 @@
 {
   "name": "clipsync",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "release": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 all",
+    "release:windows": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 windows",
+    "release:android": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 android",
+    "release:android-key": "powershell -ExecutionPolicy Bypass -File scripts/release.ps1 android-key"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.5.0",
