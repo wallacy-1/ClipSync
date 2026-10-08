@@ -88,16 +88,69 @@ pub fn current_platform() -> String {
     }
 }
 
+/// Nome das versões antigas no Android; trocado pelo do aparelho ao carregar.
+const LEGACY_ANDROID_NAME: &str = "Android";
+
 fn default_name() -> String {
-    let base = if cfg!(target_os = "android") {
-        "Android".to_string()
-    } else {
-        gethostname::gethostname().to_string_lossy().to_string()
-    };
+    #[cfg(target_os = "android")]
+    let base = android_device_name().unwrap_or_else(|| LEGACY_ANDROID_NAME.to_string());
+    #[cfg(not(target_os = "android"))]
+    let base = gethostname::gethostname().to_string_lossy().to_string();
     match std::env::var("CLIPSYNC_PROFILE") {
         Ok(p) if !p.trim().is_empty() => format!("{base}-{}", p.trim()),
         _ => base,
     }
+}
+
+/// Nome que o usuário deu ao aparelho (Configurações → Sobre o telefone); sem ele,
+/// fabricante + modelo (ex.: "motorola moto g53 5G").
+#[cfg(target_os = "android")]
+fn android_device_name() -> Option<String> {
+    use crate::android_jni::{jstring_to_string, with_class};
+    use jni::objects::JValue;
+
+    let user_set = with_class("android.provider.Settings$Global", |env, class, ctx| {
+        let resolver = env
+            .call_method(ctx, "getContentResolver", "()Landroid/content/ContentResolver;", &[])
+            .and_then(|v| v.l())
+            .map_err(|e| crate::error::AppError::Other(e.to_string()))?;
+        let key = env.new_string("device_name").map_err(|e| crate::error::AppError::Other(e.to_string()))?;
+        let out = env
+            .call_static_method(
+                class,
+                "getString",
+                "(Landroid/content/ContentResolver;Ljava/lang/String;)Ljava/lang/String;",
+                &[JValue::Object(&resolver), JValue::Object(&key)],
+            )
+            .and_then(|v| v.l())
+            .map_err(|e| crate::error::AppError::Other(e.to_string()))?;
+        if out.is_null() {
+            return Ok(String::new());
+        }
+        jstring_to_string(env, out)
+    });
+    if let Ok(name) = user_set.map(|n| n.trim().to_string()) {
+        if !name.is_empty() {
+            return Some(name);
+        }
+    }
+
+    let model = with_class("android.os.Build", |env, class, _ctx| {
+        let mut field = |name: &str| -> Result<String> {
+            let v = env
+                .get_static_field(class, name, "Ljava/lang/String;")
+                .and_then(|v| v.l())
+                .map_err(|e| crate::error::AppError::Other(e.to_string()))?;
+            if v.is_null() { Ok(String::new()) } else { jstring_to_string(env, v) }
+        };
+        let maker = field("MANUFACTURER")?;
+        let model = field("MODEL")?;
+        // Evita marca repetida quando o modelo já a traz.
+        Ok(if model.to_lowercase().starts_with(&maker.to_lowercase()) { model } else { format!("{maker} {model}") })
+    })
+    .ok()?;
+    let model = model.trim().to_string();
+    (!model.is_empty()).then_some(model)
 }
 
 pub fn load_or_create(app_dir: &Path, ks: &Keystore) -> Result<LocalIdentity> {
@@ -120,9 +173,14 @@ pub fn load_or_create(app_dir: &Path, ks: &Keystore) -> Result<LocalIdentity> {
             s
         }
     };
+    let name = if cfg!(target_os = "android") && stored.name == LEGACY_ANDROID_NAME {
+        default_name()
+    } else {
+        stored.name.clone()
+    };
     Ok(LocalIdentity {
         device_id: device_id_from_public_key(&stored.public_key),
-        name: stored.name.clone(),
+        name,
         platform: current_platform(),
         public_key: stored.public_key.clone(),
         private_key: stored.private_key.clone(),
