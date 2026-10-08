@@ -3,6 +3,7 @@ import { api, startDragging } from "../lib/ipc";
 import { shortTime } from "../lib/format";
 import { usePeers, useApp, type View } from "../store/app";
 import { Clipboard, Monitor, Pin, Sliders, Transfers } from "../components/Icons";
+import { NetworkWarning } from "../components/NetworkWarning";
 import { Dot, Toast } from "../components/ui";
 import { HistoryView } from "./HistoryView";
 import { DevicesView } from "./DevicesView";
@@ -117,6 +118,7 @@ export function WinShell() {
         <AskPrompt variant="float" />
         <CopiedFilesOffer variant="float" />
       </div>
+      <NetworkWarning />
       <Toast />
     </div>
   );
