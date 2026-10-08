@@ -24,6 +24,15 @@ object CoreBridge {
     @JvmStatic
     external fun nativeOnClip(text: String, sensitive: Boolean): Boolean
 
+    /** Reconecta aos pareados na hora (o Android pode ter derrubado a rede em segundo plano). */
+    @JvmStatic
+    external fun nativeWake()
+
+    @JvmStatic
+    fun wake() {
+        if (ready) runCatching { nativeWake() }
+    }
+
     /** JSON `[{id, hash, text, ts, sensitive}]` dos itens ainda não processados. */
     @JvmStatic
     fun listInbox(context: Context): String = ImeInbox.listJson(context)

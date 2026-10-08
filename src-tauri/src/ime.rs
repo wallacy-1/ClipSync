@@ -200,6 +200,22 @@ mod bridge {
 }
 
 #[cfg(target_os = "android")]
+mod wake_bridge {
+    use super::APP;
+    use jni::objects::JClass;
+    use jni::JNIEnv;
+
+    /// `CoreBridge.nativeWake()`: teclado apareceu ou app voltou à frente.
+    #[no_mangle]
+    pub extern "system" fn Java_app_clipsync_desktop_ime_CoreBridge_nativeWake(_env: JNIEnv, _class: JClass) {
+        let Some(app) = APP.get() else { return };
+        if std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| crate::transport::wake(app))).is_err() {
+            log::error!("[TRANSPORT] wake entrou em pânico na ponte do IME");
+        }
+    }
+}
+
+#[cfg(target_os = "android")]
 mod platform_inbox {
     use super::INBOX_TTL_MS;
     use crate::android_jni::{jstring_to_string, with_class};

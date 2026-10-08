@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.wifi.WifiManager
 import android.os.Bundle
 import androidx.activity.enableEdgeToEdge
+import app.clipsync.desktop.ime.CoreBridge
 import app.clipsync.desktop.share.ShareBridge
 import app.clipsync.desktop.transfer.FileBridge
 import app.clipsync.desktop.transfer.TransferBridge
@@ -37,6 +38,7 @@ class MainActivity : TauriActivity() {
   override fun onResume() {
     super.onResume()
     TransferBridge.onActivityResumed()
+    CoreBridge.wake()
   }
 
   // Seletor de documentos (SAF) da transferência de arquivos.

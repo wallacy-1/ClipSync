@@ -46,6 +46,8 @@ class ClipSyncImeService : InputMethodService() {
     override fun onWindowShown() {
         super.onWindowShown()
         ClipboardBridge.imeShown = true
+        // Colar logo em seguida tem que pegar o que o PC mandou enquanto o processo dormia.
+        CoreBridge.wake()
     }
 
     override fun onWindowHidden() {

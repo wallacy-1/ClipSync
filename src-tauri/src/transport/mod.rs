@@ -11,6 +11,7 @@ use crate::events;
 use crate::models::now_ms;
 use crate::state::AppState;
 use discovery::Discovery;
+use protocol::Message;
 use std::net::{IpAddr, SocketAddr};
 use std::sync::atomic::Ordering;
 use std::time::Duration;
@@ -123,6 +124,22 @@ pub fn candidate_addrs(state: &AppState, device_id: &str) -> Vec<String> {
         }
     });
     out
+}
+
+/// Processo voltou a rodar (teclado aberto, app na frente): reconecta já em vez de
+/// esperar o laço de 8 s, e pinga as conexões abertas para derrubar logo as que o
+/// Android matou enquanto o processo estava congelado.
+#[cfg_attr(not(target_os = "android"), allow(dead_code))]
+pub fn wake(app: &AppHandle) {
+    let state = app.state::<AppState>();
+    for d in state.db.list_devices().unwrap_or_default() {
+        if d.blocked {
+            continue;
+        }
+        if !state.send_to(&d.device_id, Message::Ping) {
+            maybe_connect(app.clone(), d.device_id.clone());
+        }
+    }
 }
 
 /// Abre conexão com um dispositivo pareado se fizer sentido agora.
