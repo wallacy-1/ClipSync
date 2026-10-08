@@ -17,6 +17,8 @@ export function DevicesView() {
   const removeDevice = useApp((s) => s.removeDevice);
   const now = useApp((s) => s.now);
   const [confirmRemove, setConfirmRemove] = useState<Device | null>(null);
+  const requestPairing = useApp((s) => s.requestPairing);
+  const [requesting, setRequesting] = useState<string | null>(null);
 
   const failed = peers.filter((d) => d.lastError || (d.queued > 0 && d.state !== "connected"));
   const meDevice = useApp((s) => s.devices.find((d) => d.isSelf));
@@ -102,7 +104,14 @@ export function DevicesView() {
                     <div className="detail">{PLATFORM_LABEL[d.platform] ?? d.platform} · {d.address?.replace(/:\d+$/, "") ?? "visto agora"}</div>
                   </div>
                   <DeviceBadge device={d} />
-                  <span className="muted" style={{ fontSize: 12.5 }}>Pareie pelo QR no outro dispositivo</span>
+                  <button
+                    className="btn btn-secondary"
+                    disabled={requesting !== null}
+                    title="Pede ao outro dispositivo que mostre um código para digitar aqui"
+                    onClick={async () => { setRequesting(d.deviceId); await requestPairing(d); setRequesting(null); }}
+                  >
+                    {requesting === d.deviceId ? "Enviando pedido…" : "Solicitar pareamento"}
+                  </button>
                 </div>
               ))}
             </div>

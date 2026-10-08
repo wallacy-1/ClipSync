@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Clipboard, Clock, Monitor, Sliders, Transfers } from "../components/Icons";
 import { NetworkWarning } from "../components/NetworkWarning";
+import { PairPrompts } from "../components/PairPrompts";
 import { Toast } from "../components/ui";
 import { api, inTauri } from "../lib/ipc";
 import { useApp } from "../store/app";
@@ -55,6 +56,7 @@ export function AndroidShell() {
         <Onboarding onPair={() => { setStartScan(true); setTab("devices"); void useApp.getState().finishOnboarding(); }} />
         {pendingShare && <ShareSheet />}
         {!pendingShare && <AskPrompt variant="android" />}
+        <PairPrompts />
         <NetworkWarning />
         <Toast />
       </div>
@@ -68,6 +70,7 @@ export function AndroidShell() {
         <KeyboardPrompt onConfigure={() => { setSettingsSub("keyboard"); setTab("settings"); }} />
         {pendingShare && <ShareSheet />}
         {!pendingShare && <AskPrompt variant="android" />}
+        <PairPrompts />
         <NetworkWarning />
         <Toast />
       </div>
@@ -96,6 +99,7 @@ export function AndroidShell() {
       {pendingShare && <ShareSheet />}
       {!pendingShare && <AskPrompt variant="android" />}
       {detailId && <ItemSheet itemId={detailId} onClose={() => setDetailId(null)} onSend={(id) => { setDetailId(null); setSendId(id); }} />}
+      <PairPrompts />
       <NetworkWarning />
       <Toast />
     </div>

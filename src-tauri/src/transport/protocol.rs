@@ -37,13 +37,16 @@ pub const CAP_FILE_ASK_V1: &str = "file-ask-v1";
 #[serde(rename_all = "camelCase")]
 pub struct PreHello {
     pub v: u32,
-    /// "session" | "pair"
+    /// "session" | "pair" | "request"
     pub mode: String,
     pub pairing_id: Option<String>,
     /// Só no modo "pair": "qr" | "code" (ver `pairing::PairAuth`). Ausente = peer
     /// anterior ao PAKE, que não consegue mais parear.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub auth: Option<String>,
+    /// Só no modo "request" (ver `request.rs`): quem pede o pareamento.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from: Option<DeviceIdentity>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

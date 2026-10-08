@@ -4,7 +4,7 @@ import { Avatar, Confirm, DeviceBadge, Toggle } from "../components/ui";
 import { PLATFORM_LABEL, relTime } from "../lib/format";
 import { api, cancelScan, errorText, inTauri, scanQr } from "../lib/ipc";
 import type { Device } from "../lib/types";
-import { usePeers, useApp } from "../store/app";
+import { useDiscovered, usePeers, useApp } from "../store/app";
 
 type Mode = "list" | "scan" | "manual";
 
@@ -24,6 +24,9 @@ function ListView({ onAdd }: { onAdd: () => void }) {
   const setDeviceFlags = useApp((s) => s.setDeviceFlags);
   const removeDevice = useApp((s) => s.removeDevice);
   const [confirm, setConfirm] = useState<Device | null>(null);
+  const discovered = useDiscovered();
+  const requestPairing = useApp((s) => s.requestPairing);
+  const [requesting, setRequesting] = useState<string | null>(null);
 
   const all = me ? [me, ...peers] : peers;
 
@@ -60,6 +63,28 @@ function ListView({ onAdd }: { onAdd: () => void }) {
           {peers.length === 0 && (
             <button className="btn btn-primary btn-block" style={{ height: 52, fontWeight: 700, fontSize: 15 }} onClick={onAdd}>Parear com o PC</button>
           )}
+          {discovered.length > 0 && <div className="section-title" style={{ marginTop: 14 }}>Na rede, ainda não pareados</div>}
+          {discovered.map((d) => (
+            <div className="and-dev-card" key={d.deviceId}>
+              <div className="top">
+                <Avatar device={d} />
+                <div className="info">
+                  <div className="name">{d.name}</div>
+                  <div className="detail">{PLATFORM_LABEL[d.platform] ?? d.platform} · {d.address?.replace(/:\d+$/, "") ?? "visto agora"}</div>
+                </div>
+              </div>
+              <div className="bottom">
+                <span>Pede que {d.name} mostre um código</span>
+                <button
+                  className="btn btn-secondary"
+                  disabled={requesting !== null}
+                  onClick={async () => { setRequesting(d.deviceId); await requestPairing(d); setRequesting(null); }}
+                >
+                  {requesting === d.deviceId ? "Enviando…" : "Solicitar"}
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
         <div className="and-note">
           <Shield size={20} style={{ color: "var(--color-accent-2-800)" }} />

@@ -51,6 +51,10 @@ interface AppStore {
   revealed: Record<string, string>;
   sendTargets: string[];
   pairing: PairingInfo | null;
+  /** Outro dispositivo pediu para parear com este. */
+  pairRequest: PairRequest | null;
+  /** Este dispositivo pediu; espera o código que aparece no outro. */
+  pairOutgoing: PairRequest | null;
   toast: Toast | null;
   /** Transferências de arquivo, mais recente primeiro. Carregadas sob demanda. */
   transfers: TransferRecord[];
@@ -92,6 +96,9 @@ interface AppStore {
   removeDevice: (deviceId: string) => Promise<void>;
   startPairing: () => Promise<void>;
   cancelPairing: () => Promise<void>;
+  requestPairing: (device: Device) => Promise<void>;
+  dismissPairRequest: () => void;
+  dismissPairOutgoing: () => void;
   clearHistory: (keepPinned: boolean) => Promise<void>;
   finishOnboarding: () => Promise<void>;
   dismissKeyboardPrompt: () => Promise<void>;
@@ -128,6 +135,12 @@ interface AppStore {
 /** Mantém só alvos que ainda existem, não são este aparelho e não estão bloqueados. */
 function pruneTargets(ids: string[], devices: Device[]): string[] {
   return ids.filter((id) => devices.some((d) => d.deviceId === id && !d.isSelf && d.state !== "blocked"));
+}
+
+export interface PairRequest {
+  deviceId: string;
+  name: string;
+  platform: string;
 }
 
 let toastSeq = 0;
@@ -171,6 +184,8 @@ export const useApp = create<AppStore>((set, get) => ({
   revealed: {},
   sendTargets: [],
   pairing: null,
+  pairRequest: null,
+  pairOutgoing: null,
   toast: null,
   transfers: [],
   transfersLoaded: false,
@@ -238,8 +253,9 @@ export const useApp = create<AppStore>((set, get) => ({
       }),
       listen<SyncStatus>("sync:state", (sync) => set({ sync })),
       listen<Settings>("settings:changed", (settings) => set({ settings })),
+      listen<PairRequest>("pairing:request", (req) => set({ pairRequest: req })),
       listen<{ deviceId: string; name: string }>("pairing:completed", ({ name }) => {
-        set({ pairing: null });
+        set({ pairing: null, pairRequest: null, pairOutgoing: null });
         get().showToast(`${name} pareado`);
         void get().refreshDevices();
       }),
@@ -381,6 +397,20 @@ export const useApp = create<AppStore>((set, get) => ({
   },
   async startPairing() {
     set({ pairing: await api.startPairing() });
+  },
+  async requestPairing(device) {
+    try {
+      await api.requestPairing(device.deviceId);
+      set({ pairOutgoing: { deviceId: device.deviceId, name: device.name, platform: device.platform } });
+    } catch (e) {
+      get().showToast(errorText(e), "error");
+    }
+  },
+  dismissPairRequest() {
+    set({ pairRequest: null });
+  },
+  dismissPairOutgoing() {
+    set({ pairOutgoing: null });
   },
   async cancelPairing() {
     await api.cancelPairing();

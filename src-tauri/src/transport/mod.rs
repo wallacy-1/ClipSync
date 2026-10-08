@@ -5,6 +5,7 @@ pub mod discovery;
 pub mod noise;
 pub mod pairing;
 pub mod protocol;
+pub mod request;
 
 use crate::error::{AppError, Result};
 use crate::events;

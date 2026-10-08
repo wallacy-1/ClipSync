@@ -10,6 +10,8 @@ pub const DEVICE_UPDATED: &str = "device:updated";
 pub const PAIRING_STARTED: &str = "pairing:started";
 pub const PAIRING_COMPLETED: &str = "pairing:completed";
 pub const PAIRING_FAILED: &str = "pairing:failed";
+/// Outro dispositivo pediu para parear: `{ deviceId, name, platform }`.
+pub const PAIRING_REQUEST: &str = "pairing:request";
 
 pub const CLIPBOARD_CHANGED: &str = "clipboard:changed";
 pub const CLIPBOARD_SENT: &str = "clipboard:sent";

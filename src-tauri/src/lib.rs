@@ -168,6 +168,7 @@ pub fn run() {
             commands::cancel_pairing,
             commands::pair_with_payload,
             commands::pair_with_code,
+            commands::request_pairing,
             commands::window_action,
             commands::quit,
             ime::ime_status,

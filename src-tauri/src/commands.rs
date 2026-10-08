@@ -378,9 +378,17 @@ pub async fn pair_with_payload(app: AppHandle, raw: String) -> Result<DeviceIden
     pair_at(&app, addrs, Some(p.pairing_id), pairing::PairAuth::Qr, &p.secret).await
 }
 
-/// Código digitado manualmente: procura na LAN um dispositivo anunciando pareamento.
+/// Pede a um dispositivo visto na rede que abra o pareamento e mostre o código.
 #[tauri::command]
-pub async fn pair_with_code(app: AppHandle, code: String) -> Result<DeviceIdentity> {
+pub async fn request_pairing(app: AppHandle, device_id: String) -> Result<()> {
+    transport::request::send(&app, &device_id).await
+}
+
+/// Código digitado manualmente: procura na LAN um dispositivo anunciando pareamento.
+/// `device_id`: depois de um pedido de pareamento já se sabe com quem parear; vai direto
+/// aos endereços dele em vez de esperar o anúncio mDNS com pairing=1.
+#[tauri::command]
+pub async fn pair_with_code(app: AppHandle, code: String, device_id: Option<String>) -> Result<DeviceIdentity> {
     let code = pairing::normalize_code(&code);
     if code.len() != 7 {
         return Err(AppError::Pairing("código deve ter 6 caracteres".into()));
@@ -393,7 +401,10 @@ pub async fn pair_with_code(app: AppHandle, code: String) -> Result<DeviceIdenti
             let peers = state.peers.lock().unwrap();
             peers
                 .values()
-                .filter(|p| p.pairing)
+                .filter(|p| match &device_id {
+                    Some(id) => &p.device_id == id,
+                    None => p.pairing,
+                })
                 .map(|p| (p.device_id.clone(), p.addrs.iter().map(|a| SocketAddr::new(*a, p.port).to_string()).collect()))
                 .collect()
         };

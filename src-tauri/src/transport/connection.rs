@@ -292,6 +292,7 @@ async fn run_with_pairing_id(
                     Mode::Pair { auth, .. } => Some(auth.as_str().into()),
                     Mode::Session => None,
                 },
+                from: None,
             };
             write_frame(&mut stream, &serde_json::to_vec(&hello)?).await?;
             (mode, pairing_id)
@@ -303,6 +304,9 @@ async fn run_with_pairing_id(
             let hello: PreHello = serde_json::from_slice(&raw)?;
             if hello.v != PROTOCOL_VERSION {
                 return Err(AppError::Net("versão de protocolo incompatível".into()));
+            }
+            if hello.mode == super::request::MODE {
+                return super::request::on_request(&app, &mut stream, hello.from, &peer_addr).await;
             }
             if hello.mode == "pair" {
                 let Some(auth) = hello.auth.as_deref().and_then(PairAuth::parse) else {

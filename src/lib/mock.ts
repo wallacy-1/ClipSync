@@ -54,6 +54,9 @@ let devices: Device[] = [
     deviceId: "notebook", name: "Notebook-Casa", platform: "windows", publicKey: "cc", state: scenario === "error" ? "blocked" : "disconnected",
     isSelf: false, autoSend: false, autoReceive: true, lastSeen: now - 2 * 86400000, address: null, pairedAt: now - 60 * 86400000,
     lastError: scenario === "error" ? "chave de pareamento expirada" : null, queued: scenario === "error" ? 2 : 0,
+  },  {
+    deviceId: "tablet", name: "Galaxy Tab", platform: "android", publicKey: "dd", state: "discovered",
+    isSelf: false, autoSend: false, autoReceive: false, lastSeen: now, address: "192.168.0.21:47820", pairedAt: null, lastError: null, queued: 0,
   },
 ];
 
@@ -143,6 +146,9 @@ const listeners = new Map<string, Set<(p: unknown) => void>>();
 function emit(name: string, payload: unknown) {
   listeners.get(name)?.forEach((h) => h(payload));
 }
+
+// Console do navegador: __clipsyncMock.emit("pairing:request", { deviceId: "tablet", name: "Galaxy Tab", platform: "android" })
+(window as unknown as { __clipsyncMock: unknown }).__clipsyncMock = { emit };
 export function mockListen(name: string, h: (p: unknown) => void) {
   if (!listeners.has(name)) listeners.set(name, new Set());
   listeners.get(name)!.add(h);
@@ -270,6 +276,7 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
       return info;
     }
     case "cancel_pairing": return;
+    case "request_pairing": await sleep(600); return;
     case "pair_with_payload":
     case "pair_with_code": {
       await sleep(1200);
