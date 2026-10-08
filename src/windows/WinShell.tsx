@@ -48,6 +48,8 @@ export function WinShell() {
       : sync.queuedCount > 0 && connected === 0
         ? "Reconectando…"
         : `Sincronizado · ${peers.length + 1} disp.`;
+  // Sem nenhum pareado não há o que sincronizar; o status só confundiria.
+  const showStatus = peers.length > 0 || sync.paused;
   const panelShortcut = useApp((s) => s.settings?.shortcuts.openPanel);
   const statusClass = sync.paused ? "" : sync.queuedCount > 0 && connected === 0 ? "warn" : "online";
 
@@ -99,10 +101,12 @@ export function WinShell() {
 
           <div className="grow" />
           <div className="side-status">
-            <div className="row-flex" style={{ gap: 8 }}>
-              <span className={`dot ${statusClass}`} />
-              <span className="label">{statusLabel}</span>
-            </div>
+            {showStatus && (
+              <div className="row-flex" style={{ gap: 8 }}>
+                <span className={`dot ${statusClass}`} />
+                <span className="label">{statusLabel}</span>
+              </div>
+            )}
             {panelShortcut && <span className="hint">Painel rápido · {panelShortcut}</span>}
           </div>
         </nav>

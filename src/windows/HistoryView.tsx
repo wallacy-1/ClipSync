@@ -70,14 +70,16 @@ export function HistoryView() {
               <input ref={searchRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar por conteúdo, tipo ou dispositivo…" />
               <span className="kbd">Ctrl+F</span>
             </label>
-            <button className="btn btn-secondary" disabled={!selected} onClick={() => selected && send(selected.id, sendTargets)}>
-              <Send size={15} /> Enviar para
-            </button>
+            {peers.length > 0 && (
+              <button className="btn btn-secondary" disabled={!selected} onClick={() => selected && send(selected.id, sendTargets)}>
+                <Send size={15} /> Enviar para
+              </button>
+            )}
             {sync.paused ? (
               <button className="btn btn-primary" onClick={() => setPaused(false)}>
                 <Play size={15} /> Retomar sync
               </button>
-            ) : (
+            ) : peers.length > 0 && (
               <button className="btn btn-primary" onClick={() => setPaused(true)}>
                 <Pause size={15} /> Pausar sync
               </button>
@@ -147,6 +149,7 @@ function Row({ id, selected }: { id: string; selected: boolean }) {
   const now = useApp((s) => s.now);
   const revealed = useApp((s) => !!s.revealed[id]);
   const hideSensitive = useApp((s) => s.settings?.hideSensitive ?? true);
+  const hasPeers = usePeers().length > 0;
   const { select, copy, remove, reveal, hide, send, sendTargets } = useApp.getState();
   if (!it) return null;
   const masked = it.isSensitive && hideSensitive && !revealed;
@@ -171,10 +174,10 @@ function Row({ id, selected }: { id: string; selected: boolean }) {
           {masked ? "Mostrar" : "Ocultar"}
         </button>
       )}
-      <StateTag item={it} />
+      {hasPeers && <StateTag item={it} />}
       <div className="actions">
         <button className="icon-btn" title="Copiar" onClick={(e) => { e.stopPropagation(); void copy(it.id); }}><Copy size={15} /></button>
-        <button className="icon-btn" title="Enviar para os dispositivos marcados" onClick={(e) => { e.stopPropagation(); void send(it.id, sendTargets); }}><Send size={15} /></button>
+        {hasPeers && <button className="icon-btn" title="Enviar para os dispositivos marcados" onClick={(e) => { e.stopPropagation(); void send(it.id, sendTargets); }}><Send size={15} /></button>}
         <button className="icon-btn" title="Apagar" onClick={(e) => { e.stopPropagation(); void remove(it.id); }}><Trash size={15} /></button>
       </div>
     </div>
@@ -214,13 +217,13 @@ function Rail() {
             <div><span>Copiado</span><span>{relTime(item.createdAt, now)}</span></div>
             <div><span>Tipo</span><span>{TYPE_LABEL[item.contentType]}</span></div>
             {item.expiresAt && <div><span>Expira</span><span>em {countdown(item.expiresAt, now)}</span></div>}
-            <div><span>Sincronizado com</span><span>{syncedWith}</span></div>
+            {peers.length > 0 && <div><span>Sincronizado com</span><span>{syncedWith}</span></div>}
           </div>
           <div className="actions">
             <button className="btn btn-primary btn-block" onClick={() => copy(item.id)}>Copiar agora</button>
             <div className="pair">
               <button className="btn btn-secondary" onClick={() => pin(item.id, !item.isPinned)}>{item.isPinned ? "Desafixar" : "Fixar"}</button>
-              <button className="btn btn-secondary" disabled={masked} onClick={() => send(item.id, sendTargets)}>Enviar</button>
+              {peers.length > 0 && <button className="btn btn-secondary" disabled={masked} onClick={() => send(item.id, sendTargets)}>Enviar</button>}
             </div>
           </div>
         </>
@@ -228,9 +231,8 @@ function Rail() {
         <div className="muted" style={{ fontSize: 13.5 }}>Selecione um item para ver detalhes.</div>
       )}
 
-      <div className="targets">
+      {peers.length > 0 && <div className="targets">
         <div className="section-title">Enviar para</div>
-        {peers.length === 0 && <div className="muted" style={{ fontSize: 13 }}>Nenhum dispositivo pareado ainda.</div>}
         {peers.map((d) => (
           <div className="target-row" key={d.deviceId}>
             <Dot device={d} />
@@ -238,7 +240,7 @@ function Rail() {
             <CheckBox small on={sendTargets.includes(d.deviceId)} onChange={() => toggleTarget(d.deviceId)} disabled={d.state === "blocked"} />
           </div>
         ))}
-      </div>
+      </div>}
 
       <div className="shortcuts">
         <div className="section-title">Atalhos</div>

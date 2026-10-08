@@ -1,7 +1,7 @@
 import { Copy, Pin, Send, Trash } from "../components/Icons";
 import { useMasked } from "../components/ui";
 import { TYPE_LABEL, countdown, deviceName, isMono, relTime } from "../lib/format";
-import { useApp } from "../store/app";
+import { usePeers, useApp } from "../store/app";
 
 export function ItemSheet({ itemId, onClose, onSend }: { itemId: string; onClose: () => void; onSend: (id: string) => void }) {
   const item = useApp((s) => s.items.find((i) => i.id === itemId) ?? null);
@@ -9,6 +9,7 @@ export function ItemSheet({ itemId, onClose, onSend }: { itemId: string; onClose
   const me = useApp((s) => s.me);
   const now = useApp((s) => s.now);
   const hideSensitive = useApp((s) => s.settings?.hideSensitive ?? true);
+  const hasPeers = usePeers().length > 0;
   const { copy, pin, remove, reveal, hide } = useApp.getState();
   const { masked, text } = useMasked(item);
   if (!item) return null;
@@ -32,7 +33,7 @@ export function ItemSheet({ itemId, onClose, onSend }: { itemId: string; onClose
         )}
         <div className="actions-grid">
           <button className="btn btn-primary" onClick={async () => { await copy(item.id); onClose(); }}><Copy size={17} /> Copiar</button>
-          <button className="btn btn-secondary" disabled={masked} onClick={() => onSend(item.id)}><Send size={17} /> Enviar</button>
+          {hasPeers && <button className="btn btn-secondary" disabled={masked} onClick={() => onSend(item.id)}><Send size={17} /> Enviar</button>}
           <button className="btn btn-secondary" onClick={() => pin(item.id, !item.isPinned)}><Pin size={17} /> {item.isPinned ? "Desafixar" : "Fixar"}</button>
           <button className="btn btn-secondary" style={{ color: "var(--color-danger-fg)" }} onClick={async () => { await remove(item.id); onClose(); }}><Trash size={17} /> Apagar</button>
         </div>

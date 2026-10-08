@@ -125,6 +125,11 @@ interface AppStore {
   installUpdate: () => Promise<void>;
 }
 
+/** Mantém só alvos que ainda existem, não são este aparelho e não estão bloqueados. */
+function pruneTargets(ids: string[], devices: Device[]): string[] {
+  return ids.filter((id) => devices.some((d) => d.deviceId === id && !d.isSelf && d.state !== "blocked"));
+}
+
 let toastSeq = 0;
 let initStarted = false;
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
@@ -228,7 +233,7 @@ export const useApp = create<AppStore>((set, get) => ({
         else set((s) => ({ items: s.items.filter((i) => !ids.includes(i.id)), totalItems: Math.max(0, s.totalItems - ids.length) }));
       }),
       listen<Device[]>("device:updated", (devices) => {
-        set({ devices });
+        set((s) => ({ devices, sendTargets: pruneTargets(s.sendTargets, devices) }));
         void api.syncStatus().then((sync) => set({ sync }));
       }),
       listen<SyncStatus>("sync:state", (sync) => set({ sync })),
@@ -333,13 +338,18 @@ export const useApp = create<AppStore>((set, get) => ({
       return { revealed: r };
     });
   },
-  async send(itemId, deviceIds) {
+  async send(itemId, ids) {
+    if (selectPeers(get()).length === 0) {
+      get().showToast("Nenhum dispositivo pareado para enviar", "error");
+      return;
+    }
+    const deviceIds = pruneTargets(ids, get().devices);
     if (deviceIds.length === 0) {
       get().showToast("Escolha ao menos um dispositivo", "error");
       return;
     }
     await api.sendItem(itemId, deviceIds);
-    const names = deviceIds.map((id) => get().devices.find((d) => d.deviceId === id)?.name ?? id);
+    const names = deviceIds.map((id) => get().devices.find((d) => d.deviceId === id)!.name);
     get().showToast(`Enviando para ${names.join(", ")}`);
   },
   async setPaused(paused, minutes) {
@@ -365,7 +375,8 @@ export const useApp = create<AppStore>((set, get) => ({
     set({ devices: await api.setDeviceFlags(deviceId, flags) });
   },
   async removeDevice(deviceId) {
-    set({ devices: await api.removeDevice(deviceId) });
+    const devices = await api.removeDevice(deviceId);
+    set((s) => ({ devices, sendTargets: pruneTargets(s.sendTargets, devices) }));
     get().showToast("Dispositivo removido e chaves revogadas");
   },
   async startPairing() {

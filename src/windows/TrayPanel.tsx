@@ -37,7 +37,7 @@ export function TrayPanel() {
     else if (e.key === "ArrowDown") { e.preventDefault(); setActive((a) => Math.min(a + 1, items.length - 1)); }
     else if (e.key === "ArrowUp") { e.preventDefault(); setActive((a) => Math.max(a - 1, 0)); }
     else if (e.key === "Enter" && items[active]) { e.preventDefault(); void paste(items[active].id); }
-    else if (e.ctrlKey && e.key.toLowerCase() === "s" && items[active]) { e.preventDefault(); void send(items[active].id, sendTargets); }
+    else if (e.ctrlKey && e.key.toLowerCase() === "s" && items[active] && peers.length > 0) { e.preventDefault(); void send(items[active].id, sendTargets); }
     else if (/^[1-8]$/.test(e.key) && !query && items[Number(e.key) - 1]) { e.preventDefault(); void paste(items[Number(e.key) - 1].id); }
   };
 
@@ -49,10 +49,12 @@ export function TrayPanel() {
       <div className="tray-head">
         <div className="brand-dot" />
         <span className="title">ClipSync</span>
-        <span className={`status-inline${connected > 0 && !sync.paused ? "" : " warn"}`}>
-          <span className={`dot ${connected > 0 && !sync.paused ? "online pulse" : "warn"}`} />
-          {statusText}
-        </span>
+        {(peers.length > 0 || sync.paused) && (
+          <span className={`status-inline${connected > 0 && !sync.paused ? "" : " warn"}`}>
+            <span className={`dot ${connected > 0 && !sync.paused ? "online pulse" : "warn"}`} />
+            {statusText}
+          </span>
+        )}
       </div>
       <label className="tray-search">
         <Search size={15} style={{ color: "var(--color-neutral-600)" }} />
@@ -77,7 +79,7 @@ export function TrayPanel() {
       <div className="tray-foot">
         <span><b>↑↓</b> navegar</span>
         <span><b>Enter</b> colar</span>
-        <span><b>Ctrl+S</b> enviar</span>
+        {peers.length > 0 && <span><b>Ctrl+S</b> enviar</span>}
         <button className="open" onClick={() => api.windowAction("show_main")}>Abrir janela</button>
       </div>
       <Toast />

@@ -58,7 +58,7 @@ export function HomeView({ openSend, openDetail, goTab }: ViewCtx) {
       <div className="and-head">
         <div className="logo"><Clipboard size={17} /></div>
         <span className="brand">ClipSync</span>
-        <span className={`tag ${status.cls}`}>{status.label}</span>
+        {(peers.length > 0 || sync.paused) && <span className={`tag ${status.cls}`}>{status.label}</span>}
         <button className="icon-btn lg" onClick={() => { setQuery(""); goTab("history"); }}><Search size={20} /></button>
       </div>
 
@@ -74,9 +74,11 @@ export function HomeView({ openSend, openDetail, goTab }: ViewCtx) {
               <div className={`text${isMono(current.contentType) ? "" : " body"}${masked ? " dim" : ""}`} {...holdProps}>{text}</div>
               {currentNote && <div className="note">{currentNote}</div>}
               <div className="actions">
-                <button className="btn btn-primary" disabled={masked || peers.length === 0} onClick={() => openSend(current.id)}>
-                  <Send size={17} /> Enviar
-                </button>
+                {peers.length > 0 && (
+                  <button className="btn btn-primary" disabled={masked} onClick={() => openSend(current.id)}>
+                    <Send size={17} /> Enviar
+                  </button>
+                )}
                 <button className="btn btn-secondary" aria-label="Copiar" onClick={() => copy(current.id)}><Copy size={19} /></button>
                 <button className={`btn btn-secondary${current.isPinned ? " on" : ""}`} aria-label="Fixar" onClick={() => pin(current.id, !current.isPinned)}><Pin size={19} /></button>
               </div>
