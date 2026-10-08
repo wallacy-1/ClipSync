@@ -6,6 +6,7 @@ mod autostart;
 mod clipboard;
 mod commands;
 mod content;
+mod crash;
 mod db;
 mod error;
 mod events;
@@ -29,6 +30,7 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    crash::install();
     let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("clipsync=debug,clipsync_lib=debug"))
         .try_init();
 
@@ -62,6 +64,7 @@ pub fn run() {
                 }
             }
             std::fs::create_dir_all(&app_dir)?;
+            crash::set_dir(&app_dir);
 
             let keystore = keystore::Keystore::open(&app_dir)?;
             let identity = identity::load_or_create(&app_dir, &keystore)?;
