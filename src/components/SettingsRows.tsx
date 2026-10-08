@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { PLATFORM_LABEL } from "../lib/format";
-import { appVersion } from "../lib/ipc";
+import { api, appVersion } from "../lib/ipc";
+import type { Shortcuts } from "../lib/types";
 import { useApp } from "../store/app";
 import { Toggle } from "./ui";
 
@@ -143,6 +144,100 @@ export function PrivacyRows() {
           <option value="show">Mostrar</option>
         </select>
       </Row>
+    </>
+  );
+}
+
+export const SHORTCUTS: { id: keyof Shortcuts; label: string; help: string }[] = [
+  { id: "openPanel", label: "Abrir painel rápido", help: "Mostra o histórico perto do cursor" },
+  { id: "pasteLast", label: "Colar último", help: "Põe o último item na área de transferência" },
+  { id: "sendLast", label: "Enviar último", help: "Manda o último item aos dispositivos pareados" },
+  { id: "togglePause", label: "Pausar sync", help: "Pausa ou retoma a sincronização" },
+];
+
+const MODIFIER_CODES = ["ControlLeft", "ControlRight", "AltLeft", "AltRight", "ShiftLeft", "ShiftRight", "MetaLeft", "MetaRight"];
+
+/** Monta "Ctrl+Alt+Shift+V" a partir da tecla; null enquanto só há modificadores. */
+function comboFromEvent(e: KeyboardEvent): string | null {
+  if (MODIFIER_CODES.includes(e.code)) return null;
+  const key = e.code.replace(/^Key/, "").replace(/^Digit/, "");
+  const mods = [e.ctrlKey && "Ctrl", e.altKey && "Alt", e.shiftKey && "Shift", e.metaKey && "Win"].filter(Boolean);
+  return [...mods, key].join("+");
+}
+
+export function ShortcutRows() {
+  const s = useApp((st) => st.settings)!;
+  const save = useApp((st) => st.saveSettings);
+  const [recording, setRecording] = useState<keyof Shortcuts | null>(null);
+  const [failed, setFailed] = useState<string[]>([]);
+
+  const refreshFailures = () => void api.shortcutFailures().then(setFailed).catch(() => {});
+  useEffect(refreshFailures, []);
+
+  const apply = async (id: keyof Shortcuts, combo: string) => {
+    setRecording(null);
+    await save({ shortcuts: { ...s.shortcuts, [id]: combo } });
+    await api.shortcutsSuspend(false).catch(() => {});
+    refreshFailures();
+  };
+
+  // Enquanto grava, os atalhos ficam soltos para a combinação atual também chegar aqui.
+  useEffect(() => {
+    if (!recording) return;
+    void api.shortcutsSuspend(true).catch(() => {});
+    const onKey = (e: KeyboardEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const plain = !e.ctrlKey && !e.altKey && !e.shiftKey && !e.metaKey;
+      if (plain && e.code === "Escape") {
+        setRecording(null);
+        void api.shortcutsSuspend(false).catch(() => {});
+        return;
+      }
+      if (plain && (e.code === "Backspace" || e.code === "Delete")) {
+        void apply(recording, "");
+        return;
+      }
+      const combo = comboFromEvent(e);
+      if (combo) void apply(recording, combo);
+    };
+    const onBlur = () => {
+      setRecording(null);
+      void api.shortcutsSuspend(false).catch(() => {});
+    };
+    window.addEventListener("keydown", onKey, true);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKey, true);
+      window.removeEventListener("blur", onBlur);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recording]);
+
+  return (
+    <>
+      {SHORTCUTS.map((sc) => {
+        const combo = s.shortcuts[sc.id];
+        const help = recording === sc.id
+          ? "Pressione a combinação · Esc cancela · Backspace desliga"
+          : failed.includes(sc.id)
+            ? "Outro programa já usa esta combinação; escolha outra"
+            : sc.help;
+        return (
+          <Row key={sc.id} label={sc.label} help={help}>
+            <button
+              className={`chip shortcut-key${recording === sc.id ? " active" : ""}${failed.includes(sc.id) ? " failed" : ""}`}
+              onClick={() => {
+                if (recording !== sc.id) return setRecording(sc.id);
+                setRecording(null);
+                void api.shortcutsSuspend(false).catch(() => {});
+              }}
+            >
+              {recording === sc.id ? "Gravando…" : combo || "Desligado"}
+            </button>
+          </Row>
+        );
+      })}
     </>
   );
 }

@@ -36,6 +36,7 @@ const settings: Settings = {
   hideSensitive: true,
   sensitiveExpireMinutes: 2,
   launchAtLogin: false,
+  shortcuts: { openPanel: "Ctrl+Alt+Shift+V", pasteLast: "Ctrl+Alt+Shift+C", sendLast: "Ctrl+Alt+Shift+E", togglePause: "Ctrl+Alt+Shift+P" },
 };
 
 let devices: Device[] = [
@@ -246,6 +247,8 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
     case "clipboard_poll_now": return null;
     case "get_settings": return settings;
     case "set_settings": Object.assign(settings, args.settings); emit("settings:changed", settings); return settings;
+    case "shortcut_failures": return [];
+    case "shortcuts_suspend": return;
     case "list_devices": return devices;
     case "set_device_flags":
       devices = devices.map((d) => d.deviceId === args.deviceId

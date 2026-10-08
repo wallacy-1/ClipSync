@@ -175,6 +175,10 @@ pub fn set_settings(app: AppHandle, state: State<'_, AppState>, settings: Settin
     if old.launch_at_login != settings.launch_at_login {
         crate::autostart::set(&app, settings.launch_at_login)?;
     }
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    if old.shortcuts != settings.shortcuts {
+        crate::tray::change_shortcuts(&app, &old.shortcuts, &settings.shortcuts)?;
+    }
     state.db.save_settings(&settings)?;
     *state.settings.write().unwrap() = settings.clone();
     if old.device_name != settings.device_name {
@@ -191,6 +195,28 @@ pub fn set_settings(app: AppHandle, state: State<'_, AppState>, settings: Settin
     events::emit(&app, events::SETTINGS_CHANGED, &settings);
     events::emit(&app, events::DEVICE_UPDATED, state.devices());
     Ok(settings)
+}
+
+/// Ações cujo atalho não registrou na inicialização (outro programa já usa).
+#[tauri::command]
+pub fn shortcut_failures(app: AppHandle) -> Vec<String> {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    return crate::tray::shortcut_failures(&app);
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    {
+        let _ = app;
+        Vec::new()
+    }
+}
+
+/// Solta os atalhos enquanto a tela grava uma combinação nova (senão o próprio atalho
+/// atual nunca chega à janela).
+#[tauri::command]
+pub fn shortcuts_suspend(app: AppHandle, suspend: bool) {
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    crate::tray::suspend_shortcuts(&app, suspend);
+    #[cfg(any(target_os = "android", target_os = "ios"))]
+    let _ = (app, suspend);
 }
 
 #[tauri::command]

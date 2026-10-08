@@ -158,6 +158,8 @@ pub fn run() {
             commands::clipboard_poll_now,
             commands::get_settings,
             commands::set_settings,
+            commands::shortcut_failures,
+            commands::shortcuts_suspend,
             commands::list_devices,
             commands::set_device_flags,
             commands::remove_device,

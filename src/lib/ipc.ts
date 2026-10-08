@@ -88,6 +88,8 @@ export const api = {
   clipboardPollNow: () => call<ClipboardItem | null>("clipboard_poll_now"),
   getSettings: () => call<Settings>("get_settings"),
   setSettings: (settings: Settings) => call<Settings>("set_settings", { settings }),
+  shortcutFailures: () => call<string[]>("shortcut_failures"),
+  shortcutsSuspend: (suspend: boolean) => call<void>("shortcuts_suspend", { suspend }),
   listDevices: () => call<Device[]>("list_devices"),
   setDeviceFlags: (deviceId: string, flags: { autoSend?: boolean; autoReceive?: boolean; blocked?: boolean }) =>
     call<Device[]>("set_device_flags", { deviceId, ...flags }),

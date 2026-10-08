@@ -112,6 +112,31 @@ pub struct Settings {
     pub notify_text: bool,
     /// Android: serviço em primeiro plano que mantém a conexão viva fora do app.
     pub keep_alive: bool,
+    /// Windows: atalhos globais; string vazia = desligado.
+    pub shortcuts: Shortcuts,
+}
+
+/// Combinações no formato "Ctrl+Alt+Shift+V" (o mesmo que o `global-hotkey` entende).
+/// Padrão em Ctrl+Alt+Shift: Ctrl+Shift+V/S/P são de "colar sem formatação",
+/// "Salvar como" e paletas de comando em muitos apps, e o atalho global rouba a tecla deles.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Shortcuts {
+    pub open_panel: String,
+    pub paste_last: String,
+    pub send_last: String,
+    pub toggle_pause: String,
+}
+
+impl Default for Shortcuts {
+    fn default() -> Self {
+        Self {
+            open_panel: "Ctrl+Alt+Shift+V".into(),
+            paste_last: "Ctrl+Alt+Shift+C".into(),
+            send_last: "Ctrl+Alt+Shift+E".into(),
+            toggle_pause: "Ctrl+Alt+Shift+P".into(),
+        }
+    }
 }
 
 impl Settings {
@@ -146,6 +171,7 @@ impl Default for Settings {
             notifications: true,
             notify_text: false,
             keep_alive: false,
+            shortcuts: Shortcuts::default(),
         }
     }
 }

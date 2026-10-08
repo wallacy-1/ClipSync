@@ -48,6 +48,7 @@ export function WinShell() {
       : sync.queuedCount > 0 && connected === 0
         ? "Reconectando…"
         : `Sincronizado · ${peers.length + 1} disp.`;
+  const panelShortcut = useApp((s) => s.settings?.shortcuts.openPanel);
   const statusClass = sync.paused ? "" : sync.queuedCount > 0 && connected === 0 ? "warn" : "online";
 
   return (
@@ -102,7 +103,7 @@ export function WinShell() {
               <span className={`dot ${statusClass}`} />
               <span className="label">{statusLabel}</span>
             </div>
-            <span className="hint">Painel rápido · Ctrl+Shift+V</span>
+            {panelShortcut && <span className="hint">Painel rápido · {panelShortcut}</span>}
           </div>
         </nav>
 

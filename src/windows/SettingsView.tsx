@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Shield } from "../components/Icons";
-import { AboutRows, PrivacyRows, SyncRows } from "../components/SettingsRows";
+import { AboutRows, PrivacyRows, ShortcutRows, SyncRows } from "../components/SettingsRows";
 import { Confirm } from "../components/ui";
 import { useApp } from "../store/app";
 
@@ -19,6 +19,10 @@ export function SettingsView() {
           <div>
             <div className="section-title">Privacidade</div>
             <PrivacyRows />
+          </div>
+          <div>
+            <div className="section-title">Atalhos globais</div>
+            <ShortcutRows />
           </div>
           <div className="security-note">
             <Shield size={20} style={{ color: "var(--color-accent-2-800)" }} />

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { Clipboard, Copy, Pause, Play, Search, Send, Trash, WifiOff } from "../components/Icons";
+import { SHORTCUTS } from "../components/SettingsRows";
 import { CheckBox, Dot, ItemText, StateTag, TypeTag, useMasked } from "../components/ui";
 import { TYPE_LABEL, countdown, deviceName, isMono, pluralize, relTime } from "../lib/format";
 import type { Filter } from "../lib/types";
@@ -189,6 +190,7 @@ function Rail() {
   const now = useApp((s) => s.now);
   const sendTargets = useApp((s) => s.sendTargets);
   const toggleTarget = useApp((s) => s.toggleTarget);
+  const shortcuts = useApp((s) => s.settings?.shortcuts);
   const { copy, pin, send } = useApp.getState();
   const { masked, text } = useMasked(item);
 
@@ -241,10 +243,9 @@ function Rail() {
       <div className="shortcuts">
         <div className="section-title">Atalhos</div>
         <div className="lines">
-          <div><span>Abrir painel rápido</span><span>Ctrl+Shift+V</span></div>
-          <div><span>Colar último</span><span>Ctrl+Shift+1</span></div>
-          <div><span>Enviar ao celular</span><span>Ctrl+Shift+S</span></div>
-          <div><span>Pausar sync</span><span>Ctrl+Shift+P</span></div>
+          {SHORTCUTS.map((sc) => (
+            <div key={sc.id}><span>{sc.label}</span><span>{shortcuts?.[sc.id] || "—"}</span></div>
+          ))}
         </div>
       </div>
     </aside>

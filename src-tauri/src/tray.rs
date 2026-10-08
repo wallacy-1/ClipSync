@@ -4,12 +4,16 @@
 use crate::clipboard;
 use crate::error::{AppError, Result};
 use crate::events;
+use crate::models::Shortcuts;
 use crate::state::AppState;
 use crate::sync;
+use std::collections::HashMap;
+use std::str::FromStr;
+use std::sync::Mutex;
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, ShortcutState};
+use tauri::{AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Wry};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 pub const TRAY_WINDOW: &str = "tray";
 pub const MAIN_WINDOW: &str = "main";
@@ -27,9 +31,9 @@ pub fn setup(app: &AppHandle) -> anyhow::Result<()> {
         .focused(false)
         .build()?;
 
-    let open = MenuItem::with_id(app, "open", "Abrir ClipSync", true, Some("Ctrl+Shift+V"))?;
-    let paste = MenuItem::with_id(app, "paste_last", "Colar último item", true, Some("Ctrl+Shift+1"))?;
-    let send = MenuItem::with_id(app, "send_last", "Enviar último item", true, Some("Ctrl+Shift+S"))?;
+    let open = MenuItem::with_id(app, "open", "Abrir ClipSync", true, None::<&str>)?;
+    let paste = MenuItem::with_id(app, "paste_last", "Colar último item", true, None::<&str>)?;
+    let send = MenuItem::with_id(app, "send_last", "Enviar último item", true, None::<&str>)?;
     let pause = MenuItem::with_id(app, "pause_1h", "Pausar sync por 1 h", true, None::<&str>)?;
     let resume = MenuItem::with_id(app, "resume", "Retomar sync", true, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;
@@ -63,38 +67,241 @@ pub fn setup(app: &AppHandle) -> anyhow::Result<()> {
         })
         .build(app)?;
 
+    app.manage(TrayMenu { open, paste, send });
     register_shortcuts(app)?;
     Ok(())
 }
 
+/// Itens do menu que exibem o atalho ao lado; atualizados quando ele muda.
+struct TrayMenu {
+    open: MenuItem<Wry>,
+    paste: MenuItem<Wry>,
+    send: MenuItem<Wry>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Action {
+    OpenPanel,
+    PasteLast,
+    SendLast,
+    TogglePause,
+}
+
+impl Action {
+    /// Mesmo nome do campo em `Shortcuts` (camelCase), usado pela UI.
+    fn key(self) -> &'static str {
+        match self {
+            Action::OpenPanel => "openPanel",
+            Action::PasteLast => "pasteLast",
+            Action::SendLast => "sendLast",
+            Action::TogglePause => "togglePause",
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            Action::OpenPanel => "Abrir painel rápido",
+            Action::PasteLast => "Colar último",
+            Action::SendLast => "Enviar último",
+            Action::TogglePause => "Pausar sync",
+        }
+    }
+}
+
+fn combos(s: &Shortcuts) -> [(Action, &str); 4] {
+    [
+        (Action::OpenPanel, s.open_panel.as_str()),
+        (Action::PasteLast, s.paste_last.as_str()),
+        (Action::SendLast, s.send_last.as_str()),
+        (Action::TogglePause, s.toggle_pause.as_str()),
+    ]
+}
+
+/// Atalhos registrados agora (id do atalho -> ação) e os que falharam na inicialização.
+#[derive(Default)]
+struct Registry {
+    active: Mutex<HashMap<u32, (Action, Shortcut)>>,
+    failed: Mutex<Vec<String>>,
+}
+
 fn register_shortcuts(app: &AppHandle) -> anyhow::Result<()> {
+    app.manage(Registry::default());
     app.plugin(
         tauri_plugin_global_shortcut::Builder::new()
             .with_handler(|app, shortcut, event| {
                 if event.state() != ShortcutState::Pressed {
                     return;
                 }
-                let mods = Modifiers::CONTROL | Modifiers::SHIFT;
-                if shortcut.matches(mods, Code::KeyV) {
-                    toggle_tray_window(app, None);
-                } else if shortcut.matches(mods, Code::Digit1) {
-                    paste_last(app);
-                } else if shortcut.matches(mods, Code::KeyS) {
-                    send_last(app);
-                } else if shortcut.matches(mods, Code::KeyP) {
-                    let paused = app.state::<AppState>().is_paused();
-                    set_paused(app, !paused, None);
+                let action = app.state::<Registry>().active.lock().unwrap().get(&shortcut.id()).map(|(a, _)| *a);
+                match action {
+                    Some(Action::OpenPanel) => toggle_tray_window(app, None),
+                    Some(Action::PasteLast) => paste_last(app),
+                    Some(Action::SendLast) => send_last(app),
+                    Some(Action::TogglePause) => {
+                        let paused = app.state::<AppState>().is_paused();
+                        set_paused(app, !paused, None);
+                    }
+                    None => {}
                 }
             })
             .build(),
     )?;
+    let shortcuts = app.state::<AppState>().settings().shortcuts;
+    let failed = register_all(app, &shortcuts);
+    for (action, combo, e) in &failed {
+        log::warn!("atalho {combo} ({}) indisponível: {e}", action.label());
+    }
+    *app.state::<Registry>().failed.lock().unwrap() = failed.iter().map(|(a, _, _)| a.key().to_string()).collect();
+    update_menu(app, &shortcuts);
+    Ok(())
+}
+
+/// A UI escreve "Win"; o `global-hotkey` chama a tecla de "Super".
+fn parse(combo: &str) -> std::result::Result<Shortcut, String> {
+    let combo = combo.split('+').map(|t| if t.trim().eq_ignore_ascii_case("win") { "Super" } else { t }).collect::<Vec<_>>().join("+");
+    Shortcut::from_str(&combo).map_err(|e| e.to_string())
+}
+
+/// Registra o que der; devolve as combinações inválidas ou que outro programa já ocupa.
+fn register_all(app: &AppHandle, s: &Shortcuts) -> Vec<(Action, String, String)> {
     let gs = app.global_shortcut();
-    for combo in ["ctrl+shift+v", "ctrl+shift+1", "ctrl+shift+s", "ctrl+shift+p"] {
-        if let Err(e) = gs.register(combo) {
-            log::warn!("atalho {combo} indisponível: {e}");
+    let reg = app.state::<Registry>();
+    let mut failed = Vec::new();
+    for (action, combo) in combos(s) {
+        if combo.trim().is_empty() {
+            continue;
+        }
+        let res = parse(combo).and_then(|sc| gs.register(sc).map(|_| sc).map_err(|e| e.to_string()));
+        match res {
+            Ok(sc) => {
+                reg.active.lock().unwrap().insert(sc.id(), (action, sc));
+            }
+            Err(e) => failed.push((action, combo.to_string(), e)),
         }
     }
+    failed
+}
+
+fn unregister_all(app: &AppHandle) {
+    let gs = app.global_shortcut();
+    let active: Vec<Shortcut> = app.state::<Registry>().active.lock().unwrap().drain().map(|(_, (_, sc))| sc).collect();
+    for sc in active {
+        let _ = gs.unregister(sc);
+    }
+}
+
+fn update_menu(app: &AppHandle, s: &Shortcuts) {
+    let Some(menu) = app.try_state::<TrayMenu>() else { return };
+    let accel = |c: &str| if c.trim().is_empty() { None } else { Some(c.to_string()) };
+    let _ = menu.open.set_accelerator(accel(&s.open_panel));
+    let _ = menu.paste.set_accelerator(accel(&s.paste_last));
+    let _ = menu.send.set_accelerator(accel(&s.send_last));
+}
+
+pub fn shortcut_failures(app: &AppHandle) -> Vec<String> {
+    app.try_state::<Registry>().map(|r| r.failed.lock().unwrap().clone()).unwrap_or_default()
+}
+
+pub fn suspend_shortcuts(app: &AppHandle, suspend: bool) {
+    if app.try_state::<Registry>().is_none() {
+        return;
+    }
+    unregister_all(app);
+    if !suspend {
+        register_all(app, &app.state::<AppState>().settings().shortcuts);
+    }
+}
+
+/// Troca os atalhos: valida, registra os novos e, se algum já estiver em uso por outro
+/// programa, volta aos antigos e diz qual falhou.
+pub fn change_shortcuts(app: &AppHandle, old: &Shortcuts, new: &Shortcuts) -> Result<()> {
+    let mut seen: Vec<(Modifiers, Code, Action)> = Vec::new();
+    for (action, combo) in combos(new) {
+        if combo.trim().is_empty() {
+            continue;
+        }
+        let sc = parse(combo).map_err(|_| AppError::Other(format!("Atalho inválido: {combo}")))?;
+        if let Some(why) = conflict_reason(sc.mods, sc.key) {
+            return Err(AppError::Other(format!("{combo} {why}. Escolha outra combinação.")));
+        }
+        if let Some((_, _, other)) = seen.iter().find(|(m, k, _)| *m == sc.mods && *k == sc.key) {
+            return Err(AppError::Other(format!("{combo} já é o atalho de \"{}\".", other.label())));
+        }
+        seen.push((sc.mods, sc.key, action));
+    }
+
+    unregister_all(app);
+    let failed = register_all(app, new);
+    if let Some((action, combo, _)) = failed.first() {
+        unregister_all(app);
+        register_all(app, old);
+        return Err(AppError::Other(format!(
+            "{combo} ({}) já está em uso por outro programa. Escolha outra combinação.",
+            action.label()
+        )));
+    }
+    app.state::<Registry>().failed.lock().unwrap().clear();
+    update_menu(app, new);
     Ok(())
+}
+
+/// Combinações que o Windows ou apps comuns já usam. O `RegisterHotKey` aceita várias
+/// delas, mas o atalho global tiraria a tecla de todos os outros programas.
+fn conflict_reason(mods: Modifiers, key: Code) -> Option<&'static str> {
+    use Code::*;
+    let ctrl = mods.contains(Modifiers::CONTROL);
+    let alt = mods.contains(Modifiers::ALT);
+    let shift = mods.contains(Modifiers::SHIFT);
+    let win = mods.contains(Modifiers::SUPER);
+    if !ctrl && !alt && !win {
+        return Some("precisa de Ctrl, Alt ou Win, senão a tecla some da digitação");
+    }
+    if win && !ctrl && !alt {
+        return Some("é reservado do Windows (Win+tecla)");
+    }
+    if !win && !shift && ctrl != alt {
+        return Some(if ctrl {
+            "é usado pelos programas (Ctrl+tecla: copiar, salvar, buscar…)"
+        } else {
+            "é usado pelos menus dos programas (Alt+tecla)"
+        });
+    }
+    if ctrl && alt && !shift && !win {
+        if key == Delete {
+            return Some("é reservado do Windows");
+        }
+        // Em teclado ABNT2, Ctrl+Alt = AltGr: essas teclas digitam / ? ° ₢ ¹ ² ³ £ ¢ ¬ § ª º.
+        if matches!(
+            key,
+            KeyQ | KeyW | KeyE | KeyC | Digit1 | Digit2 | Digit3 | Digit4 | Digit5 | Digit6 | Equal | BracketLeft | BracketRight
+        ) {
+            return Some("digita um símbolo com AltGr no teclado ABNT2");
+        }
+    }
+    if ctrl && shift && !alt && !win {
+        let common = match key {
+            KeyV => Some("é \"colar sem formatação\" em muitos programas"),
+            KeyS => Some("é \"Salvar como\" em muitos programas"),
+            KeyP => Some("é a paleta de comandos e a janela anônima de editores e navegadores"),
+            KeyN => Some("é \"nova pasta\" no Explorer e janela anônima no Chrome"),
+            KeyT => Some("reabre a aba fechada nos navegadores"),
+            KeyZ => Some("é \"refazer\" em muitos programas"),
+            KeyI | KeyJ | KeyC => Some("abre as ferramentas de desenvolvedor nos navegadores"),
+            KeyW => Some("fecha a janela nos navegadores"),
+            KeyB => Some("mostra a barra de favoritos nos navegadores"),
+            Escape => Some("abre o Gerenciador de Tarefas"),
+            Tab => Some("volta de aba nos programas"),
+            Delete => Some("limpa os dados de navegação nos navegadores"),
+            _ => None,
+        };
+        if common.is_some() {
+            return common;
+        }
+    }
+    if alt && !ctrl && matches!(key, F4 | Tab | Escape | Space) {
+        return Some("é reservado do Windows");
+    }
+    None
 }
 
 fn main_window(app: &AppHandle) -> Option<WebviewWindow> {
@@ -213,4 +420,30 @@ pub fn window_action(app: &AppHandle, action: &str) -> Result<()> {
         other => return Err(AppError::Other(format!("ação desconhecida: {other}"))),
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn reason(combo: &str) -> Option<&'static str> {
+        let sc = parse(combo).unwrap();
+        conflict_reason(sc.mods, sc.key)
+    }
+
+    #[test]
+    fn defaults_are_free() {
+        for (_, combo) in combos(&Shortcuts::default()) {
+            assert_eq!(reason(combo), None, "{combo}");
+        }
+    }
+
+    #[test]
+    fn common_combos_are_rejected() {
+        for combo in ["Ctrl+Shift+V", "Ctrl+Shift+S", "Ctrl+Shift+P", "Ctrl+C", "Alt+F4", "Win+V", "Shift+A", "Ctrl+Alt+Q", "Ctrl+Alt+1"] {
+            assert!(reason(combo).is_some(), "{combo}");
+        }
+        assert_eq!(reason("Ctrl+Shift+1"), None);
+        assert_eq!(reason("Ctrl+Alt+V"), None);
+    }
 }

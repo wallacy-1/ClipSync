@@ -67,6 +67,15 @@ export interface Settings {
   sensitiveExpireMinutes: number;
   launchAtLogin: boolean;
   autostartInitialized: boolean;
+  /** Windows: atalhos globais ("Ctrl+Alt+Shift+V"); "" = desligado. */
+  shortcuts: Shortcuts;
+}
+
+export interface Shortcuts {
+  openPanel: string;
+  pasteLast: string;
+  sendLast: string;
+  togglePause: string;
 }
 
 export interface SyncStatus {
