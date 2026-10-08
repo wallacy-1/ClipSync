@@ -14,6 +14,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.ProcessLifecycleOwner
+import app.clipsync.desktop.R
 
 /**
  * "Arquivo recebido" ao concluir um recebimento; tocar abre o arquivo (o FGS some sem aviso ao
@@ -46,7 +47,7 @@ object ReceivedNotifier {
         val open = PendingIntent.getActivity(app, transferId.hashCode(), chooser, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
 
         val n = NotificationCompat.Builder(app, CHANNEL)
-            .setSmallIcon(android.R.drawable.stat_sys_download_done)
+            .setSmallIcon(R.drawable.ic_stat_clipsync)
             .setContentTitle(title)
             .setContentText(text)
             // Tocar abre o arquivo e some (botão de ação não auto-cancela: ficaria a notificação velha).

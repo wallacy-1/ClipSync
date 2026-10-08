@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Camada "monochrome" do ícone adaptativo (ícones com tema do Android 13+): mesmo
+     desenho de ic_stat_clipsync, centrado na zona segura de 66 dp. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="2"
+        android:scaleY="2"
+        android:translateX="30"
+        android:translateY="30">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M9,2h6a1,1 0,0 1,1 1v2h-8v-2a1,1 0,0 1,1 -1z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M7,4h10a2,2 0,0 1,2 2v13a2,2 0,0 1,-2 2h-10a2,2 0,0 1,-2 -2v-13a2,2 0,0 1,2 -2z M8,7v11h8v-11z" />
+        <path
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="1.8"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M9.6,12.6l2,2l3.2,-4.2" />
+    </group>
+</vector>

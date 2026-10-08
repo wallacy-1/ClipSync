@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- Mesmo laranja do círculo do ícone: a máscara do launcher não deixa borda branca. -->
+  <color name="ic_launcher_background">#C67139</color>
+</resources>

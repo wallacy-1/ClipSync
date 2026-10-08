@@ -14,6 +14,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.os.SystemClock
 import androidx.core.app.NotificationCompat
+import app.clipsync.desktop.R
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
@@ -211,7 +212,7 @@ class TransferService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         return NotificationCompat.Builder(this, CHANNEL)
-            .setSmallIcon(android.R.drawable.stat_sys_download)
+            .setSmallIcon(R.drawable.ic_stat_clipsync)
             .setContentTitle(title)
             .setContentText(text)
             .setOnlyAlertOnce(true)
