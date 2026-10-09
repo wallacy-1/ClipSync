@@ -33,7 +33,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDlGREEyQUU1RTg3MjQ1MUEKUldRYVJYTG81U3JhbjJnM1UvY3Zvcm9meldsdFVxczVNc2xMZHRLbjlIcXM2SUswbzZCZzMvWEsK",
       "endpoints": [
-        "https://github.com/wallacy/ClipSync/releases/latest/download/latest.json"
+        "https://github.com/wallacy-1/ClipSync/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"
