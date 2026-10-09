@@ -155,7 +155,7 @@ impl Db {
             params![id, state.kind(), state.reason(), now, completed],
         )?;
         if n == 0 {
-            return Err(AppError::Other(format!("transferência {id} não encontrada")));
+            return Err(AppError::Other(crate::i18n::trf("err.transfer_missing", &[("id", id)])));
         }
         Ok(())
     }

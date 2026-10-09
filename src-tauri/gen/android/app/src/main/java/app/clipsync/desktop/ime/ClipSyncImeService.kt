@@ -8,7 +8,8 @@ import android.text.InputType
 import android.text.TextUtils
 import android.view.View
 import android.view.inputmethod.EditorInfo
-import android.view.inputmethod.InputMethodManager
+import android.view.inputmethod.InputMethodManager
+import app.clipsync.desktop.R
 
 /**
  * Teclado opcional do ClipSync. Nada do que é digitado é registrado, persistido ou
@@ -128,12 +129,12 @@ class ClipSyncImeService : InputMethodService() {
         if ((info.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION) != 0) return "↵"
         info.actionLabel?.let { if (!TextUtils.isEmpty(it)) return it.toString() }
         return when (info.imeOptions and EditorInfo.IME_MASK_ACTION) {
-            EditorInfo.IME_ACTION_GO -> "Ir"
-            EditorInfo.IME_ACTION_SEARCH -> "Buscar"
-            EditorInfo.IME_ACTION_SEND -> "Enviar"
-            EditorInfo.IME_ACTION_NEXT -> "Próximo"
-            EditorInfo.IME_ACTION_DONE -> "OK"
-            EditorInfo.IME_ACTION_PREVIOUS -> "Anterior"
+            EditorInfo.IME_ACTION_GO -> getString(R.string.ime_action_go)
+            EditorInfo.IME_ACTION_SEARCH -> getString(R.string.ime_action_search)
+            EditorInfo.IME_ACTION_SEND -> getString(R.string.ime_action_send)
+            EditorInfo.IME_ACTION_NEXT -> getString(R.string.ime_action_next)
+            EditorInfo.IME_ACTION_DONE -> getString(R.string.ime_action_done)
+            EditorInfo.IME_ACTION_PREVIOUS -> getString(R.string.ime_action_previous)
             else -> "↵"
         }
     }

@@ -35,15 +35,16 @@ object ReceivedNotifier {
 
         val app = context.applicationContext
         val nm = app.getSystemService(NotificationManager::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm.getNotificationChannel(CHANNEL) == null) {
-            nm.createNotificationChannel(NotificationChannel(CHANNEL, "Arquivos recebidos", NotificationManager.IMPORTANCE_DEFAULT))
+        // Sempre recria: o sistema só atualiza nome/descrição do canal existente, e assim ele segue o idioma atual.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            nm.createNotificationChannel(NotificationChannel(CHANNEL, app.getString(R.string.channel_received), NotificationManager.IMPORTANCE_DEFAULT))
         }
 
         // URI do MediaStore é nossa (Downloads/ClipSync): podemos conceder leitura a quem abrir.
         val view = Intent(Intent.ACTION_VIEW)
             .setDataAndType(Uri.parse(uri), mime ?: app.contentResolver.getType(Uri.parse(uri)) ?: "*/*")
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-        val chooser = Intent.createChooser(view, "Abrir com").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val chooser = Intent.createChooser(view, app.getString(R.string.received_open_with)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         val open = PendingIntent.getActivity(app, transferId.hashCode(), chooser, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
 
         val n = NotificationCompat.Builder(app, CHANNEL)

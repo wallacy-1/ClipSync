@@ -50,7 +50,7 @@ interface KeyboardTheme {
 /** Tema padrão: parece um teclado Android comum. Segue o modo claro/escuro do sistema. */
 object DefaultTheme : KeyboardTheme {
     override val id = "default"
-    override val label = "Padrão"
+    override val label = "Default" // a UI traduz pelo `id` (ver KeyboardView.tsx)
     override val keyRadiusDp = 6f
     override val keyGapDp = 5f
     override val rowGapDp = 9f

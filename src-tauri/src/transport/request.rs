@@ -69,6 +69,19 @@ pub async fn on_request(app: &AppHandle, stream: &mut TcpStream, from: Option<De
     write_frame(stream, &serde_json::to_vec(&reply)?).await
 }
 
+/// Motivo da recusa recebido do outro lado. O fio leva o texto em pt (compatível com versões antigas);
+/// os conhecidos são traduzidos aqui, o resto aparece como veio.
+fn refusal_text(reason: Option<String>) -> String {
+    use crate::i18n::tr;
+    match reason.as_deref() {
+        None => tr("err.pair_declined").into(),
+        Some("pedido sem remetente") => tr("err.pair_no_sender").into(),
+        Some("este é o próprio dispositivo") => tr("err.pair_self").into(),
+        Some("aguarde alguns segundos e peça de novo") => tr("err.pair_throttled").into(),
+        Some(other) => other.to_string(),
+    }
+}
+
 /// Lado que pede: manda o pedido a um dispositivo visto na rede e espera o "recebido".
 pub async fn send(app: &AppHandle, device_id: &str) -> Result<()> {
     let state = app.state::<AppState>();
@@ -80,13 +93,13 @@ pub async fn send(app: &AppHandle, device_id: &str) -> Result<()> {
         .map(|p| p.addrs.iter().map(|a| SocketAddr::new(*a, p.port)).collect())
         .unwrap_or_default();
     if addrs.is_empty() {
-        return Err(AppError::Pairing("o dispositivo não está mais na rede".into()));
+        return Err(AppError::Pairing(crate::i18n::tr("err.pair_left_network").into()));
     }
     let me = DeviceIdentity { name: state.display_name(), ..state.identity.read().unwrap().summary() };
     let hello = PreHello { v: PROTOCOL_VERSION, mode: MODE.into(), pairing_id: None, auth: None, from: Some(me) };
     let bytes = serde_json::to_vec(&hello)?;
 
-    let mut last = AppError::Pairing("não foi possível alcançar o dispositivo".into());
+    let mut last = AppError::Pairing(crate::i18n::tr("err.pair_unreachable").into());
     for addr in addrs {
         let res = tokio::time::timeout(TIMEOUT, async {
             let mut s = TcpStream::connect(addr).await?;
@@ -96,12 +109,12 @@ pub async fn send(app: &AppHandle, device_id: &str) -> Result<()> {
         .await;
         match res {
             Ok(Ok(raw)) => {
-                let r: Reply = serde_json::from_slice(&raw).map_err(|_| AppError::Pairing("resposta inválida".into()))?;
-                return if r.ok { Ok(()) } else { Err(AppError::Pairing(r.reason.unwrap_or_else(|| "pedido recusado".into()))) };
+                let r: Reply = serde_json::from_slice(&raw).map_err(|_| AppError::Pairing(crate::i18n::tr("err.pair_bad_reply").into()))?;
+                return if r.ok { Ok(()) } else { Err(AppError::Pairing(refusal_text(r.reason))) };
             }
             Ok(Err(e)) => last = e,
             // Versões antigas tratam o pedido como sessão e ficam esperando o handshake.
-            Err(_) => last = AppError::Pairing("o outro dispositivo não respondeu; atualize o ClipSync nele".into()),
+            Err(_) => last = AppError::Pairing(crate::i18n::tr("err.pair_no_reply_update").into()),
         }
     }
     Err(last)

@@ -4,13 +4,14 @@
 use crate::clipboard;
 use crate::error::{AppError, Result};
 use crate::events;
+use crate::i18n::{tr, trf};
 use crate::models::Shortcuts;
 use crate::state::AppState;
 use crate::sync;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Mutex;
-use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem, Submenu};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager, PhysicalPosition, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Wry};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
@@ -21,7 +22,7 @@ pub const MAIN_WINDOW: &str = "main";
 pub fn setup(app: &AppHandle) -> anyhow::Result<()> {
     // Painel rápido: janela só do desktop (por isso criada aqui, não no tauri.conf.json).
     WebviewWindowBuilder::new(app, TRAY_WINDOW, WebviewUrl::App("index.html#/tray".into()))
-        .title("ClipSync — Painel rápido")
+        .title(tr("tray.window"))
         .inner_size(400.0, 560.0)
         .resizable(false)
         .decorations(false)
@@ -31,12 +32,18 @@ pub fn setup(app: &AppHandle) -> anyhow::Result<()> {
         .focused(false)
         .build()?;
 
-    let open = MenuItem::with_id(app, "open", "Abrir ClipSync", true, None::<&str>)?;
-    let paste = MenuItem::with_id(app, "paste_last", "Colar último item", true, None::<&str>)?;
-    let send = MenuItem::with_id(app, "send_last", "Enviar último item", true, None::<&str>)?;
-    let pause = MenuItem::with_id(app, "pause_1h", "Pausar sync por 1 h", true, None::<&str>)?;
-    let resume = MenuItem::with_id(app, "resume", "Retomar sync", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Sair", true, None::<&str>)?;
+    // Os textos são (re)aplicados por `refresh_texts` ao mudar o idioma; aqui entram os do idioma atual.
+    let item = |id: &str, key: &str| MenuItem::with_id(app, id, tr(key), true, None::<&str>);
+    let open = item("open", "tray.open")?;
+    let paste = item("paste_last", "tray.paste_last")?;
+    let send = item("send_last", "tray.send_last")?;
+    let pause_15 = item("pause_15", "tray.pause_15")?;
+    let pause_60 = item("pause_60", "tray.pause_60")?;
+    let pause_480 = item("pause_480", "tray.pause_480")?;
+    let pause_0 = item("pause_0", "tray.pause_0")?;
+    let pause = Submenu::with_items(app, tr("tray.pause"), true, &[&pause_15, &pause_60, &pause_480, &pause_0])?;
+    let resume = item("resume", "tray.resume")?;
+    let quit = item("quit", "tray.quit")?;
     let menu = Menu::with_items(
         app,
         &[&open, &paste, &send, &pause, &resume, &PredefinedMenuItem::separator(app)?, &quit],
@@ -54,7 +61,10 @@ pub fn setup(app: &AppHandle) -> anyhow::Result<()> {
                 "open" => show_main(&app),
                 "paste_last" => paste_last(&app),
                 "send_last" => send_last(&app),
-                "pause_1h" => set_paused(&app, true, Some(60)),
+                "pause_15" => set_paused(&app, true, Some(15)),
+                "pause_60" => set_paused(&app, true, Some(60)),
+                "pause_480" => set_paused(&app, true, Some(480)),
+                "pause_0" => set_paused(&app, true, None),
                 "resume" => set_paused(&app, false, None),
                 "quit" => app.exit(0),
                 _ => {}
@@ -67,16 +77,39 @@ pub fn setup(app: &AppHandle) -> anyhow::Result<()> {
         })
         .build(app)?;
 
-    app.manage(TrayMenu { open, paste, send });
+    app.manage(TrayMenu { open, paste, send, pause, pause_items: [pause_15, pause_60, pause_480, pause_0], resume, quit });
     register_shortcuts(app)?;
     Ok(())
 }
 
-/// Itens do menu que exibem o atalho ao lado; atualizados quando ele muda.
+/// Itens do menu: `open`/`paste`/`send` exibem o atalho ao lado (atualizado quando ele muda);
+/// todos têm o texto refeito quando o idioma muda.
 struct TrayMenu {
     open: MenuItem<Wry>,
     paste: MenuItem<Wry>,
     send: MenuItem<Wry>,
+    pause: Submenu<Wry>,
+    pause_items: [MenuItem<Wry>; 4],
+    resume: MenuItem<Wry>,
+    quit: MenuItem<Wry>,
+}
+
+/// Aplica o idioma atual (`i18n::tr`) ao menu da bandeja e ao título do painel rápido.
+pub fn refresh_texts(app: &AppHandle) {
+    if let Some(m) = app.try_state::<TrayMenu>() {
+        let _ = m.open.set_text(tr("tray.open"));
+        let _ = m.paste.set_text(tr("tray.paste_last"));
+        let _ = m.send.set_text(tr("tray.send_last"));
+        let _ = m.pause.set_text(tr("tray.pause"));
+        for (it, key) in m.pause_items.iter().zip(["tray.pause_15", "tray.pause_60", "tray.pause_480", "tray.pause_0"]) {
+            let _ = it.set_text(tr(key));
+        }
+        let _ = m.resume.set_text(tr("tray.resume"));
+        let _ = m.quit.set_text(tr("tray.quit"));
+    }
+    if let Some(w) = app.get_webview_window(TRAY_WINDOW) {
+        let _ = w.set_title(tr("tray.window"));
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -100,10 +133,10 @@ impl Action {
 
     fn label(self) -> &'static str {
         match self {
-            Action::OpenPanel => "Abrir painel rápido",
-            Action::PasteLast => "Colar último",
-            Action::SendLast => "Enviar último",
-            Action::TogglePause => "Pausar sync",
+            Action::OpenPanel => tr("sc.open_panel"),
+            Action::PasteLast => tr("sc.paste_last"),
+            Action::SendLast => tr("sc.send_last"),
+            Action::TogglePause => tr("sc.toggle_pause"),
         }
     }
 }
@@ -220,12 +253,12 @@ pub fn change_shortcuts(app: &AppHandle, old: &Shortcuts, new: &Shortcuts) -> Re
         if combo.trim().is_empty() {
             continue;
         }
-        let sc = parse(combo).map_err(|_| AppError::Other(format!("Atalho inválido: {combo}")))?;
+        let sc = parse(combo).map_err(|_| AppError::Other(trf("sc.invalid", &[("combo", combo)])))?;
         if let Some(why) = conflict_reason(sc.mods, sc.key) {
-            return Err(AppError::Other(format!("{combo} {why}. Escolha outra combinação.")));
+            return Err(AppError::Other(trf("sc.reason", &[("combo", combo), ("why", why)])));
         }
         if let Some((_, _, other)) = seen.iter().find(|(m, k, _)| *m == sc.mods && *k == sc.key) {
-            return Err(AppError::Other(format!("{combo} já é o atalho de \"{}\".", other.label())));
+            return Err(AppError::Other(trf("sc.dup", &[("combo", combo), ("other", other.label())])));
         }
         seen.push((sc.mods, sc.key, action));
     }
@@ -235,10 +268,7 @@ pub fn change_shortcuts(app: &AppHandle, old: &Shortcuts, new: &Shortcuts) -> Re
     if let Some((action, combo, _)) = failed.first() {
         unregister_all(app);
         register_all(app, old);
-        return Err(AppError::Other(format!(
-            "{combo} ({}) já está em uso por outro programa. Escolha outra combinação.",
-            action.label()
-        )));
+        return Err(AppError::Other(trf("sc.taken", &[("combo", combo), ("action", action.label())])));
     }
     app.state::<Registry>().failed.lock().unwrap().clear();
     update_menu(app, new);
@@ -254,44 +284,40 @@ fn conflict_reason(mods: Modifiers, key: Code) -> Option<&'static str> {
     let shift = mods.contains(Modifiers::SHIFT);
     let win = mods.contains(Modifiers::SUPER);
     if !ctrl && !alt && !win {
-        return Some("precisa de Ctrl, Alt ou Win, senão a tecla some da digitação");
+        return Some(tr("sc.why_modifier"));
     }
     if win && !ctrl && !alt {
-        return Some("é reservado do Windows (Win+tecla)");
+        return Some(tr("sc.why_win"));
     }
     if !win && !shift && ctrl != alt {
-        return Some(if ctrl {
-            "é usado pelos programas (Ctrl+tecla: copiar, salvar, buscar…)"
-        } else {
-            "é usado pelos menus dos programas (Alt+tecla)"
-        });
+        return Some(tr(if ctrl { "sc.why_ctrl" } else { "sc.why_alt" }));
     }
     if ctrl && alt && !shift && !win {
         if key == Delete {
-            return Some("é reservado do Windows");
+            return Some(tr("sc.why_windows"));
         }
         // Em teclado ABNT2, Ctrl+Alt = AltGr: essas teclas digitam / ? ° ₢ ¹ ² ³ £ ¢ ¬ § ª º.
         if matches!(
             key,
             KeyQ | KeyW | KeyE | KeyC | Digit1 | Digit2 | Digit3 | Digit4 | Digit5 | Digit6 | Equal | BracketLeft | BracketRight
         ) {
-            return Some("digita um símbolo com AltGr no teclado ABNT2");
+            return Some(tr("sc.why_altgr"));
         }
     }
     if ctrl && shift && !alt && !win {
         let common = match key {
-            KeyV => Some("é \"colar sem formatação\" em muitos programas"),
-            KeyS => Some("é \"Salvar como\" em muitos programas"),
-            KeyP => Some("é a paleta de comandos e a janela anônima de editores e navegadores"),
-            KeyN => Some("é \"nova pasta\" no Explorer e janela anônima no Chrome"),
-            KeyT => Some("reabre a aba fechada nos navegadores"),
-            KeyZ => Some("é \"refazer\" em muitos programas"),
-            KeyI | KeyJ | KeyC => Some("abre as ferramentas de desenvolvedor nos navegadores"),
-            KeyW => Some("fecha a janela nos navegadores"),
-            KeyB => Some("mostra a barra de favoritos nos navegadores"),
-            Escape => Some("abre o Gerenciador de Tarefas"),
-            Tab => Some("volta de aba nos programas"),
-            Delete => Some("limpa os dados de navegação nos navegadores"),
+            KeyV => Some(tr("sc.why_paste_plain")),
+            KeyS => Some(tr("sc.why_save_as")),
+            KeyP => Some(tr("sc.why_palette")),
+            KeyN => Some(tr("sc.why_new_folder")),
+            KeyT => Some(tr("sc.why_reopen_tab")),
+            KeyZ => Some(tr("sc.why_redo")),
+            KeyI | KeyJ | KeyC => Some(tr("sc.why_devtools")),
+            KeyW => Some(tr("sc.why_close_window")),
+            KeyB => Some(tr("sc.why_bookmarks")),
+            Escape => Some(tr("sc.why_task_manager")),
+            Tab => Some(tr("sc.why_prev_tab")),
+            Delete => Some(tr("sc.why_clear_data")),
             _ => None,
         };
         if common.is_some() {
@@ -299,7 +325,7 @@ fn conflict_reason(mods: Modifiers, key: Code) -> Option<&'static str> {
         }
     }
     if alt && !ctrl && matches!(key, F4 | Tab | Escape | Space) {
-        return Some("é reservado do Windows");
+        return Some(tr("sc.why_windows"));
     }
     None
 }
@@ -349,9 +375,13 @@ pub fn toggle_tray_window(app: &AppHandle, at: Option<PhysicalPosition<f64>>) {
 fn paste_last(app: &AppHandle) {
     let state = app.state::<AppState>();
     if let Ok(Some(item)) = state.db.latest_item() {
-        if let Err(e) = clipboard::write_local(app, &item.content) {
-            log::warn!("colar último falhou: {e}");
-        }
+        // Imagem decodifica o PNG (e pode repetir a escrita): fora da thread do menu/atalho.
+        let app = app.clone();
+        tauri::async_runtime::spawn_blocking(move || {
+            if let Err(e) = clipboard::copy_item(&app, &item) {
+                log::warn!("colar último falhou: {e}");
+            }
+        });
     }
 }
 
@@ -372,19 +402,7 @@ fn send_last(app: &AppHandle) {
 }
 
 fn set_paused(app: &AppHandle, paused: bool, minutes: Option<u32>) {
-    let state = app.state::<AppState>();
-    {
-        let mut p = state.paused_until.lock().unwrap();
-        *p = if !paused {
-            None
-        } else {
-            match minutes {
-                Some(m) => Some(crate::models::now_ms() + m as i64 * 60_000),
-                None => Some(0),
-            }
-        };
-    }
-    events::emit(app, events::SYNC_STATE, state.sync_status());
+    sync::set_paused(app, paused, minutes);
 }
 
 /// Ações da barra de título customizada e do painel rápido.

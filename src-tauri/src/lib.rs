@@ -10,6 +10,7 @@ mod crash;
 mod db;
 mod error;
 mod events;
+mod i18n;
 mod identity;
 mod ime;
 mod keepalive;
@@ -20,9 +21,9 @@ mod sync;
 mod transfer;
 mod transport;
 mod notify;
+mod quick;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod tray;
-#[cfg(not(any(target_os = "android", target_os = "ios")))]
 mod updater;
 
 use state::AppState;
@@ -74,6 +75,7 @@ pub fn run() {
             let identity = identity::load_or_create(&app_dir, &keystore)?;
             let db = db::Db::open(&app_dir)?;
             let settings = db.load_settings()?;
+            i18n::apply(&settings);
             log::info!("[IDENTITY] device_id={} platform={} name={:?} dir={}", identity.device_id, identity.platform, identity.name, app_dir.display());
 
             handle.manage(AppState {
@@ -108,12 +110,13 @@ pub fn run() {
             transfer::manager::startup(&handle);
             ime::attach(&handle);
             keepalive::apply(&handle);
+            quick::refresh(&handle);
+            updater::spawn(&handle);
 
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             {
                 tray::setup(&handle)?;
                 autostart::sync_on_startup(&handle);
-                updater::spawn(&handle);
                 // A janela nasce escondida (tauri.conf.json); no login do Windows fica só a bandeja.
                 if autostart::launched_at_login() {
                     log::info!("[AUTOSTART] started at login: tray only");
@@ -147,10 +150,13 @@ pub fn run() {
             commands::list_items,
             commands::latest_item,
             commands::copy_item,
+            commands::item_image,
+            commands::reveal_item_file,
             commands::pin_item,
             commands::delete_item,
             commands::clear_history,
             commands::reveal_item,
+            commands::open_item,
             commands::send_item,
             commands::retry_queue,
             commands::sync_status,
@@ -162,6 +168,7 @@ pub fn run() {
             commands::shortcuts_suspend,
             commands::list_devices,
             commands::set_device_flags,
+            commands::set_device_address,
             commands::remove_device,
             commands::connect_device,
             commands::start_pairing,
@@ -169,12 +176,14 @@ pub fn run() {
             commands::pair_with_payload,
             commands::pair_with_code,
             commands::request_pairing,
+            commands::local_addresses,
             commands::window_action,
             commands::quit,
             ime::ime_status,
             ime::ime_open_settings,
             ime::ime_show_picker,
             ime::ime_set_theme,
+            commands::set_system_bars,
             commands::transfer_send,
             commands::transfer_list,
             commands::transfer_clear_finished,
@@ -195,6 +204,9 @@ pub fn run() {
             commands::update_status,
             commands::update_check,
             commands::update_install,
+            commands::update_open,
+            quick::quick_add_tile,
+            quick::quick_add_widget,
         ]);
 
     builder

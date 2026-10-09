@@ -30,6 +30,8 @@ pub const CAP_CLIP_IMAGE_V1: &str = "clip-image-v1";
 /// O receptor pode perguntar ao usuário antes de aceitar: o emissor espera o `FileAccept`
 /// por até `transfer::ASK_WAIT_SECS` em vez de 30 s.
 pub const CAP_FILE_ASK_V1: &str = "file-ask-v1";
+/// Entende `metadata.html` (texto formatado) num `Clip`; sem ela o emissor não manda o HTML.
+pub const CAP_CLIP_HTML_V1: &str = "clip-html-v1";
 
 /// Primeira mensagem, em texto puro (não carrega dados do usuário): só diz
 /// qual handshake usar.
@@ -266,7 +268,7 @@ impl SecureChannel {
         while self.rd_hdr_len < 4 {
             let n = self.stream.read(&mut self.rd_hdr[self.rd_hdr_len..]).await?;
             if n == 0 {
-                return Err(AppError::Net("conexão fechada".into()));
+                return Err(AppError::Net(crate::i18n::tr("err.net_closed").into()));
             }
             self.rd_hdr_len += n;
         }

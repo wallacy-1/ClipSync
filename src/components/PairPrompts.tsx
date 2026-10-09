@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useT } from "../i18n";
 import { PLATFORM_LABEL, mmss } from "../lib/format";
 import { api, errorText } from "../lib/ipc";
 import { useApp } from "../store/app";
@@ -15,6 +16,7 @@ export function PairPrompts() {
 
 /** Outro dispositivo pediu: aceitar abre o pareamento e mostra o código para digitar lá. */
 function IncomingRequest() {
+  const t = useT();
   const req = useApp((s) => s.pairRequest);
   const pairing = useApp((s) => s.pairing);
   const now = useApp((s) => s.now);
@@ -37,14 +39,14 @@ function IncomingRequest() {
     return (
       <div className="dialog-backdrop">
         <div className="dialog">
-          <div className="dialog-title">Digite este código em {req.name}</div>
-          <div className="dialog-body">O pareamento termina sozinho quando o código for digitado lá.</div>
+          <div className="dialog-title">{t("pair.codeTitle", { name: req.name })}</div>
+          <div className="dialog-body">{t("pair.codeBody")}</div>
           <div className="row-flex" style={{ gap: 12 }}>
             <span className="pair-code">{pairing.code}</span>
-            <span className="pair-expires">expira em {mmss(pairing.expiresAt - now)}</span>
+            <span className="pair-expires">{t("devices.expiresIn", { time: mmss(pairing.expiresAt - now) })}</span>
           </div>
           <div className="dialog-actions">
-            <button className="btn btn-secondary" onClick={() => { void cancelPairing(); dismissPairRequest(); }}>Cancelar</button>
+            <button className="btn btn-secondary" onClick={() => { void cancelPairing(); dismissPairRequest(); }}>{t("common.cancel")}</button>
           </div>
         </div>
       </div>
@@ -54,12 +56,10 @@ function IncomingRequest() {
   return (
     <div className="dialog-backdrop">
       <div className="dialog">
-        <div className="dialog-title">{req.name} quer parear</div>
-        <div className="dialog-body">
-          Um {where} na sua rede pediu para sincronizar com este dispositivo. Aceite só se foi você quem pediu: um código vai aparecer aqui para você digitar lá.
-        </div>
+        <div className="dialog-title">{t("pair.askTitle", { name: req.name })}</div>
+        <div className="dialog-body">{t("pair.askBody", { platform: where })}</div>
         <div className="dialog-actions">
-          <button className="btn btn-secondary" onClick={dismissPairRequest}>Recusar</button>
+          <button className="btn btn-secondary" onClick={dismissPairRequest}>{t("common.decline")}</button>
           <button
             className="btn btn-primary"
             disabled={accepted}
@@ -73,7 +73,7 @@ function IncomingRequest() {
               }
             }}
           >
-            {accepted ? "Abrindo…" : "Aceitar"}
+            {accepted ? t("pair.opening") : t("common.accept")}
           </button>
         </div>
       </div>
@@ -83,6 +83,7 @@ function IncomingRequest() {
 
 /** Este dispositivo pediu: espera o código que apareceu no outro. */
 function OutgoingRequest() {
+  const t = useT();
   const out = useApp((s) => s.pairOutgoing);
   const { dismissPairOutgoing, refreshDevices, showToast } = useApp.getState();
   const [code, setCode] = useState("");
@@ -100,7 +101,7 @@ function OutgoingRequest() {
     try {
       const id = await api.pairWithCode(code, out.deviceId);
       await refreshDevices();
-      showToast(`${id.name} pareado`);
+      showToast(t("toast.paired", { name: id.name }));
       dismissPairOutgoing();
     } catch (e) {
       setError(errorText(e));
@@ -112,8 +113,8 @@ function OutgoingRequest() {
   return (
     <div className="dialog-backdrop">
       <div className="dialog">
-        <div className="dialog-title">Pedido enviado para {out.name}</div>
-        <div className="dialog-body">Aceite o pedido em {out.name}. Um código de 6 caracteres aparece lá; digite aqui.</div>
+        <div className="dialog-title">{t("pair.sentTitle", { name: out.name })}</div>
+        <div className="dialog-body">{t("pair.sentBody", { name: out.name })}</div>
         <input
           className="input"
           value={code}
@@ -127,8 +128,8 @@ function OutgoingRequest() {
         />
         {error && <div className="dialog-body" style={{ color: "var(--color-danger-fg)", opacity: 1 }}>{error}</div>}
         <div className="dialog-actions">
-          <button className="btn btn-secondary" onClick={dismissPairOutgoing}>Cancelar</button>
-          <button className="btn btn-primary" disabled={!valid || busy} onClick={submit}>{busy ? "Pareando…" : "Parear"}</button>
+          <button className="btn btn-secondary" onClick={dismissPairOutgoing}>{t("common.cancel")}</button>
+          <button className="btn btn-primary" disabled={!valid || busy} onClick={submit}>{busy ? t("pair.pairing") : t("pair.pair")}</button>
         </div>
       </div>
     </div>

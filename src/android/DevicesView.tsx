@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { useT } from "../i18n";
 import { Back, Plus, Shield } from "../components/Icons";
-import { Avatar, Confirm, DeviceBadge, Toggle } from "../components/ui";
+import { Avatar, Confirm, DeviceBadge, DeviceFlag, Prompt } from "../components/ui";
 import { PLATFORM_LABEL, relTime } from "../lib/format";
 import { api, cancelScan, errorText, inTauri, scanQr } from "../lib/ipc";
 import type { Device } from "../lib/types";
@@ -18,12 +19,16 @@ export function DevicesView({ autoScan, onScanHandled }: { autoScan: boolean; on
 }
 
 function ListView({ onAdd }: { onAdd: () => void }) {
+  const t = useT();
   const me = useApp((s) => s.devices.find((d) => d.isSelf));
   const peers = usePeers();
   const now = useApp((s) => s.now);
+  const settings = useApp((s) => s.settings);
   const setDeviceFlags = useApp((s) => s.setDeviceFlags);
   const removeDevice = useApp((s) => s.removeDevice);
+  const setDeviceAddress = useApp((s) => s.setDeviceAddress);
   const [confirm, setConfirm] = useState<Device | null>(null);
+  const [editAddr, setEditAddr] = useState<Device | null>(null);
   const discovered = useDiscovered();
   const requestPairing = useApp((s) => s.requestPairing);
   const [requesting, setRequesting] = useState<string | null>(null);
@@ -33,8 +38,8 @@ function ListView({ onAdd }: { onAdd: () => void }) {
   return (
     <>
       <div className="and-head" style={{ padding: "16px 18px 12px" }}>
-        <span className="page-title">Dispositivos</span>
-        <button className="fab" aria-label="Adicionar dispositivo" onClick={onAdd}><Plus size={20} /></button>
+        <span className="page-title">{t("nav.devices")}</span>
+        <button className="fab" aria-label={t("devices.add")} onClick={onAdd}><Plus size={20} /></button>
       </div>
       <div className="and-scroll">
         <div style={{ padding: "0 18px", display: "flex", flexDirection: "column", gap: 10 }}>
@@ -45,42 +50,48 @@ function ListView({ onAdd }: { onAdd: () => void }) {
                 <div className="info">
                   <div className="name">{d.name}</div>
                   <div className="detail">
-                    {PLATFORM_LABEL[d.platform] ?? d.platform} ·{" "}
-                    {d.isSelf ? "este dispositivo" : d.lastError ? d.lastError : d.state === "connected" ? `visto agora${d.address ? ` · ${d.address.replace(/:\d+$/, "")}` : ""}` : d.state === "connecting" ? "conectando…" : `visto ${relTime(d.lastSeen, now)}`}
+                    {d.isSelf
+                      ? t("devices.thisDevice", { platform: PLATFORM_LABEL[d.platform] ?? d.platform })
+                      : `${PLATFORM_LABEL[d.platform] ?? d.platform} · ${d.lastError ? d.lastError : d.state === "connected" ? t("android.devices.seenNow", { addr: d.address ? ` · ${d.address.replace(/:47820$/, "")}` : "" }) : d.state === "connecting" ? t("devices.connecting") : t("devices.seen", { when: relTime(d.lastSeen, now) })}`}
                   </div>
                 </div>
                 <DeviceBadge device={d} />
               </div>
               {!d.isSelf && (
-                <div className="bottom">
-                  <span>Receber automático</span>
-                  <Toggle on={d.autoReceive} disabled={d.state === "blocked"} onChange={(v) => setDeviceFlags(d.deviceId, { autoReceive: v })} />
-                  <button className="btn btn-ghost" onClick={() => setConfirm(d)}>Remover</button>
+                <div className="bottom opts">
+                  <DeviceFlag label={t("devices.sendAuto")} help={t("devices.sendAutoHelp")} on={d.autoSend}
+                    globalOff={settings?.autoSend === false} disabled={d.state === "blocked"} onChange={(v) => setDeviceFlags(d.deviceId, { autoSend: v })} />
+                  <DeviceFlag label={t("devices.receiveAuto")} help={t("devices.receiveAutoHelp")} on={d.autoReceive}
+                    globalOff={settings?.autoReceive === false} disabled={d.state === "blocked"} onChange={(v) => setDeviceFlags(d.deviceId, { autoReceive: v })} />
+                  <div className="row-btns">
+                    <button className="btn btn-ghost plain" disabled={d.state === "blocked"} onClick={() => setEditAddr(d)}>{t("android.devices.setAddress")}</button>
+                    <button className="btn btn-ghost" onClick={() => setConfirm(d)}>{t("devices.remove")}</button>
+                  </div>
                 </div>
               )}
             </div>
           ))}
           {peers.length === 0 && (
-            <button className="btn btn-primary btn-block" style={{ height: 52, fontWeight: 700, fontSize: 15 }} onClick={onAdd}>Parear com o PC</button>
+            <button className="btn btn-primary btn-block" style={{ height: 52, fontWeight: 700, fontSize: 15 }} onClick={onAdd}>{t("android.devices.pairWithPc")}</button>
           )}
-          {discovered.length > 0 && <div className="section-title" style={{ marginTop: 14 }}>Na rede, ainda não pareados</div>}
+          {discovered.length > 0 && <div className="section-title" style={{ marginTop: 14 }}>{t("devices.discovered")}</div>}
           {discovered.map((d) => (
             <div className="and-dev-card" key={d.deviceId}>
               <div className="top">
                 <Avatar device={d} />
                 <div className="info">
                   <div className="name">{d.name}</div>
-                  <div className="detail">{PLATFORM_LABEL[d.platform] ?? d.platform} · {d.address?.replace(/:\d+$/, "") ?? "visto agora"}</div>
+                  <div className="detail">{PLATFORM_LABEL[d.platform] ?? d.platform} · {d.address?.replace(/:47820$/, "") ?? "visto agora"}</div>
                 </div>
               </div>
               <div className="bottom">
-                <span>Pede que {d.name} mostre um código</span>
+                <span>{t("android.devices.askCode", { name: d.name })}</span>
                 <button
                   className="btn btn-secondary"
                   disabled={requesting !== null}
                   onClick={async () => { setRequesting(d.deviceId); await requestPairing(d); setRequesting(null); }}
                 >
-                  {requesting === d.deviceId ? "Enviando…" : "Solicitar"}
+                  {requesting === d.deviceId ? t("android.home.statusSending") : t("android.devices.request")}
                 </button>
               </div>
             </div>
@@ -88,14 +99,25 @@ function ListView({ onAdd }: { onAdd: () => void }) {
         </div>
         <div className="and-note">
           <Shield size={20} style={{ color: "var(--color-accent-2-800)" }} />
-          <span>Pareamento na rede local, cifrado ponta a ponta. Remova um dispositivo e as chaves dele são revogadas.</span>
+          <span>{t("devices.note")}</span>
         </div>
       </div>
+      {editAddr && (
+        <Prompt
+          title={t("devices.addressTitle", { name: editAddr.name })}
+          body={t("devices.addressBody")}
+          initial={editAddr.address?.replace(/:47820$/, "") ?? ""}
+          placeholder="192.168.0.10"
+          inputMode="url"
+          onCancel={() => setEditAddr(null)}
+          onSubmit={async (addr) => { await setDeviceAddress(editAddr.deviceId, addr); setEditAddr(null); }}
+        />
+      )}
       {confirm && (
         <Confirm
-          title={`Remover ${confirm.name}?`}
-          body="Este dispositivo deixa de receber e enviar itens. Para voltar, será preciso parear de novo."
-          confirmLabel="Remover"
+          title={t("devices.removeTitle", { name: confirm.name })}
+          body={t("devices.removeBody")}
+          confirmLabel={t("devices.remove")}
           danger
           onCancel={() => setConfirm(null)}
           onConfirm={() => { const d = confirm; setConfirm(null); void removeDevice(d.deviceId); }}
@@ -106,6 +128,7 @@ function ListView({ onAdd }: { onAdd: () => void }) {
 }
 
 function usePair() {
+  const t = useT();
   const showToast = useApp((s) => s.showToast);
   const refreshDevices = useApp((s) => s.refreshDevices);
   const [busy, setBusy] = useState(false);
@@ -116,7 +139,7 @@ function usePair() {
     try {
       const id = await fn();
       await refreshDevices();
-      showToast(`${id.name} pareado`);
+      showToast(t("toast.paired", { name: id.name }));
       return true;
     } catch (e) {
       setError(errorText(e));
@@ -129,6 +152,7 @@ function usePair() {
 }
 
 function ScanView({ onBack, onManual }: { onBack: () => void; onManual: () => void }) {
+  const t = useT();
   const { busy, error, run, setError } = usePair();
   const [scanning, setScanning] = useState(false);
   const alive = useRef(true);
@@ -162,41 +186,48 @@ function ScanView({ onBack, onManual }: { onBack: () => void; onManual: () => vo
   return (
     <div className={`scan${scanning && inTauri ? " transparent" : ""}`}>
       <div className="head">
-        <button aria-label="Voltar" onClick={onBack}><Back size={22} /></button>
-        <span className="title">Escanear código</span>
+        <button aria-label={t("android.back")} onClick={onBack}><Back size={22} /></button>
+        <span className="title">{t("android.scan.title")}</span>
       </div>
       <div className="body">
         <div className={`frame${scanning ? " live" : ""}`}><div className="line" /></div>
         <div className="copy">
-          <h3>{busy ? "Pareando…" : "Aponte para o PC"}</h3>
-          <p>{busy ? "Trocando chaves pela rede local." : "No Windows: Dispositivos → Adicionar dispositivo. O código aparece na janela."}</p>
+          <h3>{busy ? t("pair.pairing") : t("android.scan.aim")}</h3>
+          <p>{busy ? t("android.scan.exchanging") : t("android.scan.aimBody")}</p>
         </div>
         {error && <div className="error">{error}</div>}
       </div>
       <div className="foot">
-        <button className="btn btn-secondary btn-block" onClick={onManual}>Digitar código manualmente</button>
+        <button className="btn btn-secondary btn-block" onClick={onManual}>{t("android.scan.manual")}</button>
       </div>
     </div>
   );
 }
 
+/** Sem mDNS o PC não aparece: em vez do erro cru (do Rust, nos dois idiomas), aponta para o campo de endereço. */
+function notFoundHint(error: string, t: ReturnType<typeof useT>) {
+  return error.includes("nenhum dispositivo em modo de pareamento") || error.includes("no device in pairing mode") ? t("android.manual.notFound") : error;
+}
+
 function ManualView({ onBack, onScan }: { onBack: () => void; onScan: () => void }) {
+  const t = useT();
   const { busy, error, run } = usePair();
   const [code, setCode] = useState("");
+  const [addr, setAddr] = useState("");
   const submit = async () => {
-    const ok = await run(() => api.pairWithCode(code));
+    const ok = await run(() => api.pairWithCode(code, undefined, addr.trim() || undefined));
     if (ok) onBack();
   };
   return (
     <div className="scan">
       <div className="head">
-        <button aria-label="Voltar" onClick={onBack}><Back size={22} /></button>
-        <span className="title">Digitar código</span>
+        <button aria-label={t("android.back")} onClick={onBack}><Back size={22} /></button>
+        <span className="title">{t("android.manual.title")}</span>
       </div>
       <div className="body">
         <div className="copy">
-          <h3>Código do PC</h3>
-          <p>Os 6 caracteres mostrados ao lado do QR na janela do Windows. O PC precisa estar na mesma rede.</p>
+          <h3>{t("android.manual.heading")}</h3>
+          <p>{t("android.manual.body")}</p>
         </div>
         <input
           className="input"
@@ -208,13 +239,24 @@ function ManualView({ onBack, onScan }: { onBack: () => void; onScan: () => void
           onChange={(e) => setCode(e.target.value.toUpperCase())}
           onKeyDown={(e) => { if (e.key === "Enter") void submit(); }}
         />
-        {error && <div className="error">{error}</div>}
+        <input
+          className="input"
+          value={addr}
+          inputMode="url"
+          autoCapitalize="none"
+          placeholder="192.168.0.10"
+          aria-label={t("android.manual.addrLabel")}
+          onChange={(e) => setAddr(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") void submit(); }}
+        />
+        <p className="hint">{t("android.manual.addrHint")}</p>
+        {error && <div className="error">{notFoundHint(error, t)}</div>}
       </div>
       <div className="foot">
         <button className="btn btn-primary btn-block" style={{ height: 52, fontWeight: 700, fontSize: 15 }} disabled={busy || code.replace(/[^a-z0-9]/gi, "").length !== 6} onClick={submit}>
-          {busy ? "Pareando…" : "Parear"}
+          {busy ? t("pair.pairing") : t("pair.pair")}
         </button>
-        <button className="btn btn-secondary btn-block" onClick={onScan}>Escanear QR</button>
+        <button className="btn btn-secondary btn-block" onClick={onScan}>{t("android.manual.scanQr")}</button>
       </div>
     </div>
   );

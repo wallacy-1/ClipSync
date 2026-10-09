@@ -92,7 +92,7 @@ fn on_resolved(app: &AppHandle, info: &ServiceInfo) {
         .get_addresses()
         .iter()
         .copied()
-        .filter(|a| !a.is_loopback() && a.is_ipv4())
+        .filter(super::is_usable_peer_addr)
         .collect();
     if addrs.is_empty() {
         return;

@@ -198,10 +198,11 @@ class TransferService : Service() {
 
     private fun build(title: String, text: String, percent: Int, id: String): Notification {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm.getNotificationChannel(CHANNEL) == null) {
+        // Sempre recria: atualiza nome/descrição do canal existente para o idioma atual.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Transferência de arquivos", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "Progresso das transferências de arquivo do ClipSync"
+                NotificationChannel(CHANNEL, getString(R.string.channel_transfer), NotificationManager.IMPORTANCE_LOW).apply {
+                    description = getString(R.string.channel_transfer_desc)
                     setShowBadge(false)
                 },
             )
@@ -218,7 +219,7 @@ class TransferService : Service() {
             .setOnlyAlertOnce(true)
             .setOngoing(true)
             .setProgress(100, percent.coerceIn(0, 100), percent < 0)
-            .addAction(0, "Cancelar", cancel)
+            .addAction(0, getString(R.string.transfer_cancel), cancel)
             .build()
     }
 }

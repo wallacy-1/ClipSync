@@ -42,6 +42,19 @@
   --color-danger-bg: #f6d2c4;
   --color-danger-fg: #7a2e12;
 
+  /* Fixos nos dois temas: creme sobre o acento/telas escuras, fundo do QR (leitor exige preto no branco). */
+  --color-on-accent: #f5ead8;
+  --color-dark-surface: #2e2b25;
+  --color-qr-bg: #ffffff;
+  --color-failed: #c4562f;
+  --color-close: #d24b2a;
+  --color-scan-error: #ffc6a5;
+
+  --color-overlay: color-mix(in srgb, #2e2b25 35%, transparent);
+  --color-overlay-strong: color-mix(in srgb, #2e2b25 50%, transparent);
+  --chevron-accent: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23643312' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  --chevron-ink: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23f5ead8' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+
   --font-heading: "Caprasimo", system-ui, sans-serif;
   --font-heading-weight: 400;
   --font-body: "Figtree", system-ui, sans-serif;
@@ -61,6 +74,61 @@
   --shadow-sm: 0 1px 2px color-mix(in srgb, #2e2b25 14%, transparent);
   --shadow-md: 0 3px 10px color-mix(in srgb, #2e2b25 16%, transparent);
   --shadow-lg: 0 12px 32px color-mix(in srgb, #2e2b25 22%, transparent);
+}
+
+/* Tema escuro: mesmos tokens, escalas invertidas (neutral/accent 100 = mais escuro, 900 = mais claro),
+   então todo uso do tema claro continua correto sem mexer no CSS dos componentes. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --color-bg: #1c1a17;
+  --color-surface: #26231f;
+  --color-text: #efe6d8;
+  --color-accent: #d9854a;
+  --color-accent-2: #8fa073;
+  --color-divider: color-mix(in srgb, #efe6d8 16%, transparent);
+
+  --color-neutral-100: #24211d;
+  --color-neutral-200: #2f2b26;
+  --color-neutral-300: #3c372f;
+  --color-neutral-400: #554e43;
+  --color-neutral-500: #766d5f;
+  --color-neutral-600: #9a9081;
+  --color-neutral-700: #b5ab9b;
+  --color-neutral-800: #cfc6b6;
+  --color-neutral-900: #e8dfcf;
+
+  --color-accent-100: #2b1b10;
+  --color-accent-200: #3d2515;
+  --color-accent-300: #5a3519;
+  --color-accent-400: #824a22;
+  --color-accent-500: #b2622d;
+  --color-accent-600: #e08f58;
+  --color-accent-700: #eba77a;
+  --color-accent-800: #f6bf98;
+  --color-accent-900: #ffdcc6;
+
+  --color-accent-2-100: #1b2114;
+  --color-accent-2-200: #29321e;
+  --color-accent-2-300: #38442a;
+  --color-accent-2-400: #4f5f3a;
+  --color-accent-2-500: #6d8050;
+  --color-accent-2-600: #8ea06f;
+  --color-accent-2-700: #a9ba8c;
+  --color-accent-2-800: #c3d3a8;
+  --color-accent-2-900: #dbe8c6;
+
+  --color-danger-bg: #4a2118;
+  --color-danger-fg: #ffb59c;
+
+  --color-overlay: color-mix(in srgb, #000000 55%, transparent);
+  --color-overlay-strong: color-mix(in srgb, #000000 68%, transparent);
+  --chevron-accent: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%23f6bf98' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  --chevron-ink: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%231c1a17' stroke-width='3' stroke-linecap='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+
+  --shadow-sm: 0 1px 2px color-mix(in srgb, #000000 40%, transparent);
+  --shadow-md: 0 3px 10px color-mix(in srgb, #000000 45%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #000000 55%, transparent);
 }
 
 *, *::before, *::after { box-sizing: border-box; }

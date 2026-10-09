@@ -67,6 +67,41 @@ object ClipImageBridge {
     }
 
     /**
+     * Miniatura PNG de [src] em [dest], com o lado maior em até [max] px. Decodifica já reduzido
+     * (`inSampleSize`), então um print grande não ocupa memória inteira. Retorna
+     * `[largura, altura, larguraMiniatura, alturaMiniatura]` (largura e altura do original), ou null.
+     */
+    @JvmStatic
+    fun thumbnail(src: String, dest: String, max: Int): IntArray? {
+        return try {
+            val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+            BitmapFactory.decodeFile(src, bounds)
+            val w = bounds.outWidth
+            val h = bounds.outHeight
+            if (w <= 0 || h <= 0 || max <= 0) return null
+            var sample = 1
+            while (maxOf(w, h) / (sample * 2) >= max) sample *= 2
+            val decoded = BitmapFactory.decodeFile(src, BitmapFactory.Options().apply { inSampleSize = sample }) ?: return null
+            val longest = maxOf(decoded.width, decoded.height)
+            val thumb = if (longest > max) {
+                val tw = maxOf(1, Math.round(decoded.width * max.toFloat() / longest))
+                val th = maxOf(1, Math.round(decoded.height * max.toFloat() / longest))
+                Bitmap.createScaledBitmap(decoded, tw, th, true).also { if (it !== decoded) decoded.recycle() }
+            } else {
+                decoded
+            }
+            val out = File(dest)
+            out.parentFile?.mkdirs()
+            FileOutputStream(out).use { thumb.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            val result = intArrayOf(w, h, thumb.width, thumb.height)
+            thumb.recycle()
+            result
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    /**
      * Põe a imagem de [path] no clipboard. Cópia no cache servida pelo FileProvider:
      * o sistema concede leitura ao app que colar. Escrita em segundo plano é permitida.
      */
@@ -84,6 +119,33 @@ object ClipImageBridge {
                 runCatching { cm.setPrimaryClip(clip) }
                     .onSuccess { Log.i(TAG, "imagem no clipboard: ${cm.primaryClipDescription?.getMimeType(0)} ${target.length()} B") }
                     .onFailure { Log.w(TAG, "setPrimaryClip falhou: $it") }
+            }
+            true
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /** HTML do clipboard (`ClipData.Item.getHtmlText`), ou null. Chamado só com "Manter formatação" ligado. */
+    @JvmStatic
+    fun readHtml(context: Context): String? {
+        return try {
+            val clip = manager(context)?.primaryClip ?: return null
+            if (clip.itemCount == 0) return null
+            clip.getItemAt(0).htmlText?.takeIf { it.isNotBlank() }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
+    /** Texto + HTML no clipboard. Como `setImage`, a escrita vai pela thread principal. */
+    @JvmStatic
+    fun setHtml(context: Context, text: String, html: String): Boolean {
+        return try {
+            val clip = ClipData.newHtmlText(OWN_LABEL, text, html)
+            val cm = manager(context) ?: return false
+            Handler(Looper.getMainLooper()).post {
+                runCatching { cm.setPrimaryClip(clip) }.onFailure { Log.w(TAG, "setPrimaryClip (html) falhou: $it") }
             }
             true
         } catch (_: Exception) {

@@ -189,3 +189,21 @@ export const MonitorOff = (p: P) => (
     <path d="M8 21h8M2 2l20 20" />
   </svg>
 );
+export const External = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M15 3h6v6M10 14L21 3" />
+    <path d="M18 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" />
+  </svg>
+);
+export const Mail = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="2" y="4" width="20" height="16" rx="2" />
+    <path d="M22 7l-10 6L2 7" />
+  </svg>
+);
+export const Globe = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" />
+  </svg>
+);

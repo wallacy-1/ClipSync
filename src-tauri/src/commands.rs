@@ -3,7 +3,8 @@ use crate::db::ItemFilter;
 use crate::error::{AppError, Result};
 use crate::events;
 use crate::identity::{self, DeviceIdentity};
-use crate::models::{now_ms, ClipboardItem, Device, Settings, SyncStatus};
+use crate::clipboard::rich;
+use crate::models::{ClipboardItem, Device, Settings, SyncStatus};
 use crate::state::AppState;
 use crate::sync;
 use crate::transport::{self, connection, pairing};
@@ -36,7 +37,7 @@ pub fn bootstrap(state: State<'_, AppState>) -> Result<Bootstrap> {
         me: DeviceIdentity { name: state.display_name(), ..me },
         settings: state.settings(),
         devices: state.devices(),
-        items: state.db.list_items(&ItemFilter { limit: 200, ..Default::default() })?,
+        items: state.db.list_items(&ItemFilter { limit: 200, ..Default::default() })?.iter().map(rich::for_ui).collect(),
         sync: state.sync_status(),
         listen_port: state.port(),
         total_items: total,
@@ -73,20 +74,52 @@ pub fn list_items(
 ) -> Result<ItemsPage> {
     let items = state.db.list_items(&ItemFilter { query, category, limit: limit.unwrap_or(200) })?;
     let (total, pinned) = state.db.count_items()?;
-    Ok(ItemsPage { items, total, pinned })
+    Ok(ItemsPage { items: items.iter().map(rich::for_ui).collect(), total, pinned })
 }
 
 #[tauri::command]
 pub fn latest_item(state: State<'_, AppState>) -> Result<Option<ClipboardItem>> {
-    state.db.latest_item()
+    Ok(state.db.latest_item()?.as_ref().map(rich::for_ui))
 }
 
+/// Async + `spawn_blocking`: imagem decodifica um PNG, o que não pode travar a thread principal.
 #[tauri::command]
-pub fn copy_item(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<()> {
+pub async fn copy_item(app: AppHandle, id: String) -> Result<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(item) = app.state::<AppState>().db.get_item(&id)? else {
+            return Err(AppError::Other(crate::i18n::tr("err.item_not_found").into()));
+        };
+        clipboard::copy_item(&app, &item)
+    })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?
+}
+
+/// Miniatura (ou, com `full`, a imagem inteira se for pequena) de um item `image`, como data URL.
+/// A UI não lê o disco: só este comando, e só arquivos referenciados por item de histórico.
+#[tauri::command]
+pub async fn item_image(app: AppHandle, id: String, full: bool) -> Result<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(item) = app.state::<AppState>().db.get_item(&id)? else {
+            return Err(AppError::Other(crate::i18n::tr("err.item_not_found").into()));
+        };
+        if item.content_type != crate::content::ContentType::Image {
+            return Err(AppError::Other(crate::i18n::tr("err.not_image").into()));
+        }
+        clipboard::image::data_url(&app, &item, full)
+    })
+    .await
+    .map_err(|e| AppError::Other(e.to_string()))?
+}
+
+/// "Mostrar na pasta" do PNG de um item de imagem (só desktop).
+#[tauri::command]
+pub fn reveal_item_file(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<()> {
     let Some(item) = state.db.get_item(&id)? else {
-        return Err(AppError::Other("item não encontrado".into()));
+        return Err(AppError::Other(crate::i18n::tr("err.item_not_found").into()));
     };
-    clipboard::write_local(&app, &item.content)
+    let path = clipboard::image::file_of(&app, &item)?;
+    tauri_plugin_opener::reveal_item_in_dir(path).map_err(|e| AppError::Other(e.to_string()))
 }
 
 #[tauri::command]
@@ -95,13 +128,22 @@ pub fn pin_item(state: State<'_, AppState>, id: String, pinned: bool) -> Result<
 }
 
 #[tauri::command]
-pub fn delete_item(state: State<'_, AppState>, id: String) -> Result<()> {
-    state.db.delete_item(&id)
+pub fn delete_item(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<()> {
+    let item = state.db.get_item(&id)?;
+    state.db.delete_item(&id)?;
+    if let Some(item) = item {
+        clipboard::image::remove_files(&app, &item);
+    }
+    Ok(())
 }
 
 #[tauri::command]
 pub fn clear_history(app: AppHandle, state: State<'_, AppState>, keep_pinned: bool) -> Result<u32> {
+    let images = state.db.image_items(keep_pinned)?;
     let n = state.db.clear_items(keep_pinned)?;
+    for it in &images {
+        clipboard::image::remove_files(&app, it);
+    }
     events::emit(&app, events::CLIPBOARD_EXPIRED, serde_json::json!({ "ids": [], "cleared": true }));
     Ok(n)
 }
@@ -109,9 +151,21 @@ pub fn clear_history(app: AppHandle, state: State<'_, AppState>, keep_pinned: bo
 #[tauri::command]
 pub fn reveal_item(state: State<'_, AppState>, id: String) -> Result<String> {
     let Some(item) = state.db.get_item(&id)? else {
-        return Err(AppError::Other("item não encontrado".into()));
+        return Err(AppError::Other(crate::i18n::tr("err.item_not_found").into()));
     };
     Ok(item.content)
+}
+
+/// Abre o link/e-mail de um item no app padrão. A UI só passa o id: o alvo vem do banco
+/// e passa por `link_target` (só http/https e mailto), nunca por shell.
+#[tauri::command]
+pub fn open_item(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<()> {
+    use tauri_plugin_opener::OpenerExt;
+    let Some(item) = state.db.get_item(&id)? else {
+        return Err(AppError::Other(crate::i18n::tr("err.item_not_found").into()));
+    };
+    let target = crate::content::link_target(&item.content, item.content_type)?;
+    app.opener().open_url(target, None::<&str>).map_err(|e| AppError::Other(e.to_string()))
 }
 
 #[tauri::command]
@@ -137,21 +191,8 @@ pub fn sync_status(state: State<'_, AppState>) -> Result<SyncStatus> {
 }
 
 #[tauri::command]
-pub fn set_paused(app: AppHandle, state: State<'_, AppState>, paused: bool, minutes: Option<u32>) -> Result<SyncStatus> {
-    {
-        let mut p = state.paused_until.lock().unwrap();
-        *p = if !paused {
-            None
-        } else {
-            match minutes {
-                Some(m) if m > 0 => Some(now_ms() + m as i64 * 60_000),
-                _ => Some(0),
-            }
-        };
-    }
-    let status = state.sync_status();
-    events::emit(&app, events::SYNC_STATE, &status);
-    Ok(status)
+pub fn set_paused(app: AppHandle, paused: bool, minutes: Option<u32>) -> Result<SyncStatus> {
+    Ok(sync::set_paused(&app, paused, minutes))
 }
 
 /// Android: lê o clipboard agora (ao voltar ao primeiro plano).
@@ -160,7 +201,7 @@ pub fn clipboard_poll_now(app: AppHandle) -> Result<Option<ClipboardItem>> {
     // Também é um bom momento para drenar o que o IME guardou com o núcleo morto.
     crate::ime::drain_inbox(&app);
     let prov = clipboard::provider(&app);
-    Ok(clipboard::poll_once(&app, prov.as_ref()))
+    Ok(clipboard::poll_once(&app, prov.as_ref()).as_ref().map(rich::for_ui))
 }
 
 #[tauri::command]
@@ -181,6 +222,11 @@ pub fn set_settings(app: AppHandle, state: State<'_, AppState>, settings: Settin
     }
     state.db.save_settings(&settings)?;
     *state.settings.write().unwrap() = settings.clone();
+    if old.language_resolved != settings.language_resolved {
+        crate::i18n::apply(&settings);
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        crate::tray::refresh_texts(&app);
+    }
     if old.device_name != settings.device_name {
         let name = state.display_name();
         let id = state.identity.read().unwrap().clone();
@@ -243,6 +289,25 @@ pub fn set_device_flags(
     Ok(devices)
 }
 
+/// Endereço que o usuário digitou para um dispositivo pareado (o IP mudou e o mDNS não passa).
+/// É só uma dica de rota: o Noise continua exigindo a chave pareada.
+#[tauri::command]
+pub fn set_device_address(app: AppHandle, state: State<'_, AppState>, device_id: String, addr: String) -> Result<Vec<Device>> {
+    let Some(dev) = state.db.get_device(&device_id)? else {
+        return Err(AppError::Other(crate::i18n::tr("err.device_not_found").into()));
+    };
+    if dev.blocked {
+        return Err(AppError::Other(crate::i18n::tr("err.device_blocked").into()));
+    }
+    let sock = transport::parse_manual_addr(&addr, transport::PREFERRED_PORT)?;
+    state.db.set_last_address(&device_id, &sock.to_string())?;
+    log::info!("[DEVICE] Address set manually id={device_id} addr={sock}");
+    transport::maybe_connect(app.clone(), device_id);
+    let devices = state.devices();
+    events::emit(&app, events::DEVICE_UPDATED, &devices);
+    Ok(devices)
+}
+
 /// Remove e revoga: a chave pública deixa de ser aceita em novos handshakes.
 #[tauri::command]
 pub fn remove_device(app: AppHandle, state: State<'_, AppState>, device_id: String) -> Result<Vec<Device>> {
@@ -271,6 +336,14 @@ pub struct PairingInfo {
     pub started_at: i64,
     pub expires_at: i64,
     pub payload: String,
+    /// Endereços deste aparelho para digitar no outro (`ip` ou `ip:porta`).
+    pub addrs: Vec<String>,
+}
+
+/// Endereços deste aparelho na rede, no formato de `PairingInfo.addrs`.
+#[tauri::command]
+pub fn local_addresses(state: State<'_, AppState>) -> Vec<String> {
+    transport::display_addrs(&transport::local_addrs(), state.port())
 }
 
 /// Lado que exibe o QR (normalmente o PC).
@@ -285,7 +358,7 @@ pub fn start_pairing(app: AppHandle, state: State<'_, AppState>) -> Result<Pairi
         name: state.display_name(),
         platform: me.platform.clone(),
         public_key: me.public_key.clone(),
-        addrs: transport::local_addrs(),
+        addrs: pairing::qr_addrs(&transport::local_addrs()),
         port: state.port(),
         secret: session.secret.clone(),
     };
@@ -297,6 +370,7 @@ pub fn start_pairing(app: AppHandle, state: State<'_, AppState>) -> Result<Pairi
         started_at: session.started_at,
         expires_at: session.expires_at,
         payload: serde_json::to_string(&payload)?,
+        addrs: transport::display_addrs(&transport::local_addrs(), state.port()),
     };
     log::info!("[PAIRING] Pairing started id={} expires_at={}", info.pairing_id, info.expires_at);
     *state.pairing.lock().unwrap() = Some(session);
@@ -342,7 +416,7 @@ async fn pair_at(
     secret_or_code: &str,
 ) -> Result<DeviceIdentity> {
     let password = pairing::password_for(auth, secret_or_code);
-    let mut last_err = AppError::Pairing("nenhum endereço alcançável".into());
+    let mut last_err = AppError::Pairing(crate::i18n::tr("err.pair_no_addr").into());
     for addr in addrs {
         match connection::connect_pair(app.clone(), addr.clone(), pairing_id.clone(), auth, password.clone()).await {
             // A conexão do pareamento já segue como sessão cifrada; nada a reconectar.
@@ -367,7 +441,7 @@ pub async fn pair_with_payload(app: AppHandle, raw: String) -> Result<DeviceIden
     let p = pairing::parse_payload(&raw)?;
     let state = app.state::<AppState>();
     if p.device_id == state.self_id() {
-        return Err(AppError::Pairing("este é o próprio dispositivo".into()));
+        return Err(AppError::Pairing(crate::i18n::tr("err.pair_self").into()));
     }
     let mut addrs: Vec<String> = p.addrs.iter().map(|a| SocketAddr::new(*a, p.port).to_string()).collect();
     for a in transport::candidate_addrs(&state, &p.device_id) {
@@ -387,11 +461,16 @@ pub async fn request_pairing(app: AppHandle, device_id: String) -> Result<()> {
 /// Código digitado manualmente: procura na LAN um dispositivo anunciando pareamento.
 /// `device_id`: depois de um pedido de pareamento já se sabe com quem parear; vai direto
 /// aos endereços dele em vez de esperar o anúncio mDNS com pairing=1.
+/// `addr`: endereço digitado (redes sem mDNS); pula a espera e vai direto a ele.
 #[tauri::command]
-pub async fn pair_with_code(app: AppHandle, code: String, device_id: Option<String>) -> Result<DeviceIdentity> {
+pub async fn pair_with_code(app: AppHandle, code: String, device_id: Option<String>, addr: Option<String>) -> Result<DeviceIdentity> {
     let code = pairing::normalize_code(&code);
     if code.len() != 7 {
-        return Err(AppError::Pairing("código deve ter 6 caracteres".into()));
+        return Err(AppError::Pairing(crate::i18n::tr("err.pair_code_len").into()));
+    }
+    if let Some(addr) = addr.as_deref().map(str::trim).filter(|a| !a.is_empty()) {
+        let sock = transport::parse_manual_addr(addr, transport::PREFERRED_PORT)?;
+        return pair_at(&app, vec![sock.to_string()], None, pairing::PairAuth::Code, &code).await;
     }
     let state = app.state::<AppState>();
     // O anúncio mDNS com pairing=1 pode levar alguns segundos para chegar.
@@ -414,9 +493,9 @@ pub async fn pair_with_code(app: AppHandle, code: String, device_id: Option<Stri
         tokio::time::sleep(std::time::Duration::from_millis(500)).await;
     }
     if candidates.is_empty() {
-        return Err(AppError::Pairing("nenhum dispositivo em modo de pareamento na rede".into()));
+        return Err(AppError::Pairing(crate::i18n::tr("err.pair_none_listening").into()));
     }
-    let mut last = AppError::Pairing("código incorreto".into());
+    let mut last = AppError::Pairing(crate::i18n::tr("err.pair_bad_code").into());
     for (_id, addrs) in candidates {
         match pair_at(&app, addrs, None, pairing::PairAuth::Code, &code).await {
             Ok(id) => return Ok(id),
@@ -505,7 +584,7 @@ pub async fn transfer_pick_file(app: AppHandle, folder: Option<bool>) -> Result<
     {
         let _ = (app, folder);
         if !crate::transfer::android::pick_file()? {
-            return Err(AppError::Other("sem Activity para abrir o seletor".into()));
+            return Err(AppError::Other(crate::i18n::tr("err.picker_no_activity").into()));
         }
         for _ in 0..(180 * 5) {
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
@@ -513,12 +592,12 @@ pub async fn transfer_pick_file(app: AppHandle, folder: Option<bool>) -> Result<
                 return Ok(serde_json::from_str(&json)?);
             }
         }
-        Err(AppError::Other("seletor não respondeu".into()))
+        Err(AppError::Other(crate::i18n::tr("err.picker_no_reply").into()))
     }
     #[cfg(target_os = "ios")]
     {
         let _ = (app, folder);
-        Err(AppError::Other("seletor de arquivos indisponível nesta plataforma".into()))
+        Err(AppError::Other(crate::i18n::tr("err.picker_unavailable").into()))
     }
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
     {
@@ -534,7 +613,7 @@ pub async fn transfer_pick_file(app: AppHandle, folder: Option<bool>) -> Result<
                 let _ = tx.send(f);
             });
         }
-        let Some(picked) = rx.await.map_err(|_| AppError::Other("seletor não respondeu".into()))? else {
+        let Some(picked) = rx.await.map_err(|_| AppError::Other(crate::i18n::tr("err.picker_no_reply").into()))? else {
             return Ok(serde_json::json!({ "cancelled": true }));
         };
         let mut files = Vec::new();
@@ -573,11 +652,11 @@ fn transfer_target(app: &AppHandle, id: &str) -> Result<String> {
         .state::<AppState>()
         .db
         .transfer_get(id)?
-        .ok_or_else(|| AppError::Other("transferência não encontrada".into()))?;
+        .ok_or_else(|| AppError::Other(crate::i18n::tr("err.transfer_not_found").into()))?;
     if !matches!(rec.state, crate::transfer::state::TransferState::Completed) {
-        return Err(AppError::Other("a transferência ainda não terminou".into()));
+        return Err(AppError::Other(crate::i18n::tr("err.transfer_unfinished").into()));
     }
-    let gone = || AppError::Other("o arquivo não está mais disponível".into());
+    let gone = || AppError::Other(crate::i18n::tr("err.file_gone").into());
     let target = rec.final_path.or(rec.source).ok_or_else(gone)?;
     // Movido/apagado depois, ou zip temporário de pasta (some ao terminar o envio).
     // `content://` (Android) não é caminho: quem abre é que valida.
@@ -631,11 +710,24 @@ pub fn notify_permission_request(open_settings: bool) -> Result<()> {
 }
 
 /// Texto compartilhado: vira item de histórico e vai para os dispositivos escolhidos.
+/// Se o poll acabou de registrar o mesmo texto (bloco/widget com o núcleo morto abre o app
+/// com o clipboard ainda nele), reaproveita o item: o receptor recusa o id repetido e nada duplica.
 #[tauri::command]
-pub fn share_text(app: AppHandle, text: String, device_ids: Vec<String>) -> Result<ClipboardItem> {
-    let item = crate::clipboard::ingest_shared_text(&app, text)?;
+pub fn share_text(app: AppHandle, state: State<'_, AppState>, text: String, device_ids: Vec<String>) -> Result<ClipboardItem> {
+    let hash = crate::db::content_hash(&text);
+    // Marca como visto: o próximo poll não cria (nem envia) outro item igual.
+    let _ = state.clip_dedupe.lock().unwrap().decide(&hash, crate::models::now_ms());
+    let recent = state.db.latest_item()?.filter(|i| {
+        i.content_type != crate::content::ContentType::Image
+            && crate::db::content_hash(&i.content) == hash
+            && crate::models::now_ms() - i.created_at < 60_000
+    });
+    let item = match recent {
+        Some(i) => i,
+        None => crate::clipboard::ingest_shared_text(&app, text, false)?,
+    };
     crate::sync::send_item(&app, &item.id, &device_ids)?;
-    Ok(item)
+    Ok(rich::for_ui(&item))
 }
 
 #[tauri::command]
@@ -643,30 +735,15 @@ pub fn transfer_peer_supports(app: AppHandle, device_id: String) -> bool {
     crate::transfer::manager::peer_supports_files(&app, &device_id)
 }
 
-/// Atualização pendente já encontrada pela verificação em segundo plano (só desktop).
+/// Atualização pendente já encontrada pela verificação em segundo plano.
 #[tauri::command]
 pub fn update_status() -> Option<serde_json::Value> {
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    {
-        crate::updater::pending().and_then(|u| serde_json::to_value(u).ok())
-    }
-    #[cfg(any(target_os = "android", target_os = "ios"))]
-    {
-        None
-    }
+    crate::updater::pending().and_then(|u| serde_json::to_value(u).ok())
 }
 
 #[tauri::command]
 pub async fn update_check(app: AppHandle) -> Result<Option<serde_json::Value>> {
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    {
-        Ok(crate::updater::check(&app).await?.and_then(|u| serde_json::to_value(u).ok()))
-    }
-    #[cfg(any(target_os = "android", target_os = "ios"))]
-    {
-        let _ = app;
-        Ok(None)
-    }
+    Ok(crate::updater::check(&app).await?.and_then(|u| serde_json::to_value(u).ok()))
 }
 
 #[tauri::command]
@@ -678,6 +755,40 @@ pub async fn update_install(app: AppHandle) -> Result<()> {
     #[cfg(any(target_os = "android", target_os = "ios"))]
     {
         let _ = app;
-        Err(AppError::Other("atualização pelo app só no desktop".into()))
+        Err(AppError::Other(crate::i18n::tr("err.update_desktop_only").into()))
+    }
+}
+
+/// Android: abre no navegador a página da release da atualização pendente (o APK é baixado de lá).
+#[tauri::command]
+pub fn update_open(app: AppHandle) -> Result<()> {
+    #[cfg(target_os = "android")]
+    {
+        use tauri_plugin_opener::OpenerExt;
+        let url = crate::updater::pending_url().ok_or_else(|| AppError::Other(crate::i18n::tr("err.update_none").into()))?;
+        app.opener().open_url(url, None::<&str>).map_err(|e| AppError::Other(e.to_string()))
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = app;
+        Err(AppError::Other(crate::i18n::tr("err.android_only").into()))
+    }
+}
+
+/// Ajusta a cor dos ícones das barras de status/navegação ao tema do app (só Android; nos demais é no-op).
+#[tauri::command]
+pub fn set_system_bars(dark: bool) -> Result<()> {
+    #[cfg(target_os = "android")]
+    {
+        crate::android_jni::with_class("app.clipsync.desktop.SystemBars", |env, class, _ctx| {
+            env.call_static_method(class, "set", "(Z)V", &[jni::objects::JValue::Bool(dark as u8)])
+                .map_err(|e| AppError::Other(format!("SystemBars.set: {e}")))?;
+            Ok(())
+        })
+    }
+    #[cfg(not(target_os = "android"))]
+    {
+        let _ = dark;
+        Ok(())
     }
 }

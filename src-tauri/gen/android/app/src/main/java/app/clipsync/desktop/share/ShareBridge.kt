@@ -32,6 +32,17 @@ object ShareBridge {
         }
         val text = if (uris.isEmpty()) intent.getCharSequenceExtra(Intent.EXTRA_TEXT)?.toString()?.takeIf { it.isNotBlank() } else null
         if (files.length() == 0 && text == null) return false
+        offer(files, text)
+        return true
+    }
+
+    /** Texto vindo de outro caminho (ex.: `ClipSendActivity` com o núcleo morto): vira a folha "Enviar para". */
+    fun offerText(@Suppress("UNUSED_PARAMETER") context: Context, text: String) {
+        if (text.isBlank()) return
+        offer(JSONArray(), text)
+    }
+
+    private fun offer(files: JSONArray, text: String?) {
         pending = JSONObject()
             .put("files", files)
             .put("text", text ?: JSONObject.NULL)
@@ -39,7 +50,6 @@ object ShareBridge {
         // App já aberto (onNewIntent) não gera visibilitychange: avisa a UI. Antes de o
         // núcleo existir (cold start) falha calado e a UI busca ao montar.
         runCatching { nativeShareReceived() }.onFailure { Log.i("ClipSyncShare", "núcleo ainda não subiu: ${it.javaClass.simpleName}") }
-        return true
     }
 
     /** JSON do compartilhamento pendente (consumido na leitura), ou null. */

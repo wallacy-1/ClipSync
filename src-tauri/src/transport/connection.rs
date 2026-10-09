@@ -8,7 +8,7 @@ use crate::sync;
 use crate::transport::noise::{handshake_initiator, handshake_responder, HandshakeResult};
 use crate::transport::pairing::{Pake, PairAuth, MAX_PAIR_FAILURES};
 use crate::transfer;
-use crate::transport::protocol::{read_frame, write_frame, DataFrame, Inbound, Message, PreHello, SecureChannel, CAP_CLIP_IMAGE_V1, CAP_FILE_ASK_V1, CAP_FILE_V1, PROTOCOL_VERSION};
+use crate::transport::protocol::{read_frame, write_frame, DataFrame, Inbound, Message, PreHello, SecureChannel, CAP_CLIP_HTML_V1, CAP_CLIP_IMAGE_V1, CAP_FILE_ASK_V1, CAP_FILE_V1, PROTOCOL_VERSION};
 use std::time::Duration;
 use tauri::{AppHandle, Manager};
 use tokio::net::TcpStream;
@@ -65,11 +65,11 @@ fn local_caps() -> Vec<String> {
     // Transferência de arquivos: Windows e Android; iOS não é alvo.
     #[cfg(not(target_os = "ios"))]
     {
-        vec![CAP_FILE_V1.to_string(), CAP_CLIP_IMAGE_V1.to_string(), CAP_FILE_ASK_V1.to_string()]
+        vec![CAP_FILE_V1.to_string(), CAP_CLIP_IMAGE_V1.to_string(), CAP_FILE_ASK_V1.to_string(), CAP_CLIP_HTML_V1.to_string()]
     }
     #[cfg(target_os = "ios")]
     {
-        let _ = (CAP_FILE_V1, CAP_CLIP_IMAGE_V1, CAP_FILE_ASK_V1);
+        let _ = (CAP_FILE_V1, CAP_CLIP_IMAGE_V1, CAP_FILE_ASK_V1, CAP_CLIP_HTML_V1);
         Vec::new()
     }
 }
@@ -107,7 +107,7 @@ pub async fn connect_session(app: AppHandle, device_id: String, addr: String) {
     let res = async {
         let stream = tokio::time::timeout(Duration::from_secs(6), TcpStream::connect(&addr))
             .await
-            .map_err(|_| AppError::Net(format!("timeout conectando em {addr}")))??;
+            .map_err(|_| AppError::Net(crate::i18n::trf("err.net_timeout_connect", &[("addr", &addr.to_string())])))??;
         run(app.clone(), stream, Role::Initiator, Mode::Session).await
     }
     .await;
@@ -128,7 +128,7 @@ pub async fn connect_pair(
 ) -> Result<DeviceIdentity> {
     let stream = tokio::time::timeout(Duration::from_secs(8), TcpStream::connect(&addr))
         .await
-        .map_err(|_| AppError::Net(format!("não foi possível alcançar {addr}")))??;
+        .map_err(|_| AppError::Net(crate::i18n::trf("err.net_unreachable", &[("addr", &addr.to_string())])))??;
     let (tx, rx) = tokio::sync::oneshot::channel();
     let app2 = app.clone();
     tauri::async_runtime::spawn(async move {
@@ -144,8 +144,8 @@ pub async fn connect_pair(
     });
     tokio::time::timeout(Duration::from_secs(25), rx)
         .await
-        .map_err(|_| AppError::Pairing("o outro dispositivo não respondeu".into()))?
-        .map_err(|_| AppError::Pairing("pareamento cancelado".into()))?
+        .map_err(|_| AppError::Pairing(crate::i18n::tr("err.pair_no_reply").into()))?
+        .map_err(|_| AppError::Pairing(crate::i18n::tr("err.pair_cancelled").into()))?
 }
 
 /// Sessão normal: a chave do handshake tem de ser de um device pareado e não bloqueado.
@@ -160,12 +160,12 @@ async fn authenticate_session(
     let Some(d) = state.db.device_by_public_key(remote_pk_hex)? else {
         log::warn!("[AUTH] Rejected unpaired device id={remote_id} from {peer_addr}");
         let _ = chan.send(&Message::Bye).await;
-        return Err(AppError::Net("dispositivo não pareado".into()));
+        return Err(AppError::Net(crate::i18n::tr("err.device_not_paired").into()));
     };
     if d.blocked {
         log::warn!("[AUTH] Rejected blocked device id={remote_id}");
         let _ = chan.send(&Message::Bye).await;
-        return Err(AppError::Net("dispositivo bloqueado".into()));
+        return Err(AppError::Net(crate::i18n::tr("err.device_blocked").into()));
     }
     chan.send(&Message::Hello { identity: local_identity(state), caps: local_caps() }).await?;
     let caps = match tokio::time::timeout(HANDSHAKE_TIMEOUT, chan.recv()).await {
@@ -202,10 +202,10 @@ async fn complete_pairing(
     chan.send(&Message::Hello { identity: local_identity(&state), caps: local_caps() }).await?;
     let (identity, caps) = match tokio::time::timeout(HANDSHAKE_TIMEOUT, chan.recv()).await {
         Ok(Ok(Message::Hello { identity, caps })) => (identity, caps),
-        _ => return Err(AppError::Pairing("código incorreto, expirado ou o outro dispositivo não respondeu".into())),
+        _ => return Err(AppError::Pairing(crate::i18n::tr("err.pair_bad_code_or_silent").into())),
     };
     if identity.public_key != peer.remote_pk_hex || identity.device_id != peer.remote_id {
-        return Err(AppError::Pairing("identidade não confere com a chave do handshake".into()));
+        return Err(AppError::Pairing(crate::i18n::tr("err.pair_identity").into()));
     }
     let d = StoredDevice {
         device_id: peer.remote_id.to_string(),
@@ -300,10 +300,10 @@ async fn run_with_pairing_id(
         Role::Responder => {
             let raw = tokio::time::timeout(HANDSHAKE_TIMEOUT, read_frame(&mut stream))
                 .await
-                .map_err(|_| AppError::Net("timeout no hello".into()))??;
+                .map_err(|_| AppError::Net(crate::i18n::tr("err.net_hello_timeout").into()))??;
             let hello: PreHello = serde_json::from_slice(&raw)?;
             if hello.v != PROTOCOL_VERSION {
-                return Err(AppError::Net("versão de protocolo incompatível".into()));
+                return Err(AppError::Net(crate::i18n::tr("err.net_protocol").into()));
             }
             if hello.mode == super::request::MODE {
                 return super::request::on_request(&app, &mut stream, hello.from, &peer_addr).await;
@@ -311,7 +311,7 @@ async fn run_with_pairing_id(
             if hello.mode == "pair" {
                 let Some(auth) = hello.auth.as_deref().and_then(PairAuth::parse) else {
                     log::warn!("[AUTH] Pairing from {peer_addr} without PAKE (outdated peer)");
-                    return Err(AppError::Pairing("o outro dispositivo usa uma versão antiga do ClipSync".into()));
+                    return Err(AppError::Pairing(crate::i18n::tr("err.pair_old_peer").into()));
                 };
                 let session = state.pairing.lock().unwrap().clone();
                 match session {
@@ -322,7 +322,7 @@ async fn run_with_pairing_id(
                     {
                         (Mode::Pair { auth, password: s.password(auth) }, Some(s.id))
                     }
-                    _ => return Err(AppError::Pairing("nenhuma sessão de pareamento ativa".into())),
+                    _ => return Err(AppError::Pairing(crate::i18n::tr("err.pair_no_session").into())),
                 }
             } else {
                 (Mode::Session, None)
@@ -350,14 +350,14 @@ async fn run_with_pairing_id(
         }
     })
     .await
-    .map_err(|_| AppError::Net("timeout no handshake".into()))?;
+    .map_err(|_| AppError::Net(crate::i18n::tr("err.net_handshake_timeout").into()))?;
     let hs = hs.map_err(|e| {
         log::warn!("[AUTH] Handshake failed with {peer_addr} pairing={is_pairing}: {e}");
         if is_pairing {
             if let (Role::Responder, Some(id)) = (role, pairing_id.as_deref()) {
                 note_pairing_failure(&app, id);
             }
-            AppError::Pairing("código incorreto ou expirado".into())
+            AppError::Pairing(crate::i18n::tr("err.pair_bad_code_or_expired").into())
         } else {
             e
         }
@@ -431,7 +431,7 @@ async fn run_with_pairing_id(
                         continue;
                     }
                     Ok(Err(e)) => break Err(e),
-                    Err(_) => break Err(AppError::Net("conexão ociosa".into())),
+                    Err(_) => break Err(AppError::Net(crate::i18n::tr("err.net_idle").into())),
                 };
                 match msg {
                     Message::Ping => { let _ = chan.send(&Message::Pong).await; }

@@ -129,10 +129,11 @@ class KeepAliveService : Service() {
 
     private fun build(): Notification {
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && nm.getNotificationChannel(CHANNEL) == null) {
+        // Sempre recria: atualiza nome/descrição do canal existente para o idioma atual.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Manter conectado", NotificationManager.IMPORTANCE_MIN).apply {
-                    description = "Mantém o ClipSync recebendo cópias com o app fechado"
+                NotificationChannel(CHANNEL, getString(R.string.channel_keepalive), NotificationManager.IMPORTANCE_MIN).apply {
+                    description = getString(R.string.channel_keepalive_desc)
                     setShowBadge(false)
                 },
             )
@@ -144,8 +145,8 @@ class KeepAliveService : Service() {
         )
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_stat_clipsync)
-            .setContentTitle("ClipSync conectado")
-            .setContentText("Recebendo cópias em segundo plano. Desligue em Ajustes → Manter conectado.")
+            .setContentTitle(getString(R.string.keepalive_title))
+            .setContentText(getString(R.string.keepalive_text))
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setOngoing(true)
             .setShowWhen(false)

@@ -1,4 +1,4 @@
-export type ContentType = "text" | "link" | "code" | "command" | "email" | "token" | "card";
+export type ContentType = "text" | "link" | "code" | "command" | "email" | "token" | "card" | "image";
 export type SyncState = "synced" | "sending" | "queued" | "local";
 export type DeviceState =
   | "discovered"
@@ -20,6 +20,7 @@ export interface ClipboardItem {
   isPinned: boolean;
   isSensitive: boolean;
   syncState: SyncState;
+  /** Texto formatado: `{ formatted: true }` (o HTML fica no backend). Imagem: `{ path, thumb, width, height, bytes, mime }`; `content` é só o hash e nunca aparece. */
   metadata: Record<string, unknown>;
 }
 
@@ -57,6 +58,10 @@ export interface Settings {
   /** Toasts do Windows (arquivo recebido, pedido de aceite). */
   notifications: boolean;
   notifyText: boolean;
+  /** Captura/envia o HTML junto do texto (`metadata.html`) e escreve o recebido formatado. */
+  keepFormatting: boolean;
+  /** Consulta o GitHub sozinho atrás de versão nova; "Procurar agora" funciona sempre. */
+  checkUpdates: boolean;
   /** Android: notificação fixa mantém a conexão viva com o app fechado. */
   keepAlive: boolean;
   typesRev: number;
@@ -69,7 +74,15 @@ export interface Settings {
   autostartInitialized: boolean;
   /** Windows: atalhos globais ("Ctrl+Alt+Shift+V"); "" = desligado. */
   shortcuts: Shortcuts;
+  /** Aparência: "system" segue o tema do sistema. */
+  theme: ThemePref;
+  /** Idioma da interface: "auto" segue o sistema. */
+  language: "auto" | "pt-BR" | "en";
+  /** "pt-BR" | "en" já resolvido pelo front (`navigator.language`); o Rust só lê este campo. */
+  languageResolved: string;
 }
+
+export type ThemePref = "system" | "light" | "dark";
 
 export interface Shortcuts {
   openPanel: string;
@@ -127,9 +140,11 @@ export interface PairingInfo {
   startedAt: number;
   expiresAt: number;
   payload: string;
+  /** Endereços deste aparelho para digitar no outro (`ip` ou `ip:porta`). */
+  addrs: string[];
 }
 
-export type Filter = "all" | "text" | "code" | "link" | "email" | "sensitive" | "pinned";
+export type Filter = "all" | "text" | "code" | "link" | "email" | "image" | "sensitive" | "pinned";
 
 // Espelho de `transfer::state::TransferState` (serde tag = "kind") e `TransferRecord`.
 export type TransferKind =
@@ -207,9 +222,11 @@ export type PickedFiles =
   | { cancelled: true }
   | { cancelled?: false; files: { uri: string; name: string; size: number; mime: string | null; dir?: boolean }[] };
 
-/** Nova versão encontrada pelo updater (só desktop). */
+/** Nova versão encontrada (updater no Windows; releases do GitHub no Android, com `url`). */
 export interface UpdateInfo {
   version: string;
   currentVersion: string;
   notes: string | null;
+  /** Página da release (Android). */
+  url?: string | null;
 }

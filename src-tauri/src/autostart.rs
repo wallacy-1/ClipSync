@@ -51,7 +51,7 @@ pub fn set(app: &AppHandle, enabled: bool) -> Result<()> {
         return Ok(());
     }
     let r = if enabled { launcher.enable() } else { launcher.disable() };
-    r.map_err(|e| AppError::Other(format!("não foi possível {} o início com o Windows: {e}", if enabled { "ligar" } else { "desligar" })))?;
+    r.map_err(|e| AppError::Other(crate::i18n::trf(if enabled { "err.autostart_on" } else { "err.autostart_off" }, &[("e", &e.to_string())])))?;
     log::info!("[AUTOSTART] {}", if enabled { "enabled" } else { "disabled" });
     Ok(())
 }

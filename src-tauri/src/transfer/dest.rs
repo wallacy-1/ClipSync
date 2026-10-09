@@ -19,7 +19,7 @@ pub fn dest_dir(app: &AppHandle) -> Result<PathBuf> {
     let dir = app
         .path()
         .download_dir()
-        .map_err(|e| AppError::Other(format!("pasta de downloads indisponível: {e}")))?
+        .map_err(|e| AppError::Other(crate::i18n::trf("err.downloads_unavailable", &[("e", &e.to_string())])))?
         .join(DEST_SUBDIR);
     #[cfg(target_os = "android")]
     let dir = app
@@ -91,9 +91,9 @@ pub fn finalize(part: &Path, dest_dir: &Path, safe_name: &str) -> Result<PathBuf
     let name = dedupe_name(safe_name, |candidate| {
         resolve_in(dest_dir, candidate).map(|p| p.exists()).unwrap_or(true)
     });
-    let target = resolve_in(dest_dir, &name).ok_or_else(|| AppError::Other("nome de destino inválido".into()))?;
+    let target = resolve_in(dest_dir, &name).ok_or_else(|| AppError::Other(crate::i18n::tr("err.dest_invalid").into()))?;
     if target.exists() {
-        return Err(AppError::Other("destino já existe".into()));
+        return Err(AppError::Other(crate::i18n::tr("err.dest_exists").into()));
     }
     match std::fs::rename(part, &target) {
         Ok(()) => Ok(target),

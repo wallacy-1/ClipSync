@@ -33,6 +33,17 @@ object CoreBridge {
         if (ready) runCatching { nativeWake() }
     }
 
+    /**
+     * Envio explícito (bloco, widget, "Selecionar texto"): JSON `{ok, sent, queued, names, queuedNames}`
+     * ou `{ok:false, error}`. Bloqueia (reconexão curta + SQLite): chamar fora da thread principal.
+     */
+    @JvmStatic
+    external fun nativeSendNow(text: String, sensitive: Boolean): String
+
+    /** Põe o item mais recente do histórico no clipboard; `false` = nada copiado. Fora da thread principal. */
+    @JvmStatic
+    external fun nativeCopyLatest(): Boolean
+
     /** JSON `[{id, hash, text, ts, sensitive}]` dos itens ainda não processados. */
     @JvmStatic
     fun listInbox(context: Context): String = ImeInbox.listJson(context)

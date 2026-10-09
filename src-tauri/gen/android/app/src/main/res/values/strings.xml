@@ -1,7 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Inglês é o padrão (qualquer idioma que não seja pt cai aqui); o português fica em values-pt/. -->
 <resources>
-    <string name="app_name">"ClipSync"</string>
-    <string name="main_activity_title">"ClipSync"</string>
-    <string name="ime_label">ClipSync Keyboard</string>
-    <string name="ime_subtype_pt_br">Português (Brasil)</string>
-    <string name="ime_subtype_en_us">English (US)</string>
+    <!-- Nomes próprios: iguais nos dois idiomas -->
+    <string name="app_name" translatable="false">"ClipSync"</string>
+    <string name="main_activity_title" translatable="false">"ClipSync"</string>
+    <string name="ime_label" translatable="false">ClipSync Keyboard</string>
+    <string name="ime_subtype_pt_br" translatable="false">Português (Brasil)</string>
+    <string name="ime_subtype_en_us" translatable="false">English (US)</string>
+    <string name="widget_label" translatable="false">ClipSync</string>
+
+    <!-- Bloco de Ajustes rápidos e "Selecionar texto" -->
+    <string name="tile_label">Send clipboard</string>
+    <string name="tile_no_device">No paired device</string>
+    <string name="tile_paused">Paused</string>
+    <string name="tile_connected">%d connected</string>
+    <string name="tile_offline">Offline · goes to the queue</string>
+    <string name="process_text_label">ClipSync: send</string>
+
+    <!-- Widget -->
+    <string name="widget_description">Status, last copied item and buttons to send the clipboard to your PC.</string>
+    <string name="widget_open_app">Open ClipSync to get started</string>
+    <string name="widget_no_device">No paired device</string>
+    <string name="widget_offline">Offline</string>
+    <string name="widget_paused">Paused</string>
+    <string name="widget_paused_until">Paused until %s</string>
+    <string name="widget_nothing">Nothing copied yet</string>
+    <string name="widget_sensitive">Sensitive content hidden</string>
+    <string name="widget_image">Image</string>
+    <string name="widget_other_device">other device</string>
+    <string name="widget_meta_local">Copied here · %s</string>
+    <string name="widget_meta_remote">from %1$s · %2$s</string>
+    <string name="widget_send">Send</string>
+    <string name="widget_copy">Copy last</string>
+    <plurals name="widget_connected">
+        <item quantity="one">%d device connected</item>
+        <item quantity="other">%d devices connected</item>
+    </plurals>
+
+    <!-- Toasts do envio rápido -->
+    <string name="quick_read_failed">Couldn\'t read the clipboard</string>
+    <string name="quick_empty">Clipboard is empty</string>
+    <string name="quick_image">Image: sent by the automatic sync rules</string>
+    <string name="quick_sent">Sent to %s</string>
+    <string name="quick_queued">Queued for %s (offline)</string>
+    <string name="quick_sent_and_queued">Sent to %1$s · queued for %2$s</string>
+    <string name="quick_no_device">No paired devices</string>
+    <string name="quick_error">Couldn\'t send: %s</string>
+    <string name="quick_copied">Last item copied</string>
+    <string name="quick_copy_none">Nothing to copy</string>
+
+    <!-- Notificações -->
+    <string name="channel_transfer">File transfers</string>
+    <string name="channel_transfer_desc">Progress of ClipSync file transfers</string>
+    <string name="transfer_cancel">Cancel</string>
+    <string name="channel_received">Received files</string>
+    <string name="received_open_with">Open with</string>
+    <string name="channel_keepalive">Stay connected</string>
+    <string name="channel_keepalive_desc">Keeps ClipSync receiving copies while the app is closed</string>
+    <string name="keepalive_title">ClipSync connected</string>
+    <string name="keepalive_text">Receiving copies in the background. Turn off in Settings → Stay connected.</string>
+
+    <!-- Teclado: rótulo da tecla Enter conforme a ação do campo -->
+    <string name="ime_action_go">Go</string>
+    <string name="ime_action_search">Search</string>
+    <string name="ime_action_send">Send</string>
+    <string name="ime_action_next">Next</string>
+    <string name="ime_action_done">Done</string>
+    <string name="ime_action_previous">Previous</string>
 </resources>

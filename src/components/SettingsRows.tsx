@@ -1,34 +1,38 @@
 import { useEffect, useState } from "react";
+import { t, useT, type LangPref } from "../i18n";
 import { PLATFORM_LABEL } from "../lib/format";
 import { api, appVersion } from "../lib/ipc";
-import type { Shortcuts } from "../lib/types";
+import type { Shortcuts, ThemePref } from "../lib/types";
 import { useApp } from "../store/app";
 import { Toggle } from "./ui";
 
-const TYPES: { id: string; label: string }[] = [
-  { id: "text", label: "Texto" },
-  { id: "link", label: "Links" },
-  { id: "code", label: "Código" },
-  { id: "email", label: "E-mail" },
-  { id: "sensitive", label: "Sensíveis" },
-  { id: "image", label: "Imagens" },
+/** Rótulos lidos na hora (getter): seguem o idioma ativo. */
+const TYPES: { id: string; readonly label: string }[] = [
+  { id: "text", get label() { return t("history.filterText"); } },
+  { id: "link", get label() { return t("history.filterLink"); } },
+  { id: "code", get label() { return t("history.filterCode"); } },
+  { id: "email", get label() { return t("history.filterEmail"); } },
+  { id: "sensitive", get label() { return t("history.filterSensitive"); } },
+  { id: "image", get label() { return t("history.filterImage"); } },
 ];
 
 const ACCEPT_LIMITS = [25, 100, 500, 1024];
 
+const sizeMb = (mb: number) => (mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`);
+
 function acceptHelp(mode: string, mb: number) {
-  if (mode === "auto") return "Aceita qualquer arquivo de dispositivos pareados";
-  if (mode === "ask") return "Pergunta antes de cada arquivo";
-  return `Aceita até ${mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`} sozinho; acima disso pergunta`;
+  if (mode === "auto") return t("settings.acceptAuto");
+  if (mode === "ask") return t("settings.acceptAsk");
+  return t("settings.acceptLimit", { size: sizeMb(mb) });
 }
 
-const EXPIRE_OPTIONS = [
-  { v: 1, label: "1 h" }, { v: 6, label: "6 h" }, { v: 24, label: "24 h" }, { v: 168, label: "7 dias" }, { v: 0, label: "Nunca" },
+const expireOptions = () => [
+  { v: 1, label: "1 h" }, { v: 6, label: "6 h" }, { v: 24, label: "24 h" }, { v: 168, label: t("settings.days7") }, { v: 0, label: t("common.never") },
 ];
 
-export function Row({ label, help, children }: { label: string; help: string; children: React.ReactNode }) {
+export function Row({ label, help, stack, children }: { label: string; help: string; stack?: boolean; children: React.ReactNode }) {
   return (
-    <div className="setting-row">
+    <div className={stack ? "setting-row stack" : "setting-row"}>
       <div className="info">
         <div className="label">{label}</div>
         <div className="help">{help}</div>
@@ -38,7 +42,37 @@ export function Row({ label, help, children }: { label: string; help: string; ch
   );
 }
 
+const themes = (): { v: ThemePref; label: string }[] => [
+  { v: "system", label: t("settings.themeSystem") }, { v: "light", label: t("settings.themeLight") }, { v: "dark", label: t("settings.themeDark") },
+];
+
+/** "Português" e "English" ficam no próprio idioma, para quem abriu o app na língua errada achar a saída. */
+const languages = (): { v: LangPref; label: string }[] => [
+  { v: "auto", label: t("settings.langAuto") }, { v: "pt-BR", label: "Português" }, { v: "en", label: "English" },
+];
+
+export function AppearanceRows() {
+  const t = useT();
+  const s = useApp((st) => st.settings)!;
+  const save = useApp((st) => st.saveSettings);
+  return (
+    <>
+      <Row label={t("settings.theme")} help={t("settings.themeHelp")}>
+        <select className="select" value={s.theme} onChange={(e) => save({ theme: e.target.value as ThemePref })}>
+          {themes().map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
+        </select>
+      </Row>
+      <Row label={t("settings.language")} help={t("settings.languageHelp")}>
+        <select className="select" value={s.language} onChange={(e) => save({ language: e.target.value as LangPref })}>
+          {languages().map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
+        </select>
+      </Row>
+    </>
+  );
+}
+
 export function SyncRows() {
+  const t = useT();
   const s = useApp((st) => st.settings)!;
   const platform = useApp((st) => st.platform);
   const save = useApp((st) => st.saveSettings);
@@ -46,12 +80,12 @@ export function SyncRows() {
   const [editingTypes, setEditingTypes] = useState(false);
   const [name, setName] = useState<string | null>(null);
 
-  const typesLabel = s.syncedTypes.length === TYPES.length ? "todos" : `${s.syncedTypes.length} tipos`;
-  const typesHelp = TYPES.filter((t) => s.syncedTypes.includes(t.id)).map((t) => t.label).join(", ") || "nenhum";
+  const typesLabel = s.syncedTypes.length === TYPES.length ? t("settings.typesAll") : t("settings.typesCount", { n: s.syncedTypes.length });
+  const typesHelp = TYPES.filter((o) => s.syncedTypes.includes(o.id)).map((o) => o.label).join(", ") || t("common.none");
 
   return (
     <>
-      <Row label="Nome deste dispositivo" help="Como ele aparece nos outros aparelhos">
+      <Row label={t("settings.deviceName")} help={t("settings.deviceNameHelp")}>
         <input
           className="input"
           value={name ?? (s.deviceName || me?.name || "")}
@@ -60,13 +94,13 @@ export function SyncRows() {
           onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
         />
       </Row>
-      <Row label="Sync automático" help="Envia tudo que você copia">
+      <Row label={t("settings.autoSync")} help={t("settings.autoSyncHelp")}>
         <Toggle on={s.autoSend} onChange={(v) => save({ autoSend: v })} />
       </Row>
-      <Row label="Receber automático" help="Aplica na área de transferência ao chegar">
+      <Row label={t("settings.autoReceive")} help={t("settings.autoReceiveHelp")}>
         <Toggle on={s.autoReceive} onChange={(v) => save({ autoReceive: v })} />
       </Row>
-      <Row label="Arquivos recebidos" help={acceptHelp(s.fileAccept, s.fileAutoAcceptMb)}>
+      <Row label={t("settings.filesReceived")} help={acceptHelp(s.fileAccept, s.fileAutoAcceptMb)}>
         <select
           className="select"
           value={s.fileAccept === "limit" ? `limit:${s.fileAutoAcceptMb}` : s.fileAccept}
@@ -75,50 +109,53 @@ export function SyncRows() {
             void save(mode === "limit" ? { fileAccept: "limit", fileAutoAcceptMb: Number(mb) } : { fileAccept: mode as "auto" | "ask" });
           }}
         >
-          <option value="auto">Sempre aceitar</option>
-          {ACCEPT_LIMITS.map((mb) => <option key={mb} value={`limit:${mb}`}>Perguntar acima de {mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB`}</option>)}
-          <option value="ask">Sempre perguntar</option>
+          <option value="auto">{t("settings.acceptAlways")}</option>
+          {ACCEPT_LIMITS.map((mb) => <option key={mb} value={`limit:${mb}`}>{t("settings.askAbove", { size: sizeMb(mb) })}</option>)}
+          <option value="ask">{t("settings.askAlways")}</option>
         </select>
       </Row>
       {platform === "android" && (
-        <Row label="Manter conectado" help="Recebe cópias com o app fechado; deixa uma notificação fixa e gasta um pouco mais de bateria">
+        <Row label={t("settings.keepAlive")} help={t("settings.keepAliveHelp")}>
           <Toggle on={s.keepAlive} onChange={(v) => save({ keepAlive: v })} />
         </Row>
       )}
       {platform === "windows" && (
         <>
-          <Row label="Iniciar com o Windows" help="Abre escondido na bandeja ao ligar o PC; sem ele rodando nada sincroniza">
+          <Row label={t("settings.launchAtLogin")} help={t("settings.launchAtLoginHelp")}>
             <Toggle on={s.launchAtLogin} onChange={(v) => save({ launchAtLogin: v })} />
           </Row>
-          <Row label="Notificações do Windows" help="Arquivo recebido e pedido de aceite, com a janela fechada">
+          <Row label={t("settings.notifications")} help={t("settings.notificationsHelp")}>
             <Toggle on={s.notifications} onChange={(v) => save({ notifications: v })} />
           </Row>
           {s.notifications && (
-            <Row label="Avisar texto recebido" help="Mostra uma notificação a cada texto que chega">
+            <Row label={t("settings.notifyText")} help={t("settings.notifyTextHelp")}>
               <Toggle on={s.notifyText} onChange={(v) => save({ notifyText: v })} />
             </Row>
           )}
         </>
       )}
-      <Row label="Tipos sincronizados" help={typesHelp}>
+      <Row label={t("settings.keepFormatting")} help={t("settings.keepFormattingHelp")}>
+        <Toggle on={s.keepFormatting} onChange={(v) => save({ keepFormatting: v })} />
+      </Row>
+      <Row label={t("settings.syncedTypes")} help={typesHelp}>
         {editingTypes ? (
           <div className="type-chips">
-            {TYPES.map((t) => (
+            {TYPES.map((o) => (
               <button
-                key={t.id}
-                className={`chip${s.syncedTypes.includes(t.id) ? " active" : ""}`}
-                onClick={() => save({ syncedTypes: s.syncedTypes.includes(t.id) ? s.syncedTypes.filter((x) => x !== t.id) : [...s.syncedTypes, t.id] })}
+                key={o.id}
+                className={`chip${s.syncedTypes.includes(o.id) ? " active" : ""}`}
+                onClick={() => save({ syncedTypes: s.syncedTypes.includes(o.id) ? s.syncedTypes.filter((x) => x !== o.id) : [...s.syncedTypes, o.id] })}
               >
-                {t.label}
+                {o.label}
               </button>
             ))}
-            <button className="chip" onClick={() => setEditingTypes(false)}>OK</button>
+            <button className="chip" onClick={() => setEditingTypes(false)}>{t("common.ok")}</button>
           </div>
         ) : (
           <button className="tag" onClick={() => setEditingTypes(true)}>{typesLabel}</button>
         )}
       </Row>
-      <Row label="Somente na rede local" help="Nunca sai da sua Wi-Fi. Não há servidores.">
+      <Row label={t("settings.lanOnly")} help={t("settings.lanOnlyHelp")}>
         <Toggle on disabled onChange={() => {}} />
       </Row>
     </>
@@ -126,33 +163,35 @@ export function SyncRows() {
 }
 
 export function PrivacyRows() {
+  const t = useT();
   const s = useApp((st) => st.settings)!;
   const save = useApp((st) => st.saveSettings);
   return (
     <>
-      <Row label="Ignorar gerenciadores de senha" help="Não captura cópias marcadas como sensíveis pelo app de origem">
+      <Row label={t("settings.ignorePm")} help={t("settings.ignorePmHelp")}>
         <Toggle on={s.ignorePasswordManagers} onChange={(v) => save({ ignorePasswordManagers: v })} />
       </Row>
-      <Row label="Autoexpiração" help="Apaga itens do histórico depois de">
+      <Row label={t("settings.autoExpire")} help={t("settings.autoExpireHelp")}>
         <select className="select" value={s.autoExpireHours} onChange={(e) => save({ autoExpireHours: Number(e.target.value) })}>
-          {EXPIRE_OPTIONS.map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
+          {expireOptions().map((o) => <option key={o.v} value={o.v}>{o.label}</option>)}
         </select>
       </Row>
-      <Row label="Tokens e cartões" help={s.hideSensitive ? `Detecta e oculta, expira em ${s.sensitiveExpireMinutes} min` : "Detecta e mostra; expira como os demais"}>
+      <Row label={t("settings.tokens")} help={s.hideSensitive ? t("settings.tokensHideHelp", { min: s.sensitiveExpireMinutes }) : t("settings.tokensShowHelp")}>
         <select className="select dark" value={s.hideSensitive ? "hide" : "show"} onChange={(e) => save({ hideSensitive: e.target.value === "hide" })}>
-          <option value="hide">Ocultar</option>
-          <option value="show">Mostrar</option>
+          <option value="hide">{t("settings.tokensHide")}</option>
+          <option value="show">{t("settings.tokensShow")}</option>
         </select>
       </Row>
     </>
   );
 }
 
-export const SHORTCUTS: { id: keyof Shortcuts; label: string; help: string }[] = [
-  { id: "openPanel", label: "Abrir painel rápido", help: "Mostra o histórico perto do cursor" },
-  { id: "pasteLast", label: "Colar último", help: "Põe o último item na área de transferência" },
-  { id: "sendLast", label: "Enviar último", help: "Manda o último item aos dispositivos pareados" },
-  { id: "togglePause", label: "Pausar sync", help: "Pausa ou retoma a sincronização" },
+/** `label` e `help` são getters: seguem o idioma ativo. */
+export const SHORTCUTS: { id: keyof Shortcuts; readonly label: string; readonly help: string }[] = [
+  { id: "openPanel", get label() { return t("settings.shortcutOpenPanel"); }, get help() { return t("settings.shortcutOpenPanelHelp"); } },
+  { id: "pasteLast", get label() { return t("settings.shortcutPasteLast"); }, get help() { return t("settings.shortcutPasteLastHelp"); } },
+  { id: "sendLast", get label() { return t("settings.shortcutSendLast"); }, get help() { return t("settings.shortcutSendLastHelp"); } },
+  { id: "togglePause", get label() { return t("settings.shortcutTogglePause"); }, get help() { return t("settings.shortcutTogglePauseHelp"); } },
 ];
 
 const MODIFIER_CODES = ["ControlLeft", "ControlRight", "AltLeft", "AltRight", "ShiftLeft", "ShiftRight", "MetaLeft", "MetaRight"];
@@ -166,6 +205,7 @@ function comboFromEvent(e: KeyboardEvent): string | null {
 }
 
 export function ShortcutRows() {
+  const t = useT();
   const s = useApp((st) => st.settings)!;
   const save = useApp((st) => st.saveSettings);
   const [recording, setRecording] = useState<keyof Shortcuts | null>(null);
@@ -219,9 +259,9 @@ export function ShortcutRows() {
       {SHORTCUTS.map((sc) => {
         const combo = s.shortcuts[sc.id];
         const help = recording === sc.id
-          ? "Pressione a combinação · Esc cancela · Backspace desliga"
+          ? t("settings.recordHint")
           : failed.includes(sc.id)
-            ? "Outro programa já usa esta combinação; escolha outra"
+            ? t("settings.shortcutTaken")
             : sc.help;
         return (
           <Row key={sc.id} label={sc.label} help={help}>
@@ -233,7 +273,7 @@ export function ShortcutRows() {
                 void api.shortcutsSuspend(false).catch(() => {});
               }}
             >
-              {recording === sc.id ? "Gravando…" : combo || "Desligado"}
+              {recording === sc.id ? t("settings.recording") : combo || t("settings.off")}
             </button>
           </Row>
         );
@@ -243,37 +283,59 @@ export function ShortcutRows() {
 }
 
 export function AboutRows() {
+  const t = useT();
+  const s = useApp((st) => st.settings)!;
+  const save = useApp((st) => st.saveSettings);
   const platform = useApp((st) => st.platform);
   const [version, setVersion] = useState<string | null>(null);
+  const [addrs, setAddrs] = useState<string[] | null>(null);
   useEffect(() => { void appVersion().then(setVersion).catch(() => setVersion("?")); }, []);
+  useEffect(() => { void api.localAddresses().then(setAddrs).catch(() => setAddrs([])); }, []);
   return (
     <>
-      <Row label="Versão" help={`ClipSync para ${PLATFORM_LABEL[platform] ?? platform}`}>
+      <Row label={t("settings.version")} help={t("settings.versionHelp", { platform: PLATFORM_LABEL[platform] ?? platform })}>
         <span className="tag">{version ?? "…"}</span>
       </Row>
-      {platform === "windows" && <UpdateRow />}
+      <Row stack label={t("settings.address")} help={t("settings.addressHelp")}>
+        <span className="addr">{addrs === null ? "…" : addrs.length > 0 ? addrs.join(" · ") : t("settings.noNetwork")}</span>
+      </Row>
+      <Row label={t("settings.checkUpdates")} help={t("settings.checkUpdatesHelp")}>
+        <Toggle on={s.checkUpdates} onChange={(v) => save({ checkUpdates: v })} />
+      </Row>
+      <UpdateRow />
     </>
   );
 }
 
 function UpdateRow() {
+  const t = useT();
   const update = useApp((st) => st.update);
   const updateBusy = useApp((st) => st.updateBusy);
   const checkUpdate = useApp((st) => st.checkUpdate);
   const installUpdate = useApp((st) => st.installUpdate);
+  const openUpdate = useApp((st) => st.openUpdate);
+  const platform = useApp((st) => st.platform);
   if (update) {
+    // Android não instala por dentro do app: abre a página da release e o usuário baixa o APK.
+    if (platform === "android") {
+      return (
+        <Row label={t("settings.update")} help={t("settings.updateAndroid", { version: update.version })}>
+          <button className="chip" onClick={() => void openUpdate()}>{t("settings.download")}</button>
+        </Row>
+      );
+    }
     return (
-      <Row label="Atualização" help={`Versão ${update.version} disponível; o app reinicia ao instalar`}>
+      <Row label={t("settings.update")} help={t("settings.updateDesktop", { version: update.version })}>
         <button className="chip" disabled={updateBusy !== null} onClick={() => void installUpdate()}>
-          {updateBusy === "install" ? "Instalando…" : "Atualizar e reiniciar"}
+          {updateBusy === "install" ? t("settings.installing") : t("settings.install")}
         </button>
       </Row>
     );
   }
   return (
-    <Row label="Atualização" help="Procura novas versões sozinho a cada poucas horas">
+    <Row label={t("settings.update")} help={t("settings.updateIdle")}>
       <button className="chip" disabled={updateBusy !== null} onClick={() => void checkUpdate()}>
-        {updateBusy === "check" ? "Procurando…" : "Procurar agora"}
+        {updateBusy === "check" ? t("settings.checking") : t("settings.checkNow")}
       </button>
     </Row>
   );

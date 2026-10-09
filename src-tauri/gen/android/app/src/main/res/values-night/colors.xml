@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="clip_widget_bg">#FF1C1A17</color>
+    <color name="clip_widget_surface">#FF2F2B26</color>
+    <color name="clip_widget_text">#FFEFE6D8</color>
+    <color name="clip_widget_text_dim">#FFB5AB9B</color>
+    <color name="clip_widget_accent">#FFD9854A</color>
+    <color name="clip_widget_on_accent">#FF1C1A17</color>
+    <color name="widget_dot_ok">#FF8EA06F</color>
+    <color name="widget_dot_warn">#FFD9854A</color>
+    <color name="widget_dot_off">#FF766D5F</color>
+</resources>

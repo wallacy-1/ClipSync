@@ -1,6 +1,7 @@
 //! Avisos do sistema, só com o app fora de foco (com foco a própria UI mostra).
 //! Windows: toasts de arquivo recebido, pedido de aceite e, se ligado, texto recebido.
 //! Android: "Arquivo recebido", que abre o arquivo ao tocar (`ReceivedNotifier.kt`).
+use crate::i18n::{tr, trf};
 use crate::models::ClipboardItem;
 use crate::transfer::store::TransferRecord;
 use tauri::AppHandle;
@@ -9,17 +10,19 @@ use {crate::state::AppState, tauri::Manager};
 
 #[cfg(any(windows, target_os = "android"))]
 fn device_name(app: &AppHandle, id: &str) -> String {
-    app.state::<AppState>().db.get_device(id).ok().flatten().map(|d| d.name).unwrap_or_else(|| "outro dispositivo".into())
+    app.state::<AppState>().db.get_device(id).ok().flatten().map(|d| d.name).unwrap_or_else(|| tr("notify.other_device").into())
 }
 
 #[cfg(any(windows, target_os = "android"))]
 fn size(n: u64) -> String {
     const MB: f64 = 1024.0 * 1024.0;
+    // Separador decimal do idioma do app: vírgula em pt, ponto em en.
+    let loc = |s: String| if crate::i18n::is_en() { s } else { s.replace('.', ",") };
     match n {
         n if n < 1024 => format!("{n} B"),
         n if (n as f64) < MB => format!("{:.0} KB", n as f64 / 1024.0),
-        n if (n as f64) < 1024.0 * MB => format!("{:.1} MB", n as f64 / MB).replace('.', ","),
-        n => format!("{:.2} GB", n as f64 / (1024.0 * MB)).replace('.', ","),
+        n if (n as f64) < 1024.0 * MB => loc(format!("{:.1} MB", n as f64 / MB)),
+        n => loc(format!("{:.2} GB", n as f64 / (1024.0 * MB))),
     }
 }
 
@@ -83,11 +86,11 @@ mod imp {
         }
         let from = device_name(app, &rec.device_id);
         let toast = Toast::new(&app_id(app))
-            .title(&format!("Arquivo recebido de {from}"))
+            .title(&trf("notify.file_from", &[("from", &from)]))
             .text1(&rec.safe_name)
             .text2(&format!("{} · Downloads\\ClipSync", size(rec.size)))
-            .add_button("Abrir", &format!("open:{}", rec.id))
-            .add_button("Mostrar na pasta", &format!("reveal:{}", rec.id));
+            .add_button(tr("notify.open"), &format!("open:{}", rec.id))
+            .add_button(tr("notify.reveal"), &format!("reveal:{}", rec.id));
         show(app, toast);
     }
 
@@ -98,11 +101,11 @@ mod imp {
         }
         let from = device_name(app, &rec.device_id);
         let toast = Toast::new(&app_id(app))
-            .title(&format!("{from} quer enviar um arquivo"))
+            .title(&trf("notify.wants_to_send", &[("from", &from)]))
             .text1(&rec.safe_name)
             .text2(&size(rec.size))
-            .add_button("Aceitar", &format!("accept:{}", rec.id))
-            .add_button("Recusar", &format!("decline:{}", rec.id));
+            .add_button(tr("notify.accept"), &format!("accept:{}", rec.id))
+            .add_button(tr("notify.decline"), &format!("decline:{}", rec.id));
         show(app, toast);
     }
 
@@ -113,12 +116,12 @@ mod imp {
         let from = device_name(app, from_device_id);
         // Conteúdo sensível nunca vai para a central de notificações.
         let preview = if item.is_sensitive {
-            "Conteúdo sensível (oculto)".to_string()
+            tr("notify.sensitive").to_string()
         } else {
             let t: String = item.content.chars().take(120).collect();
             t.split_whitespace().collect::<Vec<_>>().join(" ")
         };
-        let title = if applied { format!("Copiado de {from}") } else { format!("Recebido de {from}") };
+        let title = trf(if applied { "notify.copied_from" } else { "notify.received_from" }, &[("from", &from)]);
         show(app, Toast::new(&app_id(app)).title(&title).text1(&preview));
     }
 }
@@ -129,7 +132,7 @@ pub use imp::{ask, file_received, text_received};
 #[cfg(target_os = "android")]
 pub fn file_received(app: &AppHandle, rec: &TransferRecord) {
     let Some(uri) = rec.final_path.as_deref() else { return };
-    let title = format!("Arquivo recebido de {}", device_name(app, &rec.device_id));
+    let title = trf("notify.file_from", &[("from", &device_name(app, &rec.device_id))]);
     let text = format!("{} · {} · Downloads/ClipSync", rec.safe_name, size(rec.size));
     if let Err(e) = crate::transfer::android::notify_received(&rec.id, &title, &text, uri, rec.mime.as_deref()) {
         log::warn!("[NOTIFY] aviso de recebido falhou id={}: {e}", rec.id);

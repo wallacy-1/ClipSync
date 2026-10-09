@@ -27,6 +27,8 @@ const settings: Settings = {
   fileAutoAcceptMb: 100,
   notifications: true,
   notifyText: false,
+  keepFormatting: true,
+  checkUpdates: true,
   keepAlive: false,
   autostartInitialized: true,
   typesRev: 1,
@@ -36,6 +38,9 @@ const settings: Settings = {
   hideSensitive: true,
   sensitiveExpireMinutes: 2,
   launchAtLogin: false,
+  theme: "system",
+  language: "auto",
+  languageResolved: "pt-BR",
   shortcuts: { openPanel: "Ctrl+Alt+Shift+V", pasteLast: "Ctrl+Alt+Shift+C", sendLast: "Ctrl+Alt+Shift+E", togglePause: "Ctrl+Alt+Shift+P" },
 };
 
@@ -72,12 +77,26 @@ const mk = (p: Partial<ClipboardItem> & { content: string; contentType: Clipboar
   ...p,
 });
 
+/** Imagens de mentira (SVG em data URL, pequeno) para `npm run dev` mostrar o item `image`. */
+const mockImage = (a: string, b: string, label: string) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${a}"/><stop offset="1" stop-color="${b}"/></linearGradient></defs><rect width="320" height="200" fill="url(#g)"/><circle cx="240" cy="64" r="26" fill="#ffffff" fill-opacity=".55"/><path d="M0 200 L110 96 L190 170 L240 120 L320 200 Z" fill="#000000" fill-opacity=".22"/><text x="14" y="28" font-family="sans-serif" font-size="16" fill="#fff">${label}</text></svg>`,
+  )}`;
+const MOCK_IMAGES: Record<string, string> = {};
+const mkImage = (id: string, w: number, h: number, bytes: number, a: string, b: string, label: string, p: Partial<ClipboardItem> = {}) => {
+  MOCK_IMAGES[id] = mockImage(a, b, label);
+  return mk({ id, content: `img:${id.padEnd(64, "0")}`, contentType: "image", metadata: { path: `C:/clip-images/${id}.png`, thumb: `C:/clip-images/${id}.thumb.png`, width: w, height: h, bytes, mime: "image/png" }, ...p });
+};
+
 let items: ClipboardItem[] = scenario === "empty" ? [] : [
+  mkImage("img-captura", 1920, 1080, 2_516_582, "#7a5cff", "#2fb5c8", "Captura de tela", { createdAt: now - 1 * min }),
   mk({ content: "docker compose up -d --build", contentType: "command", createdAt: now - 2 * min, isPinned: true }),
   mk({ content: "https://github.com/clipsync/core/pull/482", contentType: "link", sourceDeviceId: "pixel8", createdAt: now - 8 * min }),
   mk({ content: "const { data } = await db.from('devices').select('*')", contentType: "code", createdAt: now - 14 * min }),
   mk({ content: "sk_live_51NfQ2mB7xKpLd8vR", contentType: "token", sourceDeviceId: "notebook", createdAt: now - 21 * min, isSensitive: true, expiresAt: now + 2 * min }),
   mk({ content: "Rua Aurora 128, ap. 41 — Porto Alegre / RS", contentType: "text", sourceDeviceId: "pixel8", createdAt: now - 40 * min }),
+  mk({ content: "Reunião sexta: veja a pauta", contentType: "text", createdAt: now - 42 * min, metadata: { formatted: true } }),
+  mkImage("img-foto", 1080, 1440, 1_153_434, "#ff9a5c", "#c8456f", "Foto do celular", { sourceDeviceId: "pixel8", createdAt: now - 45 * min }),
   mk({ content: "ssh deploy@10.0.4.12 -p 2202", contentType: "command", createdAt: now - 60 * min }),
   mk({ content: "https://tauri.app/v2/guides/distribution", contentType: "link", createdAt: now - 120 * min }),
   mk({ content: "git rebase -i HEAD~4", contentType: "command", sourceDeviceId: "notebook", createdAt: now - 26 * 60 * min }),
@@ -183,7 +202,7 @@ function filterItems(query?: string, category?: string) {
   let out = items.slice();
   if (query?.trim()) {
     const q = query.trim().toLowerCase();
-    out = out.filter((i) => i.content.toLowerCase().includes(q) || i.contentType.includes(q));
+    out = out.filter((i) => (i.contentType !== "image" && i.content.toLowerCase().includes(q)) || i.contentType.includes(q));
   }
   switch (category) {
     case "pinned": out = out.filter((i) => i.isPinned); break;
@@ -191,6 +210,7 @@ function filterItems(query?: string, category?: string) {
     case "text": out = out.filter((i) => i.contentType === "text"); break;
     case "link": out = out.filter((i) => i.contentType === "link"); break;
     case "email": out = out.filter((i) => i.contentType === "email"); break;
+    case "image": out = out.filter((i) => i.contentType === "image"); break;
     case "code": out = out.filter((i) => i.contentType === "code" || i.contentType === "command"); break;
   }
   return out.sort((a, b) => Number(b.isPinned) - Number(a.isPinned) || b.createdAt - a.createdAt);
@@ -216,6 +236,9 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
       // No navegador não há Configurações do Android: simula o usuário ativando.
       ime = { ...ime, enabled: true, selected: cmd === "ime_show_picker" || ime.selected };
       return;
+    case "quick_add_tile":
+    case "quick_add_widget": return "unsupported";
+    case "set_system_bars": return;
     case "ime_set_theme": ime = { ...ime, theme: args.theme as string }; return ime;
     case "list_items": {
       const list = filterItems(args.query as string, args.category as string);
@@ -223,6 +246,8 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
     }
     case "latest_item": return filterItems()[0] ?? null;
     case "copy_item": return;
+    case "item_image": return MOCK_IMAGES[args.id as string] ?? "";
+    case "reveal_item_file": return;
     case "pin_item":
       items = items.map((i) => (i.id === args.id ? { ...i, isPinned: !!args.pinned } : i));
       return;
@@ -234,6 +259,13 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
       emit("clipboard:expired", { ids: [], cleared: true });
       return 0;
     case "reveal_item": return items.find((i) => i.id === args.id)?.content ?? "";
+    case "open_item": {
+      const it = items.find((i) => i.id === args.id);
+      if (it?.contentType === "link") window.open(/^www\./i.test(it.content) ? `https://${it.content}` : it.content, "_blank", "noopener");
+      else if (it?.contentType === "email") window.open(`mailto:${it.content}`, "_blank", "noopener");
+      else throw "Este item não tem link para abrir";
+      return;
+    }
     case "send_item": {
       const id = args.itemId as string;
       items = items.map((i) => (i.id === id ? { ...i, syncState: "sending" } : i));
@@ -247,8 +279,17 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
     case "retry_queue":
     case "sync_status": return sync;
     case "set_paused":
-      sync = { ...sync, paused: !!args.paused, pausedUntil: args.minutes ? now + (args.minutes as number) * min : null };
+      sync = { ...sync, paused: !!args.paused, pausedUntil: args.paused && args.minutes ? Date.now() + (args.minutes as number) * min : null };
       emit("sync:state", sync);
+      // Como o backend: ao vencer o prazo (se a pausa for a mesma), volta a sincronizar e avisa a UI.
+      if (sync.pausedUntil) {
+        const deadline = sync.pausedUntil;
+        setTimeout(() => {
+          if (sync.pausedUntil !== deadline) return;
+          sync = { ...sync, paused: false, pausedUntil: null };
+          emit("sync:state", sync);
+        }, Math.max(0, deadline - Date.now()));
+      }
       return sync;
     case "clipboard_poll_now": return null;
     case "get_settings": return settings;
@@ -267,10 +308,19 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
       emit("device:updated", devices);
       return devices;
     case "connect_device": return;
+    case "local_addresses": return ["192.168.0.10"];
+    case "set_device_address": {
+      if (!/^\d{1,3}(\.\d{1,3}){3}(:\d{1,5})?$/.test(String(args.addr).trim())) throw "Endereço inválido. Use algo como 192.168.0.10";
+      const addr = String(args.addr).trim();
+      devices = devices.map((d) => d.deviceId === args.deviceId ? { ...d, address: addr.includes(":") ? addr : `${addr}:47820` } : d);
+      emit("device:updated", devices);
+      return devices;
+    }
     case "start_pairing": {
       const info: PairingInfo = {
         pairingId: "abc123", code: "4K7-Q2M", startedAt: now, expiresAt: Date.now() + 161_000,
         qrSvg: fakeQr(), payload: JSON.stringify({ v: 1, pairingId: "abc123", deviceId: "estacao", name: "Estação-Dev", platform: "windows", publicKey: "aa", addrs: ["192.168.0.10"], port: 47820, code: "4K7-Q2M" }),
+        addrs: ["192.168.0.10"],
       };
       emit("pairing:started", info);
       return info;
@@ -281,6 +331,7 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
     case "pair_with_code": {
       await sleep(1200);
       const code = String(args.code ?? "").replace(/[^a-z0-9]/gi, "").toUpperCase();
+      if (cmd === "pair_with_code" && args.addr && !/^\d{1,3}(\.\d{1,3}){3}(:\d{1,5})?$/.test(String(args.addr).trim())) throw "Endereço inválido. Use algo como 192.168.0.10";
       if (cmd === "pair_with_code" && code !== "4K7Q2M") throw "código incorreto ou expirado";
       const id = { deviceId: "estacao", name: "Estação-Dev", platform: "windows", publicKey: "aa" };
       if (!devices.some((d) => d.deviceId === id.deviceId)) {
@@ -358,11 +409,15 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
       return null;
     }
     case "share_text": return items[0];
-    case "update_status": return null;
+    case "update_status":
+      // ?update=1 simula uma atualização já encontrada em segundo plano.
+      return params.get("update") ? { version: "1.1.0", currentVersion: "1.0.0", notes: null, url: "https://github.com/wallacy-1/ClipSync/releases/tag/v1.1.0" } : null;
     case "update_check":
       await sleep(600);
-      return { version: "1.1.0", currentVersion: "1.0.0", notes: null };
+      if (params.get("update") === "fail") throw new Error("rede indisponível");
+      return { version: "1.1.0", currentVersion: "1.0.0", notes: null, url: "https://github.com/wallacy-1/ClipSync/releases/tag/v1.1.0" };
     case "update_install": await sleep(1200); return;
+    case "update_open": await sleep(200); return;
     default:
       throw new Error(`mock: comando desconhecido ${cmd}`);
   }

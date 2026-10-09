@@ -48,9 +48,9 @@ pub struct SourceInfo {
 pub fn describe(src: &TransferSource) -> Result<SourceInfo> {
     match src {
         TransferSource::Path(p) => {
-            let meta = std::fs::metadata(p).map_err(|e| AppError::Other(format!("arquivo inacessível: {e}")))?;
+            let meta = std::fs::metadata(p).map_err(|e| AppError::Other(crate::i18n::trf("err.file_unreadable", &[("e", &e.to_string())])))?;
             if !meta.is_file() {
-                return Err(AppError::Other("não é um arquivo".into()));
+                return Err(AppError::Other(crate::i18n::tr("err.not_a_file").into()));
             }
             let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("arquivo").to_string();
             Ok(SourceInfo { name, size: meta.len(), mime: None })

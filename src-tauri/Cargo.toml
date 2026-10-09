@@ -35,12 +35,16 @@ sha2 = "0.10"
 hmac = "0.12"
 rand = "0.8"
 hex = "0.4"
+# Data URL das miniaturas de imagem enviadas à UI.
+base64 = "0.22"
 uuid = { version = "1", features = ["v4"] }
 zeroize = "1"
 
 # Descoberta na LAN
 mdns-sd = "0.13"
 local-ip-address = "0.6"
+# Listener IPv6 só-v6 (IPV6_V6ONLY) ao lado do IPv4; já vem como dependência transitiva.
+socket2 = "0.5"
 
 # QR Code de pareamento
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }

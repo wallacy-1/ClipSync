@@ -20,6 +20,7 @@
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
 # Classes chamadas do Rust por JNI (nome e assinaturas têm de sobreviver ao R8).
+-keep class app.clipsync.desktop.SystemBars { *; }
 -keep class app.clipsync.desktop.KeyGuard { *; }
 -keep class app.clipsync.desktop.ime.ImeBridge { *; }
 -keep class app.clipsync.desktop.ime.CoreBridge { *; }
@@ -31,3 +32,6 @@
 -keep class app.clipsync.desktop.transfer.NotifyPermission { *; }
 -keep class app.clipsync.desktop.transfer.ReceivedNotifier { *; }
 -keep class app.clipsync.desktop.keepalive.KeepAliveService { *; }
+-keep class app.clipsync.desktop.quick.StatusStore { *; }
+-keep class app.clipsync.desktop.quick.QuickAdd { *; }
+-keep class app.clipsync.desktop.update.UpdateBridge { *; }

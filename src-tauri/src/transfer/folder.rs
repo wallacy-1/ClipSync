@@ -20,7 +20,7 @@ pub fn prepare(app: &AppHandle, path: &str) -> Result<String> {
     if !src.is_dir() {
         return Ok(path.to_string());
     }
-    let name = src.file_name().and_then(|n| n.to_str()).filter(|n| !n.is_empty()).unwrap_or("pasta");
+    let name = src.file_name().and_then(|n| n.to_str()).filter(|n| !n.is_empty()).unwrap_or_else(|| crate::i18n::tr("file.folder"));
     let dir = root(app).join(uuid::Uuid::new_v4().simple().to_string());
     std::fs::create_dir_all(&dir)?;
     let out = dir.join(format!("{name}.zip"));
@@ -121,7 +121,7 @@ fn zip_time(meta: &std::fs::Metadata) -> Option<zip::DateTime> {
 
 #[cfg(any(target_os = "android", target_os = "ios"))]
 fn zip_dir(_src: &Path, _name: &str, _out: &Path) -> Result<()> {
-    Err(AppError::Other("envio de pasta indisponível nesta plataforma".into()))
+    Err(AppError::Other(crate::i18n::tr("err.folder_unavailable").into()))
 }
 
 #[cfg(all(test, not(any(target_os = "android", target_os = "ios"))))]

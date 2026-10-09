@@ -1,7 +1,7 @@
 //! `ClipboardProvider`: abstração sobre o clipboard nativo. A UI nunca fala com
 //! APIs de plataforma; recebe só `clipboard.changed` / `clipboard.received` /
 //! `clipboard.expired`.
-use crate::content;
+use crate::content::{self, ContentType};
 use crate::db::content_hash;
 use crate::error::Result;
 use crate::events;
@@ -15,6 +15,7 @@ pub mod dedupe;
 #[cfg(windows)]
 pub mod files;
 pub mod image;
+pub mod rich;
 
 #[cfg(any(target_os = "android", target_os = "ios"))]
 pub mod android;
@@ -24,6 +25,14 @@ pub mod windows;
 pub trait ClipboardProvider: Send + Sync {
     fn read_text(&self) -> Result<Option<String>>;
     fn write_text(&self, text: &str) -> Result<()>;
+    /// HTML do clipboard atual (formato rico junto do texto); `None` onde a plataforma não lê.
+    fn read_html(&self) -> Result<Option<String>> {
+        Ok(None)
+    }
+    /// Texto + HTML numa escrita só; o padrão ignora o HTML.
+    fn write_rich(&self, text: &str, _html: &str) -> Result<()> {
+        self.write_text(text)
+    }
     /// Dica barata de "mudou desde a última vez?" — quando a plataforma não
     /// oferece, devolve `true` e o watcher compara por hash.
     fn changed_hint(&self) -> bool {
@@ -49,7 +58,7 @@ pub fn provider(app: &AppHandle) -> Box<dyn ClipboardProvider> {
     }
 }
 
-const MAX_TEXT_BYTES: usize = 1024 * 1024;
+pub const MAX_TEXT_BYTES: usize = 1024 * 1024;
 
 /// De onde veio um conteúdo de clipboard. Só para log/diagnóstico: o
 /// tratamento é o mesmo para todas as origens.
@@ -77,7 +86,8 @@ impl ClipOrigin {
 /// Ponto único de entrada de clipboard local, para qualquer origem: anti-loop,
 /// dedupe, classificação, SQLite, evento e sync. Retorna o item salvo, se
 /// virou histórico (`None` = ignorado ou inválido, nunca erro).
-pub fn handle_text(app: &AppHandle, text: String, excluded_by_source: bool, origin: ClipOrigin) -> Option<ClipboardItem> {
+/// `html` é o formato rico lido junto do texto (só com "Manter formatação" ligado); o IME passa `None`.
+pub fn handle_text(app: &AppHandle, text: String, html: Option<String>, excluded_by_source: bool, origin: ClipOrigin) -> Option<ClipboardItem> {
     let state = app.state::<AppState>();
     if text.trim().is_empty() || text.len() > MAX_TEXT_BYTES {
         return None;
@@ -99,7 +109,7 @@ pub fn handle_text(app: &AppHandle, text: String, excluded_by_source: bool, orig
         log::debug!("cópia marcada como sensível pela origem; ignorada");
         return None;
     }
-    let item = new_item(&state, text);
+    let item = new_item(&state, text, html);
     if !state.db.insert_item(&item).unwrap_or(false) {
         return None;
     }
@@ -113,14 +123,15 @@ pub fn handle_text(app: &AppHandle, text: String, excluded_by_source: bool, orig
         &hash[..8]
     );
     let _ = state.db.dedupe_content(&hash, &item.id);
-    events::emit(app, events::CLIPBOARD_CHANGED, &item);
+    events::emit(app, events::CLIPBOARD_CHANGED, &rich::for_ui(&item));
     sync::on_local_clip(app, &item);
     Some(item)
 }
 
-fn new_item(state: &AppState, text: String) -> ClipboardItem {
+fn new_item(state: &AppState, text: String, html: Option<String>) -> ClipboardItem {
     let settings = state.settings();
     let cls = content::classify(&text);
+    let html = rich::usable_local(html.filter(|_| settings.keep_formatting), cls.is_sensitive);
     let created_at = now_ms();
     ClipboardItem {
         id: uuid::Uuid::new_v4().to_string(),
@@ -132,18 +143,26 @@ fn new_item(state: &AppState, text: String) -> ClipboardItem {
         is_pinned: false,
         is_sensitive: cls.is_sensitive,
         sync_state: SyncState::Local,
-        metadata: serde_json::json!({}),
+        metadata: match html {
+            Some(h) => serde_json::json!({ "html": h }),
+            None => serde_json::json!({}),
+        },
     }
 }
 
 /// Texto compartilhado por outro app ("Compartilhar → ClipSync"): pedido explícito do
 /// usuário, então sem dedupe nem regras automáticas — vira histórico e o chamador envia.
-pub fn ingest_shared_text(app: &AppHandle, text: String) -> Result<ClipboardItem> {
+/// `sensitive` = a origem marcou o conteúdo como sensível (clipboard do Android 13+): vale mesmo que a classificação não pegue.
+pub fn ingest_shared_text(app: &AppHandle, text: String, sensitive: bool) -> Result<ClipboardItem> {
     if text.trim().is_empty() || text.len() > MAX_TEXT_BYTES {
-        return Err(crate::error::AppError::Other("texto vazio ou grande demais".into()));
+        return Err(crate::error::AppError::Other(crate::i18n::tr("err.text_too_big").into()));
     }
     let state = app.state::<AppState>();
-    let item = new_item(&state, text);
+    let mut item = new_item(&state, text, None);
+    if sensitive && !item.is_sensitive {
+        item.is_sensitive = true;
+        item.expires_at = sync::expiry_for(&state.settings(), true, item.created_at);
+    }
     state.db.insert_item(&item)?;
     let _ = state.db.dedupe_content(&content_hash(&item.content), &item.id);
     log::info!("[CLIPBOARD] Shared text id={} type={} bytes={}", item.id, item.content_type.as_str(), item.content.len());
@@ -153,12 +172,31 @@ pub fn ingest_shared_text(app: &AppHandle, text: String) -> Result<ClipboardItem
 
 /// Escreve no clipboard local marcando o hash para o watcher **e o IME**
 /// ignorarem o eco (anti-loop). Toda escrita local de conteúdo remoto passa aqui.
-pub fn write_local(app: &AppHandle, text: &str) -> Result<()> {
+/// Com `html` (e "Manter formatação" ligado) escreve texto + HTML; o HTML é sanitizado aqui, o ponto
+/// único de escrita, e na dúvida (ou falha da escrita rica) vai só o texto.
+pub fn write_local(app: &AppHandle, text: &str, html: Option<&str>) -> Result<()> {
     let state = app.state::<AppState>();
     let hash = content_hash(text);
-    log::info!("[CLIPBOARD] Writing to system clipboard bytes={} hash={}", text.len(), &hash[..8]);
+    let html = html.filter(|_| state.settings().keep_formatting).and_then(rich::sanitize_html);
+    log::info!("[CLIPBOARD] Writing to system clipboard bytes={} hash={} html={}", text.len(), &hash[..8], html.is_some());
     state.clip_dedupe.lock().unwrap().note_written(&hash);
-    provider(app).write_text(text)
+    let prov = provider(app);
+    if let Some(h) = html {
+        match prov.write_rich(text, &h) {
+            Ok(()) => return Ok(()),
+            Err(e) => log::warn!("[CLIPBOARD] escrita rica falhou, só texto: {e}"),
+        }
+    }
+    prov.write_text(text)
+}
+
+/// "Copiar" de um item do histórico: texto pelo `write_local`; imagem, pelo caminho de imagem
+/// (decodifica o PNG: chamar fora da thread principal).
+pub fn copy_item(app: &AppHandle, item: &ClipboardItem) -> Result<()> {
+    if item.content_type == ContentType::Image {
+        return image::copy_item(app, item);
+    }
+    write_local(app, &item.content, rich::html_of(item))
 }
 
 /// Leitura por polling (watcher e `clipboard_poll_now`): só processa se o hash
@@ -179,7 +217,8 @@ pub fn poll_once(app: &AppHandle, prov: &dyn ClipboardProvider) -> Option<Clipbo
     if !changed {
         return None;
     }
-    handle_text(app, text, prov.is_excluded_by_source(), ClipOrigin::Poll)
+    let html = if app.state::<AppState>().settings().keep_formatting { prov.read_html().ok().flatten() } else { None };
+    handle_text(app, text, html, prov.is_excluded_by_source(), ClipOrigin::Poll)
 }
 
 pub fn spawn_watcher(app: AppHandle) {

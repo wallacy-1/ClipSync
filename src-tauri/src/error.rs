@@ -2,15 +2,15 @@ use serde::Serialize;
 
 #[derive(Debug, thiserror::Error)]
 pub enum AppError {
-    #[error("banco de dados: {0}")]
+    #[error("{}: {}", crate::i18n::tr("err.db"), .0)]
     Db(#[from] rusqlite::Error),
-    #[error("io: {0}")]
+    #[error("{}: {}", crate::i18n::tr("err.io"), .0)]
     Io(#[from] std::io::Error),
-    #[error("criptografia: {0}")]
+    #[error("{}: {}", crate::i18n::tr("err.crypto"), .0)]
     Crypto(String),
-    #[error("rede: {0}")]
+    #[error("{}: {}", crate::i18n::tr("err.net"), .0)]
     Net(String),
-    #[error("pareamento: {0}")]
+    #[error("{}: {}", crate::i18n::tr("err.pairing"), .0)]
     Pairing(String),
     #[error("{0}")]
     Other(String),

@@ -17,6 +17,7 @@ class MainActivity : TauriActivity() {
   override fun onCreate(savedInstanceState: Bundle?) {
     enableEdgeToEdge()
     super.onCreate(savedInstanceState)
+    SystemBars.attach(this)
     val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
     multicastLock = wifi?.createMulticastLock("clipsync-mdns")?.apply {
       setReferenceCounted(false)
@@ -37,6 +38,7 @@ class MainActivity : TauriActivity() {
   // Transferência ativa sem FGS (start recusado em segundo plano): agora pode subir.
   override fun onResume() {
     super.onResume()
+    SystemBars.attach(this)
     TransferBridge.onActivityResumed()
     CoreBridge.wake()
   }

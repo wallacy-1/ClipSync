@@ -76,6 +76,15 @@ pub struct PairingPayload {
     pub secret: String,
 }
 
+/// Máximo de endereços no QR: cada IPv6 pesa ~40 bytes no JSON e o QR precisa continuar legível.
+pub const QR_MAX_ADDRS: usize = 4;
+
+/// Endereços que vão no QR: IPv4 primeiro (peer antigo só fala v4), depois IPv6, no máximo [`QR_MAX_ADDRS`].
+pub fn qr_addrs(addrs: &[IpAddr]) -> Vec<IpAddr> {
+    let (v4, v6): (Vec<IpAddr>, Vec<IpAddr>) = addrs.iter().copied().partition(|a| a.is_ipv4());
+    v4.into_iter().chain(v6).take(QR_MAX_ADDRS).collect()
+}
+
 pub fn generate_code() -> String {
     let mut rng = rand::thread_rng();
     let pick = |rng: &mut rand::rngs::ThreadRng| ALPHABET[rng.gen_range(0..ALPHABET.len())] as char;
@@ -172,14 +181,14 @@ pub fn parse_payload(raw: &str) -> Result<PairingPayload> {
     struct Version {
         v: u32,
     }
-    let v = serde_json::from_str::<Version>(raw.trim()).map_err(|_| AppError::Pairing("QR Code não é do ClipSync".into()))?.v;
+    let v = serde_json::from_str::<Version>(raw.trim()).map_err(|_| AppError::Pairing(crate::i18n::tr("err.qr_not_clipsync").into()))?.v;
     if v != PAYLOAD_VERSION {
-        return Err(AppError::Pairing("QR de outra versão do ClipSync; atualize os dois dispositivos".into()));
+        return Err(AppError::Pairing(crate::i18n::tr("err.qr_other_version").into()));
     }
     let p: PairingPayload =
-        serde_json::from_str(raw.trim()).map_err(|_| AppError::Pairing("QR Code não é do ClipSync".into()))?;
+        serde_json::from_str(raw.trim()).map_err(|_| AppError::Pairing(crate::i18n::tr("err.qr_not_clipsync").into()))?;
     if p.secret.len() != 64 || hex::decode(&p.secret).is_err() {
-        return Err(AppError::Pairing("QR Code inválido".into()));
+        return Err(AppError::Pairing(crate::i18n::tr("err.qr_invalid").into()));
     }
     Ok(p)
 }
@@ -209,6 +218,30 @@ mod tests {
         assert_ne!(a.unwrap(), b.unwrap());
         let (a, b) = run((PairAuth::Qr, b"ABC-DEF"), (PairAuth::Code, b"ABC-DEF"));
         assert_ne!(a.unwrap(), b.unwrap());
+    }
+
+    #[test]
+    fn qr_limits_addrs_v4_first_and_stays_encodable() {
+        let many: Vec<IpAddr> = ["2001:db8:aaaa:bbbb:cccc:dddd:eeee:1", "fd12:3456:789a:1::2", "192.168.0.5", "10.0.0.2", "172.16.0.9", "2001:db8::7"]
+            .iter()
+            .map(|s| s.parse().unwrap())
+            .collect();
+        let q = qr_addrs(&many);
+        assert_eq!(q.len(), QR_MAX_ADDRS);
+        assert!(q[..3].iter().all(|a| a.is_ipv4()) && q[3].is_ipv6());
+        let s = PairingSession::new();
+        let p = PairingPayload {
+            v: PAYLOAD_VERSION,
+            pairing_id: s.id.clone(),
+            device_id: uuid::Uuid::new_v4().to_string(),
+            name: "Computador do escritório".into(),
+            platform: "windows".into(),
+            public_key: "ab".repeat(32),
+            addrs: q,
+            port: 47820,
+            secret: s.secret.clone(),
+        };
+        assert!(qr_svg(&p).is_ok());
     }
 
     #[test]

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useT, type Key } from "../i18n";
 import { api, startDragging } from "../lib/ipc";
 import { shortTime } from "../lib/format";
 import { usePeers, useApp, type View } from "../store/app";
@@ -13,15 +14,16 @@ import { SettingsView } from "./SettingsView";
 import { CopiedFilesOffer } from "./CopiedFilesOffer";
 import { AskPrompt } from "../components/AskPrompt";
 
-const NAV: { id: View; label: string; hint?: string; Icon: typeof Clipboard }[] = [
-  { id: "history", label: "Histórico", hint: "Ctrl+1", Icon: Clipboard },
-  { id: "pinned", label: "Fixados", Icon: Pin },
-  { id: "devices", label: "Dispositivos", hint: "Ctrl+2", Icon: Monitor },
-  { id: "transfers", label: "Transferências", hint: "Ctrl+3", Icon: Transfers },
-  { id: "settings", label: "Configurações", hint: "Ctrl+4", Icon: Sliders },
+const NAV: { id: View; label: Key; hint?: string; Icon: typeof Clipboard }[] = [
+  { id: "history", label: "nav.history", hint: "Ctrl+1", Icon: Clipboard },
+  { id: "pinned", label: "nav.pinned", Icon: Pin },
+  { id: "devices", label: "nav.devices", hint: "Ctrl+2", Icon: Monitor },
+  { id: "transfers", label: "nav.transfers", hint: "Ctrl+3", Icon: Transfers },
+  { id: "settings", label: "nav.settings", hint: "Ctrl+4", Icon: Sliders },
 ];
 
 export function WinShell() {
+  const t = useT();
   const view = useApp((s) => s.view);
   const setView = useApp((s) => s.setView);
   const me = useApp((s) => s.me);
@@ -44,12 +46,12 @@ export function WinShell() {
 
   const connected = peers.filter((d) => d.state === "connected").length;
   const statusLabel = sync.paused
-    ? "Sync pausado"
+    ? t("nav.statusPaused")
     : !sync.online
-      ? "Iniciando rede…"
+      ? t("nav.statusStarting")
       : sync.queuedCount > 0 && connected === 0
-        ? "Reconectando…"
-        : `Sincronizado · ${peers.length + 1} disp.`;
+        ? t("nav.statusReconnecting")
+        : t("nav.statusSynced", { n: peers.length + 1 });
   // Sem nenhum pareado não há o que sincronizar; o status só confundiria.
   const showStatus = peers.length > 0 || sync.paused;
   const panelShortcut = useApp((s) => s.settings?.shortcuts.openPanel);
@@ -63,13 +65,13 @@ export function WinShell() {
         <span className="subtitle">— {me?.name}</span>
         <div className="grow" />
         <div className="row-flex">
-          <button className="tb-btn" title="Minimizar" onClick={() => api.windowAction("minimize")}>
+          <button className="tb-btn" title={t("nav.minimize")} onClick={() => api.windowAction("minimize")}>
             <svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" strokeWidth="1.2"><path d="M1 6h10" /></svg>
           </button>
-          <button className="tb-btn" title="Maximizar" onClick={() => api.windowAction("toggle_maximize")}>
+          <button className="tb-btn" title={t("nav.maximize")} onClick={() => api.windowAction("toggle_maximize")}>
             <svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" strokeWidth="1.2" fill="none"><rect x="1.5" y="1.5" width="9" height="9" /></svg>
           </button>
-          <button className="tb-btn close" title="Fechar (continua na bandeja)" onClick={() => api.windowAction("close")}>
+          <button className="tb-btn close" title={t("nav.close")} onClick={() => api.windowAction("close")}>
             <svg width="12" height="12" viewBox="0 0 12 12" stroke="currentColor" strokeWidth="1.2"><path d="M1.5 1.5l9 9M10.5 1.5l-9 9" /></svg>
           </button>
         </div>
@@ -80,24 +82,24 @@ export function WinShell() {
           {NAV.map(({ id, label, hint, Icon }) => (
             <button key={id} className={`nav-item${view === id ? " active" : ""}`} onClick={() => setView(id)}>
               <Icon size={17} />
-              {label}
+              {t(label)}
               <span className="hint">{id === "pinned" ? pinned : hint}</span>
             </button>
           ))}
 
-          <div className="section-title">Dispositivos</div>
+          <div className="section-title">{t("nav.devices")}</div>
           {me && (
             <div className="side-dev">
               <span className="dot online" />
               <span className="name">{me.name}</span>
-              <span className="when">este PC</span>
+              <span className="when">{t("nav.thisPc")}</span>
             </div>
           )}
           {peers.map((d) => (
             <div className="side-dev" key={d.deviceId}>
               <Dot device={d} />
               <span className="name">{d.name}</span>
-              <span className="when">{d.state === "connected" ? "agora" : d.state === "connecting" ? "…" : d.lastSeen ? shortTime(d.lastSeen, now) : "offline"}</span>
+              <span className="when">{d.state === "connected" ? t("time.now") : d.state === "connecting" ? "…" : d.lastSeen ? shortTime(d.lastSeen, now) : t("device.offlineLower")}</span>
             </div>
           ))}
 
@@ -109,7 +111,7 @@ export function WinShell() {
                 <span className="label">{statusLabel}</span>
               </div>
             )}
-            {panelShortcut && <span className="hint">Painel rápido · {panelShortcut}</span>}
+            {panelShortcut && <span className="hint">{t("nav.quickPanel", { key: panelShortcut })}</span>}
           </div>
         </nav>
 

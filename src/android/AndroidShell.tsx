@@ -3,6 +3,7 @@ import { Clipboard, Clock, Monitor, Sliders, Transfers } from "../components/Ico
 import { NetworkWarning } from "../components/NetworkWarning";
 import { PairPrompts } from "../components/PairPrompts";
 import { Toast } from "../components/ui";
+import { useT } from "../i18n";
 import { api, inTauri } from "../lib/ipc";
 import { useApp } from "../store/app";
 import { HomeView } from "./HomeView";
@@ -20,6 +21,7 @@ import { KeyboardPrompt } from "./KeyboardPrompt";
 export type Tab = "home" | "history" | "transfers" | "devices" | "settings";
 
 export function AndroidShell() {
+  const t = useT();
   const onboarded = useApp((s) => s.onboarded);
   const platform = useApp((s) => s.platform);
   const keyboardPromptSeen = useApp((s) => s.keyboardPromptSeen);
@@ -35,6 +37,8 @@ export function AndroidShell() {
     const onVis = () => {
       if (document.visibilityState !== "visible") return;
       if (inTauri) void api.clipboardPollNow();
+      // Uma pausa pode ter vencido com o processo congelado, sem o evento chegar.
+      void api.syncStatus().then((sync) => useApp.setState({ sync })).catch(() => {});
       void useApp.getState().refreshNotifyPerm();
     };
     document.addEventListener("visibilitychange", onVis);
@@ -88,11 +92,11 @@ export function AndroidShell() {
       {tab === "settings" && <SettingsView key={settingsSub ?? "root"} initialSub={settingsSub} />}
 
       <nav className="and-tabs">
-        <TabBtn active={tab === "home"} onClick={() => setTab("home")} label="Início" Icon={Clipboard} />
-        <TabBtn active={tab === "history"} onClick={() => setTab("history")} label="Histórico" Icon={Clock} />
-        <TabBtn active={tab === "transfers"} onClick={() => setTab("transfers")} label="Arquivos" Icon={Transfers} />
-        <TabBtn active={tab === "devices"} onClick={() => setTab("devices")} label="Dispositivos" Icon={Monitor} />
-        <TabBtn active={tab === "settings"} onClick={() => { setSettingsSub(null); setTab("settings"); }} label="Ajustes" Icon={Sliders} />
+        <TabBtn active={tab === "home"} onClick={() => setTab("home")} label={t("android.tab.home")} Icon={Clipboard} />
+        <TabBtn active={tab === "history"} onClick={() => setTab("history")} label={t("android.tab.history")} Icon={Clock} />
+        <TabBtn active={tab === "transfers"} onClick={() => setTab("transfers")} label={t("android.tab.files")} Icon={Transfers} />
+        <TabBtn active={tab === "devices"} onClick={() => setTab("devices")} label={t("android.tab.devices")} Icon={Monitor} />
+        <TabBtn active={tab === "settings"} onClick={() => { setSettingsSub(null); setTab("settings"); }} label={t("android.tab.settings")} Icon={Sliders} />
       </nav>
 
       {sendId && <SendSheet itemId={sendId} onClose={() => setSendId(null)} />}

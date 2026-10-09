@@ -1,4 +1,5 @@
 // Fora do Tauri (npm run dev no navegador) cai num mock em memória.
+import { t } from "../i18n";
 import type {
   Bootstrap,
   ClipboardItem,
@@ -77,10 +78,14 @@ export const api = {
     call<ItemsPage>("list_items", { query, category, limit }),
   latestItem: () => call<ClipboardItem | null>("latest_item"),
   copyItem: (id: string) => call<void>("copy_item", { id }),
+  /** Data URL da miniatura de um item `image` (ou, com `full`, da imagem inteira se for pequena). */
+  itemImage: (id: string, full: boolean) => call<string>("item_image", { id, full }),
+  revealItemFile: (id: string) => call<void>("reveal_item_file", { id }),
   pinItem: (id: string, pinned: boolean) => call<void>("pin_item", { id, pinned }),
   deleteItem: (id: string) => call<void>("delete_item", { id }),
   clearHistory: (keepPinned: boolean) => call<number>("clear_history", { keepPinned }),
   revealItem: (id: string) => call<string>("reveal_item", { id }),
+  openItem: (id: string) => call<void>("open_item", { id }),
   sendItem: (itemId: string, deviceIds: string[]) => call<void>("send_item", { itemId, deviceIds }),
   retryQueue: () => call<SyncStatus>("retry_queue"),
   syncStatus: () => call<SyncStatus>("sync_status"),
@@ -93,18 +98,24 @@ export const api = {
   listDevices: () => call<Device[]>("list_devices"),
   setDeviceFlags: (deviceId: string, flags: { autoSend?: boolean; autoReceive?: boolean; blocked?: boolean }) =>
     call<Device[]>("set_device_flags", { deviceId, ...flags }),
+  setDeviceAddress: (deviceId: string, addr: string) => call<Device[]>("set_device_address", { deviceId, addr }),
+  localAddresses: () => call<string[]>("local_addresses"),
   removeDevice: (deviceId: string) => call<Device[]>("remove_device", { deviceId }),
   connectDevice: (deviceId: string) => call<void>("connect_device", { deviceId }),
   startPairing: () => call<PairingInfo>("start_pairing"),
   cancelPairing: () => call<void>("cancel_pairing"),
   pairWithPayload: (raw: string) => call<DeviceIdentity>("pair_with_payload", { raw }),
-  pairWithCode: (code: string, deviceId?: string) => call<DeviceIdentity>("pair_with_code", { code, deviceId }),
+  pairWithCode: (code: string, deviceId?: string, addr?: string) => call<DeviceIdentity>("pair_with_code", { code, deviceId, addr }),
   requestPairing: (deviceId: string) => call<void>("request_pairing", { deviceId }),
   windowAction: (action: string) => call<void>("window_action", { action }),
   quit: () => call<void>("quit"),
   imeStatus: () => call<ImeStatus>("ime_status"),
   imeOpenSettings: () => call<void>("ime_open_settings"),
   imeShowPicker: () => call<void>("ime_show_picker"),
+  /** Bloco de Ajustes rápidos / widget (Android): `requested` = o sistema mostrou o pedido; `unsupported` = adicionar à mão. */
+  quickAddTile: () => call<"requested" | "unsupported">("quick_add_tile"),
+  quickAddWidget: () => call<"requested" | "unsupported">("quick_add_widget"),
+  setSystemBars: (dark: boolean) => call<void>("set_system_bars", { dark }),
   imeSetTheme: (theme: string) => call<ImeStatus>("ime_set_theme", { theme }),
   transferList: (limit?: number) => call<TransferRecord[]>("transfer_list", { limit }),
   transferSend: (deviceId: string, path: string) => call<TransferRecord>("transfer_send", { deviceId, path }),
@@ -126,6 +137,7 @@ export const api = {
   updateStatus: () => call<UpdateInfo | null>("update_status"),
   updateCheck: () => call<UpdateInfo | null>("update_check"),
   updateInstall: () => call<void>("update_install"),
+  updateOpen: () => call<void>("update_open"),
 };
 
 /** Abre a câmera e devolve o conteúdo do QR (só Android/iOS). */
@@ -137,7 +149,7 @@ export async function scanQr(): Promise<string | null> {
   const scanner = await import("@tauri-apps/plugin-barcode-scanner");
   let perm = await scanner.checkPermissions();
   if (perm !== "granted") perm = await scanner.requestPermissions();
-  if (perm !== "granted") throw new Error("Permissão de câmera negada");
+  if (perm !== "granted") throw new Error(t("android.camera.denied"));
   const res = await scanner.scan({ windowed: true, formats: [scanner.Format.QRCode] });
   return res?.content ?? null;
 }

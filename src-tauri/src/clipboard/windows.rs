@@ -50,6 +50,19 @@ impl ClipboardProvider for WindowsClipboard {
     }
 
     #[cfg(windows)]
+    fn read_html(&self) -> Result<Option<String>> {
+        // O plugin só fala texto; o CF_HTML sai pelo `arboard` (sem HTML = erro, vira `None`).
+        Ok(arboard::Clipboard::new().ok().and_then(|mut cb| cb.get().html().ok()))
+    }
+
+    #[cfg(windows)]
+    fn write_rich(&self, text: &str, html: &str) -> Result<()> {
+        // CF_HTML + texto numa operação só.
+        let mut cb = arboard::Clipboard::new().map_err(|e| AppError::Other(e.to_string()))?;
+        cb.set_html(html, Some(text)).map_err(|e| AppError::Other(e.to_string()))
+    }
+
+    #[cfg(windows)]
     fn changed_hint(&self) -> bool {
         let seq = sequence_number();
         self.last_seq.swap(seq, Ordering::Relaxed) != seq

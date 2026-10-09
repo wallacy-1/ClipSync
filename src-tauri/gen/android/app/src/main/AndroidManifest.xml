@@ -48,6 +48,50 @@
             </intent-filter>
         </activity>
 
+        <!-- Bloco, widget e "Selecionar texto → ClipSync": Activity invisível que lê o clipboard e fecha.
+             Exportada só por causa do PROCESS_TEXT; SEND_CLIPBOARD/COPY_LATEST exigem o token do app no Intent. -->
+        <activity
+            android:name=".quick.ClipSendActivity"
+            android:exported="true"
+            android:theme="@style/Theme.ClipSend"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:launchMode="singleInstance"
+            android:label="@string/process_text_label">
+            <intent-filter>
+                <action android:name="android.intent.action.PROCESS_TEXT" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".quick.SendTileService"
+            android:exported="true"
+            android:icon="@drawable/ic_stat_clipsync"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.quicksettings.ACTIVE_TILE"
+                android:value="false" />
+        </service>
+
+        <receiver
+            android:name=".quick.ClipWidgetProvider"
+            android:exported="false"
+            android:label="@string/widget_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/clip_widget_info" />
+        </receiver>
+
         <!-- ClipSync Keyboard: IME opcional. Só roda se o usuário ativar e selecionar
              em Configurações do Android; o app nunca faz isso sozinho. -->
         <service

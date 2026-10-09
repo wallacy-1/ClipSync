@@ -1,5 +1,6 @@
 // Nunca ativa nem troca o teclado sozinho: só mostra o estado do IME e leva às telas do sistema.
 import { useEffect } from "react";
+import { useT, type Key } from "../i18n";
 import { Back, Check, Keyboard as KeyboardIcon } from "../components/Icons";
 import { useApp } from "../store/app";
 
@@ -11,6 +12,7 @@ export function imeState(ime: { enabled: boolean; selected: boolean } | null): I
 }
 
 export function KeyboardView({ onBack }: { onBack: () => void }) {
+  const t = useT();
   const ime = useApp((s) => s.ime);
   const refreshIme = useApp((s) => s.refreshIme);
   const setImeTheme = useApp((s) => s.setImeTheme);
@@ -30,8 +32,8 @@ export function KeyboardView({ onBack }: { onBack: () => void }) {
   return (
     <>
       <div className="and-head" style={{ padding: "16px 18px 14px" }}>
-        <button className="icon-btn lg" style={{ marginLeft: -10 }} onClick={onBack} aria-label="Voltar"><Back size={22} /></button>
-        <span className="page-title">Teclado</span>
+        <button className="icon-btn lg" style={{ marginLeft: -10 }} onClick={onBack} aria-label={t("android.back")}><Back size={22} /></button>
+        <span className="page-title">{t("android.keyboard.title")}</span>
       </div>
       <div className="and-scroll">
         <div className="and-settings">
@@ -39,65 +41,63 @@ export function KeyboardView({ onBack }: { onBack: () => void }) {
             <div className="kb-status-icon"><KeyboardIcon size={26} /></div>
             <div className="kb-status-body">
               <div className="kb-status-title">ClipSync Keyboard</div>
-              {state === "active" && <div className="kb-status-line ok"><Check size={14} /> Ativo</div>}
-              {state === "enabled" && <div className="kb-status-line warn">⚠ Instalado, mas não selecionado</div>}
-              {state === "off" && <div className="kb-status-line">○ Desativado</div>}
+              {state === "active" && <div className="kb-status-line ok"><Check size={14} /> {t("android.keyboard.active")}</div>}
+              {state === "enabled" && <div className="kb-status-line warn">{t("android.keyboard.enabledWarn")}</div>}
+              {state === "off" && <div className="kb-status-line">{t("android.keyboard.off")}</div>}
               <p className="kb-status-help">
-                {state === "active" && "Você está usando o ClipSync Keyboard. Ele funciona como um teclado normal."}
-                {state === "enabled" && "O teclado está habilitado no Android, mas outro teclado continua selecionado. Escolha o ClipSync Keyboard para usá-lo."}
-                {state === "off" && "Você não precisa usar o ClipSync Keyboard. Se quiser, ative-o nas configurações de teclado do Android."}
+                {state === "active" && t("android.keyboard.helpActive")}
+                {state === "enabled" && t("android.keyboard.helpEnabled")}
+                {state === "off" && t("android.keyboard.helpOff")}
               </p>
             </div>
           </div>
 
           <div className="kb-actions">
             {state === "off" && (
-              <button className="btn btn-primary btn-block" onClick={() => void openImeSettings()}>Ativar ClipSync Keyboard</button>
+              <button className="btn btn-primary btn-block" onClick={() => void openImeSettings()}>{t("android.keyboard.enable")}</button>
             )}
             {state === "enabled" && (
               <>
-                <button className="btn btn-primary btn-block" onClick={() => void showImePicker()}>Selecionar ClipSync Keyboard</button>
-                <button className="btn btn-secondary btn-block" onClick={() => void openImeSettings()}>Configurações de teclado</button>
+                <button className="btn btn-primary btn-block" onClick={() => void showImePicker()}>{t("android.keyboard.select")}</button>
+                <button className="btn btn-secondary btn-block" onClick={() => void openImeSettings()}>{t("android.keyboard.settings")}</button>
               </>
             )}
             {state === "active" && (
-              <button className="btn btn-secondary btn-block" onClick={() => void openImeSettings()}>Configurações de teclado</button>
+              <button className="btn btn-secondary btn-block" onClick={() => void openImeSettings()}>{t("android.keyboard.settings")}</button>
             )}
-            <p className="kb-note">
-              A ativação é feita nas Configurações do Android. O ClipSync nunca troca o seu teclado sozinho.
-            </p>
+            <p className="kb-note">{t("android.keyboard.note")}</p>
           </div>
 
           <div>
-            <div className="section-title">Aparência</div>
+            <div className="section-title">{t("android.keyboard.appearance")}</div>
             <div className="group">
-              {(ime?.themes ?? []).map((t) => {
-                const on = ime?.theme === t.id;
+              {(ime?.themes ?? []).map((th) => {
+                const on = ime?.theme === th.id;
                 return (
-                  <button key={t.id} className={`kb-theme-row${on ? " on" : ""}`} onClick={() => void setImeTheme(t.id)}>
+                  <button key={th.id} className={`kb-theme-row${on ? " on" : ""}`} onClick={() => void setImeTheme(th.id)}>
                     <span className={`radio${on ? " on" : ""}`} />
-                    <span className="kb-theme-label">{t.label}</span>
-                    <span className="kb-theme-help">{THEME_HELP[t.id] ?? ""}</span>
+                    <span className="kb-theme-label">{th.id in THEME_KEYS ? t(THEME_KEYS[th.id].label) : th.label}</span>
+                    <span className="kb-theme-help">{th.id in THEME_KEYS ? t(THEME_KEYS[th.id].help) : ""}</span>
                   </button>
                 );
               })}
-              {!ime?.themes?.length && <div className="setting-row"><div className="info"><div className="help">Temas indisponíveis nesta plataforma.</div></div></div>}
+              {!ime?.themes?.length && <div className="setting-row"><div className="info"><div className="help">{t("android.keyboard.noThemes")}</div></div></div>}
             </div>
           </div>
 
           <div>
-            <div className="section-title">Privacidade</div>
+            <div className="section-title">{t("settings.privacy")}</div>
             <div className="group">
               <div className="setting-row">
                 <div className="info">
-                  <div className="label">O que o teclado faz</div>
-                  <div className="help">Digita no campo em que você está. Não registra, não guarda e não envia o que você digita — nem senhas.</div>
+                  <div className="label">{t("android.keyboard.doesTitle")}</div>
+                  <div className="help">{t("android.keyboard.doesBody")}</div>
                 </div>
               </div>
               <div className="setting-row">
                 <div className="info">
-                  <div className="label">Por que ele existe</div>
-                  <div className="help">Em versões futuras, com o teclado selecionado, o ClipSync poderá detectar cópias enquanto você usa outros aplicativos. Hoje ele é só um teclado.</div>
+                  <div className="label">{t("android.keyboard.whyTitle")}</div>
+                  <div className="help">{t("android.keyboard.whyBody")}</div>
                 </div>
               </div>
             </div>
@@ -108,7 +108,8 @@ export function KeyboardView({ onBack }: { onBack: () => void }) {
   );
 }
 
-const THEME_HELP: Record<string, string> = {
-  default: "Parece um teclado Android comum",
-  clipsync: "Cores e tipografia do ClipSync",
+/** Nome e ajuda dos temas conhecidos do teclado; tema desconhecido usa o `label` que o nativo mandou. */
+const THEME_KEYS: Record<string, { label: Key; help: Key }> = {
+  default: { label: "android.keyboard.themeDefault", help: "android.keyboard.themeDefaultHelp" },
+  clipsync: { label: "android.keyboard.themeClipsync", help: "android.keyboard.themeClipsyncHelp" },
 };

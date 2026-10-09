@@ -46,6 +46,7 @@ pub const SHARE_RECEIVED: &str = "share:received";
 pub const UPDATE_AVAILABLE: &str = "update:available";
 
 pub fn emit<P: Serialize + Clone>(app: &AppHandle, name: &str, payload: P) {
+    crate::quick::on_event(app, name);
     if let Err(e) = app.emit(name, payload) {
         log::warn!("falha ao emitir {name}: {e}");
     }

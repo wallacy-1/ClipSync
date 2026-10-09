@@ -676,6 +676,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "arboard",
+ "base64 0.22.1",
  "chacha20poly1305",
  "chrono",
  "env_logger",
@@ -697,6 +698,7 @@ dependencies = [
  "serde_json",
  "sha2",
  "snow",
+ "socket2 0.5.10",
  "spake2",
  "tauri",
  "tauri-build",

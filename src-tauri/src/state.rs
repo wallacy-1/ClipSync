@@ -45,7 +45,7 @@ pub struct AppState {
     pub keystore: Keystore,
     pub db: Db,
     pub settings: RwLock<Settings>,
-    /// `Some(0)` = pausado sem prazo; `Some(ts)` = até ts; `None` = ativo
+    /// `Some(0)` = pausado sem prazo; `Some(ts)` = até ts; `None` = ativo. Só em memória: reiniciar o app retoma.
     pub paused_until: Mutex<Option<i64>>,
     /// Anti-loop e dedupe do clipboard, compartilhado por watcher, poll e IME.
     pub clip_dedupe: Mutex<crate::clipboard::dedupe::DedupeState>,

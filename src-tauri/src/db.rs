@@ -136,7 +136,7 @@ impl StoredDevice {
 #[derive(Debug, Clone, Default)]
 pub struct ItemFilter {
     pub query: Option<String>,
-    /// "all" | "text" | "code" | "link" | "email" | "sensitive" | "pinned"
+    /// "all" | "text" | "code" | "link" | "email" | "image" | "sensitive" | "pinned"
     pub category: Option<String>,
     pub limit: u32,
 }
@@ -194,14 +194,20 @@ impl Db {
     }
 
     /// Remove duplicata recente do mesmo conteúdo (mantém o mais novo; preserva fixados).
-    pub fn dedupe_content(&self, hash: &str, keep_id: &str) -> Result<()> {
+    /// Devolve o que saiu: imagem removida deixa arquivos para o chamador apagar.
+    pub fn dedupe_content(&self, hash: &str, keep_id: &str) -> Result<Vec<ClipboardItem>> {
         let c = self.conn.lock().unwrap();
+        let gone = {
+            let mut st = c.prepare("SELECT * FROM clipboard_items WHERE content_hash = ?1 AND id != ?2 AND is_pinned = 0")?;
+            let v: Vec<ClipboardItem> = st.query_map(params![hash, keep_id], row_to_item)?.filter_map(|r| r.ok()).collect();
+            v
+        };
         c.execute(
             "DELETE FROM clipboard_items WHERE content_hash = ?1 AND id != ?2 AND is_pinned = 0",
             params![hash, keep_id],
         )?;
         c.execute("DELETE FROM outbox WHERE item_id NOT IN (SELECT id FROM clipboard_items)", [])?;
-        Ok(())
+        Ok(gone)
     }
 
     pub fn get_item(&self, id: &str) -> Result<Option<ClipboardItem>> {
@@ -225,7 +231,8 @@ impl Db {
         let mut sql = String::from("SELECT * FROM clipboard_items WHERE 1=1");
         let mut args: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
         if let Some(q) = f.query.as_ref().filter(|q| !q.trim().is_empty()) {
-            sql.push_str(" AND (content LIKE ?1 OR content_type LIKE ?1 OR source_device_id LIKE ?1)");
+            // Imagem guarda só o hash em `content`: a busca casa pelo tipo ("imagem"/"image"), não por ele.
+            sql.push_str(" AND ((content_type != 'image' AND content LIKE ?1) OR content_type LIKE ?1 OR source_device_id LIKE ?1)");
             args.push(Box::new(format!("%{}%", q.trim())));
         }
         match f.category.as_deref() {
@@ -234,6 +241,7 @@ impl Db {
             Some("text") => sql.push_str(" AND content_type = 'text'"),
             Some("link") => sql.push_str(" AND content_type = 'link'"),
             Some("email") => sql.push_str(" AND content_type = 'email'"),
+            Some("image") => sql.push_str(" AND content_type = 'image'"),
             Some("code") => sql.push_str(" AND content_type IN ('code','command')"),
             _ => {}
         }
@@ -243,6 +251,29 @@ impl Db {
         let refs: Vec<&dyn rusqlite::ToSql> = args.iter().map(|b| b.as_ref()).collect();
         let rows = st.query_map(refs.as_slice(), row_to_item)?;
         Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    /// Itens de imagem, do mais antigo para o mais novo (`unpinned_only`: só os não fixados).
+    pub fn image_items(&self, unpinned_only: bool) -> Result<Vec<ClipboardItem>> {
+        let c = self.conn.lock().unwrap();
+        let sql = format!(
+            "SELECT * FROM clipboard_items WHERE content_type = 'image'{} ORDER BY created_at ASC",
+            if unpinned_only { " AND is_pinned = 0" } else { "" }
+        );
+        let mut st = c.prepare(&sql)?;
+        let rows = st.query_map([], row_to_item)?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    /// Mantém no máximo `max` imagens não fixadas: apaga as mais antigas e devolve o que saiu.
+    pub fn evict_images(&self, max: usize) -> Result<Vec<ClipboardItem>> {
+        let all = self.image_items(true)?;
+        let excess = all.len().saturating_sub(max);
+        let gone: Vec<ClipboardItem> = all.into_iter().take(excess).collect();
+        for it in &gone {
+            self.delete_item(&it.id)?;
+        }
+        Ok(gone)
     }
 
     pub fn count_items(&self) -> Result<(u32, u32)> {
@@ -286,14 +317,14 @@ impl Db {
         Ok(n as u32)
     }
 
-    pub fn purge_expired(&self) -> Result<Vec<String>> {
+    pub fn purge_expired(&self) -> Result<Vec<ClipboardItem>> {
         let c = self.conn.lock().unwrap();
         let now = now_ms();
-        let ids: Vec<String> = {
+        let ids: Vec<ClipboardItem> = {
             let mut st = c.prepare(
-                "SELECT id FROM clipboard_items WHERE expires_at IS NOT NULL AND expires_at <= ?1 AND is_pinned = 0",
+                "SELECT * FROM clipboard_items WHERE expires_at IS NOT NULL AND expires_at <= ?1 AND is_pinned = 0",
             )?;
-            let v: Vec<String> = st.query_map([now], |r| r.get(0))?.filter_map(|r| r.ok()).collect();
+            let v: Vec<ClipboardItem> = st.query_map([now], row_to_item)?.filter_map(|r| r.ok()).collect();
             v
         };
         if !ids.is_empty() {
@@ -338,6 +369,13 @@ impl Db {
             "UPDATE devices SET last_seen = ?2, last_address = COALESCE(?3, last_address) WHERE device_id = ?1",
             params![id, now_ms(), address],
         )?;
+        Ok(())
+    }
+
+    /// Endereço informado pelo usuário; o mDNS sobrescreve depois, via `touch_device`.
+    pub fn set_last_address(&self, id: &str, address: &str) -> Result<()> {
+        let c = self.conn.lock().unwrap();
+        c.execute("UPDATE devices SET last_address = ?2 WHERE device_id = ?1", params![id, address])?;
         Ok(())
     }
 
@@ -471,6 +509,15 @@ mod tests {
     use crate::content::ContentType;
     use crate::models::now_ms;
 
+    fn image(id: &str, created_at: i64, pinned: bool) -> ClipboardItem {
+        ClipboardItem {
+            content_type: ContentType::Image,
+            created_at,
+            is_pinned: pinned,
+            ..item(id, &format!("img:{id}"), None)
+        }
+    }
+
     fn item(id: &str, content: &str, expires_at: Option<i64>) -> ClipboardItem {
         ClipboardItem {
             id: id.into(),
@@ -508,6 +555,30 @@ mod tests {
         assert!(db.outbox_has_item("new").unwrap());
         db.dequeue("new", "peer2").unwrap();
         assert!(!db.outbox_has_item("new").unwrap());
+        drop(db);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn image_limit_evicts_oldest_unpinned() {
+        let dir = std::env::temp_dir().join(format!("clipsync-db-img-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let db = Db::open(&dir).unwrap();
+        // A mais antiga está fixada: fica, e não conta para o limite.
+        db.insert_item(&image("pinned", 1, true)).unwrap();
+        for i in 0..4 {
+            db.insert_item(&image(&format!("i{i}"), 10 + i, false)).unwrap();
+        }
+        db.insert_item(&item("txt", "texto", None)).unwrap();
+        let gone = db.evict_images(2).unwrap();
+        assert_eq!(gone.iter().map(|i| i.id.as_str()).collect::<Vec<_>>(), ["i0", "i1"]);
+        let left: Vec<String> = db.image_items(false).unwrap().into_iter().map(|i| i.id).collect();
+        assert_eq!(left, ["pinned", "i2", "i3"]);
+        assert!(db.get_item("txt").unwrap().is_some());
+        // Busca textual não acha imagem pelo hash em `content`, só pelo tipo.
+        let q = |s: &str| db.list_items(&ItemFilter { query: Some(s.into()), ..Default::default() }).unwrap().len();
+        assert_eq!(q("img:i2"), 0);
+        assert_eq!(q("image"), 3);
         drop(db);
         let _ = std::fs::remove_dir_all(&dir);
     }

@@ -114,6 +114,17 @@ pub struct Settings {
     pub keep_alive: bool,
     /// Windows: atalhos globais; string vazia = desligado.
     pub shortcuts: Shortcuts,
+    /// Aparência: "system" (segue o sistema), "light" ou "dark".
+    pub theme: String,
+    /// Captura e envia o HTML junto do texto (e escreve o recebido com formatação).
+    pub keep_formatting: bool,
+    /// Consulta o GitHub sozinho atrás de versão nova (15 s após abrir e a cada 6 h). O manual sempre funciona.
+    pub check_updates: bool,
+    /// Idioma da interface: "auto" (segue o sistema), "pt-BR" ou "en".
+    pub language: String,
+    /// "pt-BR" ou "en" já resolvido pelo front (`navigator.language` quando "auto"); é o que o Rust lê
+    /// (`i18n.rs`). Antes do primeiro bootstrap vale pt-BR.
+    pub language_resolved: String,
 }
 
 /// Combinações no formato "Ctrl+Alt+Shift+V" (o mesmo que o `global-hotkey` entende).
@@ -172,6 +183,11 @@ impl Default for Settings {
             notify_text: false,
             keep_alive: false,
             shortcuts: Shortcuts::default(),
+            theme: "system".into(),
+            keep_formatting: true,
+            check_updates: true,
+            language: "auto".into(),
+            language_resolved: "pt-BR".into(),
         }
     }
 }

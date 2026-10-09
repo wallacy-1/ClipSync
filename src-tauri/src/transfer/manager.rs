@@ -81,7 +81,7 @@ fn percent(bytes_done: u64, size: u64) -> i32 {
 /// Erro = transição inválida (logada, estado intocado).
 pub fn apply(app: &AppHandle, id: &str, event: Event) -> Result<TransferRecord> {
     let state = app_state(app);
-    let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other(format!("transferência {id} não encontrada")))?;
+    let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other(crate::i18n::trf("err.transfer_missing", &[("id", id)])))?;
     let next = transition(rec.direction, &rec.state, event.clone()).map_err(|e| {
         log::warn!("[FILE] {e} id={id}");
         AppError::Other(e.to_string())
@@ -149,7 +149,7 @@ mod fgs {
         {
             let state = app_state(app);
             let name = state.db.transfer_get(id).ok().flatten().map(|r| r.safe_name).unwrap_or_default();
-            let title = if dir == Direction::Out { "Enviando arquivo" } else { "Recebendo arquivo" };
+            let title = crate::i18n::tr(if dir == Direction::Out { "fgs.sending" } else { "fgs.receiving" });
             if !super::super::android::fgs_start(title, &name, percent, id) {
                 log::warn!("[FILE] FGS recusado (app em segundo plano?); a transferência segue sem ele id={id}");
             }
@@ -172,7 +172,7 @@ mod fgs {
                 last.insert(id.to_string(), now);
             }
             let name = app_state(app).db.transfer_get(id).ok().flatten().map(|r| r.safe_name).unwrap_or_default();
-            let title = if dir == Direction::Out { "Enviando arquivo" } else { "Recebendo arquivo" };
+            let title = crate::i18n::tr(if dir == Direction::Out { "fgs.sending" } else { "fgs.receiving" });
             super::super::android::fgs_update(title, &format!("{name} · {percent}%"), percent, id);
         }
         #[cfg(not(target_os = "android"))]
@@ -253,17 +253,17 @@ pub fn send_file(app: &AppHandle, device_id: &str, source_str: &str) -> Result<T
 /// clipboard em vez de Downloads).
 pub fn send_file_with(app: &AppHandle, device_id: &str, source_str: &str, purpose: Option<&str>) -> Result<TransferRecord> {
     let state = app_state(app);
-    let dev = state.db.get_device(device_id)?.ok_or_else(|| AppError::Other("dispositivo não pareado".into()))?;
+    let dev = state.db.get_device(device_id)?.ok_or_else(|| AppError::Other(crate::i18n::tr("err.device_not_paired").into()))?;
     if dev.blocked {
-        return Err(AppError::Other("dispositivo bloqueado".into()));
+        return Err(AppError::Other(crate::i18n::tr("err.device_blocked").into()));
     }
     let src = TransferSource::parse(source_str);
     let info = source::describe(&src)?;
     if info.size > MAX_FILE_SIZE {
-        return Err(AppError::Other(format!("arquivo maior que o limite de {} GiB", MAX_FILE_SIZE >> 30)));
+        return Err(AppError::Other(crate::i18n::trf("err.file_too_big", &[("gib", &(MAX_FILE_SIZE >> 30).to_string())])));
     }
     if state.db.transfer_open_for_device(device_id)?.len() >= MAX_OPEN_PER_DEVICE {
-        return Err(AppError::Other("fila de transferências cheia para este dispositivo".into()));
+        return Err(AppError::Other(crate::i18n::tr("err.transfer_queue_full").into()));
     }
     let safe = names::sanitize(&info.name);
     let id = uuid::Uuid::new_v4().to_string();
@@ -282,7 +282,7 @@ pub fn send_file_with(app: &AppHandle, device_id: &str, source_str: &str, purpos
         temp_path: None,
         purpose,
     })?;
-    let rec = state.db.transfer_get(&id)?.ok_or_else(|| AppError::Other("falha ao registrar".into()))?;
+    let rec = state.db.transfer_get(&id)?.ok_or_else(|| AppError::Other(crate::i18n::tr("err.transfer_register").into()))?;
     log::info!("[FILE] Queued id={} name={:?} size={} to={} purpose={:?}", id, safe, info.size, device_id, purpose);
     events::emit(app, events::TRANSFER_STATE, &rec);
     kick(app, device_id);
@@ -296,9 +296,9 @@ pub fn list(app: &AppHandle, limit: u32) -> Result<Vec<TransferRecord>> {
 /// Tira uma transferência terminada da lista; o arquivo recebido fica.
 pub fn remove(app: &AppHandle, id: &str) -> Result<()> {
     let state = app_state(app);
-    let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other("transferência não encontrada".into()))?;
+    let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other(crate::i18n::tr("err.transfer_not_found").into()))?;
     if !rec.state.is_terminal() {
-        return Err(AppError::Other("a transferência ainda não terminou".into()));
+        return Err(AppError::Other(crate::i18n::tr("err.transfer_unfinished").into()));
     }
     state.db.transfer_delete(id)?;
     // Falha mantém o zip da pasta para retomar; sem a linha, não há mais retomada.
@@ -318,7 +318,7 @@ pub fn clear_finished(app: &AppHandle) -> Result<u32> {
 /// Cancelamento local (usuário). Avisa o peer se houver conexão.
 pub fn cancel(app: &AppHandle, id: &str) -> Result<TransferRecord> {
     let state = app_state(app);
-    let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other("transferência não encontrada".into()))?;
+    let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other(crate::i18n::tr("err.transfer_not_found").into()))?;
     if rec.state.is_terminal() {
         return Ok(rec);
     }
@@ -346,9 +346,9 @@ pub fn cancel(app: &AppHandle, id: &str) -> Result<TransferRecord> {
 /// (nova tentativa do zero quando terminal). Receptor não retoma por conta própria.
 pub fn resume(app: &AppHandle, id: &str) -> Result<TransferRecord> {
     let state = app_state(app);
-    let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other("transferência não encontrada".into()))?;
+    let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other(crate::i18n::tr("err.transfer_not_found").into()))?;
     if rec.direction != Direction::Out {
-        return Err(AppError::Other("só o lado que envia pode retomar; o outro reoferece ao reconectar".into()));
+        return Err(AppError::Other(crate::i18n::tr("err.transfer_sender_only").into()));
     }
     if is_active(app, id) {
         return Ok(rec);
@@ -364,10 +364,10 @@ pub fn resume(app: &AppHandle, id: &str) -> Result<TransferRecord> {
             state.db.transfer_set_progress(id, 0)?;
             state.db.transfer_bump_attempts(id)?;
         }
-        _ => return Err(AppError::Other("transferência em andamento".into())),
+        _ => return Err(AppError::Other(crate::i18n::tr("err.transfer_running").into())),
     }
     kick(app, &rec.device_id);
-    state.db.transfer_get(id)?.ok_or_else(|| AppError::Other("transferência não encontrada".into()))
+    state.db.transfer_get(id)?.ok_or_else(|| AppError::Other(crate::i18n::tr("err.transfer_not_found").into()))
 }
 
 /// Subida do processo: nada está em voo → `waiting`; expira/apaga o velho;
@@ -723,7 +723,7 @@ pub fn asks(app: &AppHandle) -> Vec<TransferRecord> {
 
 /// Usuário aceitou. Conexão ainda é a da oferta → começa agora; senão aceita na reoferta.
 pub fn accept(app: &AppHandle, id: &str) -> Result<()> {
-    let p = take_ask(app, id).ok_or_else(|| AppError::Other("pedido não encontrado ou expirado".into()))?;
+    let p = take_ask(app, id).ok_or_else(|| AppError::Other(crate::i18n::tr("err.ask_expired").into()))?;
     log::info!("[FILE] Accepted by user id={id}");
     if file_conn(app, &p.device_id).map(|(c, _)| c == p.conn_id).unwrap_or(false) {
         start_receiver(app, p);

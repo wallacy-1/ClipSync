@@ -7,4 +7,14 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <!-- Widget/bloco: paleta do app (src/styles/tokens.css), clara; o tema escuro está em values-night. -->
+    <color name="clip_widget_bg">#FFF5EAD8</color>
+    <color name="clip_widget_surface">#FFEEE7DB</color>
+    <color name="clip_widget_text">#FF201E1D</color>
+    <color name="clip_widget_text_dim">#FF645C50</color>
+    <color name="clip_widget_accent">#FFC67139</color>
+    <color name="clip_widget_on_accent">#FFF5EAD8</color>
+    <color name="widget_dot_ok">#FF728157</color>
+    <color name="widget_dot_warn">#FFC67139</color>
+    <color name="widget_dot_off">#FFA19786</color>
 </resources>

@@ -119,13 +119,13 @@ mod platform {
         Ok(ImeStatus::unsupported())
     }
     pub fn open_settings() -> Result<()> {
-        Err(AppError::Other("ClipSync Keyboard só existe no Android".into()))
+        Err(AppError::Other(crate::i18n::tr("err.keyboard_android_only").into()))
     }
     pub fn show_picker() -> Result<()> {
-        Err(AppError::Other("ClipSync Keyboard só existe no Android".into()))
+        Err(AppError::Other(crate::i18n::tr("err.keyboard_android_only").into()))
     }
     pub fn set_theme(_theme: &str) -> Result<()> {
-        Err(AppError::Other("ClipSync Keyboard só existe no Android".into()))
+        Err(AppError::Other(crate::i18n::tr("err.keyboard_android_only").into()))
     }
     pub fn set_core_ready(_ready: bool) {}
     pub fn drain_inbox(_app: &tauri::AppHandle) {}
@@ -188,7 +188,7 @@ mod bridge {
         };
         let sensitive = sensitive != JNI_FALSE;
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            clipboard::handle_text(app, text, sensitive, ClipOrigin::Ime);
+            clipboard::handle_text(app, text, None, sensitive, ClipOrigin::Ime);
         }));
         if result.is_ok() {
             JNI_TRUE
@@ -293,7 +293,7 @@ mod platform_inbox {
             }
             // Só remove depois de passar pelo pipeline (pânico = fica para a próxima).
             let ok = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                clipboard::handle_text(app, e.text, e.sensitive, ClipOrigin::ImeInbox)
+                clipboard::handle_text(app, e.text, None, e.sensitive, ClipOrigin::ImeInbox)
             }))
             .is_ok();
             if ok {

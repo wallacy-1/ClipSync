@@ -1,5 +1,6 @@
 // Lógica de transferência compartilhada pelas telas do Windows e do Android.
 import { useEffect, useState } from "react";
+import { t } from "../i18n";
 import { PLATFORM_LABEL, deviceName, isTransferActive, percent } from "../lib/format";
 import { api } from "../lib/ipc";
 import type { Device, TransferRecord } from "../lib/types";
@@ -9,7 +10,9 @@ export interface Target {
   device: Device;
   selectable: boolean;
   /** Motivo de não estar disponível (esmaecido). */
-  cap: string | null;
+  cap: "blocked" | "offline" | "unsupported" | null;
+  /** `cap` por extenso, no idioma ativo. */
+  capLabel: string | null;
   detail: string;
 }
 
@@ -35,10 +38,10 @@ export function useFileTargets(): { targets: Target[]; loading: boolean } {
 
   const targets = peers.map<Target>((d) => {
     const os = PLATFORM_LABEL[d.platform] ?? d.platform;
-    if (d.state === "blocked") return { device: d, selectable: false, cap: "Bloqueado", detail: `${os} · bloqueado` };
-    if (d.state !== "connected") return { device: d, selectable: false, cap: "Offline", detail: `${os} · offline` };
-    if (supports[d.deviceId] === false) return { device: d, selectable: false, cap: "Sem suporte", detail: `${os} · versão antiga do ClipSync` };
-    return { device: d, selectable: true, cap: null, detail: `${os} · conectado` };
+    if (d.state === "blocked") return { device: d, selectable: false, cap: "blocked", capLabel: t("sendFile.capBlocked"), detail: t("sendFile.detailBlocked", { os }) };
+    if (d.state !== "connected") return { device: d, selectable: false, cap: "offline", capLabel: t("sendFile.capOffline"), detail: t("sendFile.detailOffline", { os }) };
+    if (supports[d.deviceId] === false) return { device: d, selectable: false, cap: "unsupported", capLabel: t("sendFile.capUnsupported"), detail: t("sendFile.detailOld", { os }) };
+    return { device: d, selectable: true, cap: null, capLabel: null, detail: t("sendFile.detailConnected", { os }) };
   });
   return { targets, loading };
 }
@@ -54,26 +57,26 @@ export interface PrimaryAction {
  * arquivo concluído pode ser aberto por fora (no Android a imagem do clipboard
  * fica em disco privado).
  */
-export function useTransferRow(t: TransferRecord, canOpen: boolean) {
+export function useTransferRow(rec: TransferRecord, canOpen: boolean) {
   const devices = useApp((s) => s.devices);
   const selfId = useApp((s) => s.me?.deviceId ?? "");
-  const busy = useApp((s) => !!s.transferBusy[t.id]);
-  const asked = useApp((s) => s.asks.includes(t.id));
+  const busy = useApp((s) => !!s.transferBusy[rec.id]);
+  const asked = useApp((s) => s.asks.includes(rec.id));
   const accept = useApp((s) => s.acceptTransfer);
   const decline = useApp((s) => s.declineTransfer);
   const cancel = useApp((s) => s.cancelTransfer);
   const resume = useApp((s) => s.resumeTransfer);
   const open = useApp((s) => s.openTransfer);
 
-  const kind = t.state.kind;
-  const active = isTransferActive(t);
-  const incoming = t.direction === "in";
+  const kind = rec.state.kind;
+  const active = isTransferActive(rec);
+  const incoming = rec.direction === "in";
   const primary: PrimaryAction | null = active
-    ? (kind === "verifying" ? null : { label: busy ? "Cancelando…" : "Cancelar", run: () => void cancel(t.id), disabled: busy })
+    ? (kind === "verifying" ? null : { label: busy ? t("transfers.cancelling") : t("transfers.cancel"), run: () => void cancel(rec.id), disabled: busy })
     : kind === "failed" && !incoming
-      ? { label: "Tentar de novo", run: () => void resume(t.id), disabled: false }
+      ? { label: t("common.retry"), run: () => void resume(rec.id), disabled: false }
       : kind === "completed" && canOpen
-        ? { label: "Abrir", run: () => void open(t.id), disabled: false }
+        ? { label: t("common.open"), run: () => void open(rec.id), disabled: false }
         : null;
 
   return {
@@ -82,14 +85,14 @@ export function useTransferRow(t: TransferRecord, canOpen: boolean) {
     incoming,
     busy,
     asked,
-    dev: deviceName(devices, t.deviceId, selfId),
+    dev: deviceName(devices, rec.deviceId, selfId),
     hasBar: ["transferring", "verifying", "waiting", "cancelled"].includes(kind),
-    pct: kind === "verifying" ? 100 : percent(t),
+    pct: kind === "verifying" ? 100 : percent(rec),
     primary,
-    accept: () => void accept(t.id),
-    decline: () => void decline(t.id),
-    cancel: () => void cancel(t.id),
-    resume: () => void resume(t.id),
-    open: () => void open(t.id),
+    accept: () => void accept(rec.id),
+    decline: () => void decline(rec.id),
+    cancel: () => void cancel(rec.id),
+    resume: () => void resume(rec.id),
+    open: () => void open(rec.id),
   };
 }

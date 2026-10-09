@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { Search } from "../components/Icons";
+import { useT } from "../i18n";
 import { ItemText, Toast, TypeTag } from "../components/ui";
+import { pausedUntilText } from "../components/pause";
 import { api } from "../lib/ipc";
 import { deviceName, relTime } from "../lib/format";
 import { usePeers, useVisibleItems, useApp } from "../store/app";
 import { CopiedFilesOffer } from "./CopiedFilesOffer";
 
 export function TrayPanel() {
+  const t = useT();
   const query = useApp((s) => s.query);
   const setQuery = useApp((s) => s.setQuery);
   const items = useVisibleItems().slice(0, 8);
@@ -42,7 +45,9 @@ export function TrayPanel() {
   };
 
   const connected = peers.filter((d) => d.state === "connected").length;
-  const statusText = sync.paused ? "Pausado" : connected > 0 ? "Sincronizado" : sync.queuedCount > 0 ? "Na fila" : "Aguardando";
+  const statusText = sync.paused
+    ? (sync.pausedUntil ? t("tray.pausedUntil", { until: pausedUntilText(sync.pausedUntil) }) : t("tray.paused"))
+    : connected > 0 ? t("tray.synced") : sync.queuedCount > 0 ? t("tray.queued") : t("tray.waiting");
 
   return (
     <div className="tray" onKeyDown={onKey}>
@@ -58,18 +63,18 @@ export function TrayPanel() {
       </div>
       <label className="tray-search">
         <Search size={15} style={{ color: "var(--color-neutral-600)" }} />
-        <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Buscar no histórico…" />
+        <input ref={inputRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("tray.search")} />
       </label>
       <div className="tray-list">
         <CopiedFilesOffer variant="inline" />
-        {items.length === 0 && <div className="muted" style={{ padding: "18px 12px", fontSize: 13 }}>Nada por aqui ainda.</div>}
+        {items.length === 0 && <div className="muted" style={{ padding: "18px 12px", fontSize: 13 }}>{t("tray.empty")}</div>}
         {items.map((it, i) => (
           <button key={it.id} className={`tray-row${i === active ? " active" : ""}`} onMouseEnter={() => setActive(i)} onClick={() => paste(it.id)}>
             <span className="key">{i + 1}</span>
             <div className="body">
               <ItemText item={it} />
               <div className="meta">
-                {it.isSensitive ? "oculto" : deviceName(devices, it.sourceDeviceId, me?.deviceId ?? "")} · {relTime(it.createdAt, now)}
+                {it.isSensitive ? t("item.hidden") : deviceName(devices, it.sourceDeviceId, me?.deviceId ?? "")} · {relTime(it.createdAt, now)}
               </div>
             </div>
             <TypeTag item={it} />
@@ -77,10 +82,10 @@ export function TrayPanel() {
         ))}
       </div>
       <div className="tray-foot">
-        <span><b>↑↓</b> navegar</span>
-        <span><b>Enter</b> colar</span>
-        {peers.length > 0 && <span><b>Ctrl+S</b> enviar</span>}
-        <button className="open" onClick={() => api.windowAction("show_main")}>Abrir janela</button>
+        <span><b>↑↓</b> {t("tray.navigate")}</span>
+        <span><b>Enter</b> {t("tray.paste")}</span>
+        {peers.length > 0 && <span><b>Ctrl+S</b> {t("tray.send")}</span>}
+        <button className="open" onClick={() => api.windowAction("show_main")}>{t("tray.openWindow")}</button>
       </div>
       <Toast />
     </div>

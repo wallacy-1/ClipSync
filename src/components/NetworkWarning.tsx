@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useT } from "../i18n";
 import { WifiOff } from "./Icons";
 
 /** Aviso quando o aparelho perde a rede; volta a aparecer a cada nova queda. */
 export function NetworkWarning() {
+  const t = useT();
   const [offline, setOffline] = useState(() => !navigator.onLine);
   const [dismissed, setDismissed] = useState(false);
 
@@ -22,13 +24,11 @@ export function NetworkWarning() {
     <div className="dialog-backdrop" onClick={() => setDismissed(true)}>
       <div className="dialog" onClick={(e) => e.stopPropagation()}>
         <div className="dialog-title row-flex" style={{ gap: 10 }}>
-          <WifiOff size={22} style={{ color: "var(--color-accent-800)" }} /> Sem conexão
+          <WifiOff size={22} style={{ color: "var(--color-accent-800)" }} /> {t("net.title")}
         </div>
-        <div className="dialog-body">
-          Este dispositivo não está conectado a nenhuma rede. A sincronização só funciona com os aparelhos na mesma Wi-Fi; o que você copiar fica na fila até a rede voltar.
-        </div>
+        <div className="dialog-body">{t("net.body")}</div>
         <div className="dialog-actions">
-          <button className="btn btn-primary" onClick={() => setDismissed(true)}>Entendi</button>
+          <button className="btn btn-primary" onClick={() => setDismissed(true)}>{t("net.gotIt")}</button>
         </div>
       </div>
     </div>
