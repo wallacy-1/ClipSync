@@ -65,17 +65,23 @@ e cole o conteúdo de `updater.key.pub` em `plugins.updater.pubkey`.
    - (opcional) o `.msi`
 4. Publique a release (não deixe como pre-release/draft: o endpoint usa `releases/latest`).
 
-As instalações Windows procuram `https://github.com/<repo>/releases/latest/download/latest.json`
-15 s após abrir e a cada 6 h; o usuário confirma em Ajustes → Atualização. O pacote só é instalado
-se a assinatura bater com a chave pública embutida no app.
+As instalações Windows procuram `https://github.com/wallacy-1/ClipSync/releases/latest/download/latest.json`
+15 s após abrir e a cada 6 h (se "Procurar atualizações" estiver ligado em Ajustes → Sobre); o usuário
+confirma em Ajustes → Atualização. O pacote só é instalado se a assinatura bater com a chave pública
+embutida no app.
 
-O endpoint está em `src-tauri/tauri.conf.json` → `plugins.updater.endpoints`. Se o repositório no
-GitHub tiver outro dono/nome, corrija ali **antes** de distribuir a primeira versão (versões já
-instaladas só olham para a URL com que foram compiladas).
+O repositório aparece em dois lugares, que têm de ser iguais: `src-tauri/tauri.conf.json` →
+`plugins.updater.endpoints` (Windows) e a constante `GITHUB_REPO` em `src-tauri/src/updater.rs` (Android).
+Se o repositório no GitHub tiver outro dono/nome, corrija **os dois** antes de distribuir a primeira
+versão (versões já instaladas só olham para a URL com que foram compiladas). Sem `-Repo` e sem remote
+`origin`, o `scripts/release.ps1` usa o repositório do endpoint.
 
 ## Android
 
-O APK não se atualiza sozinho: o usuário baixa o novo `.apk` da release e instala por cima.
+O APK não se atualiza sozinho: o app consulta `api.github.com/repos/wallacy-1/ClipSync/releases/latest`
+(mesmos horários do Windows) e, se a tag (`v1.0.1`) for maior que a instalada e a release tiver um `.apk`
+anexado, mostra "Versão X disponível" com o botão **Baixar**, que abre a página da release no navegador.
+O usuário baixa o novo `.apk` e instala por cima. Tags fora do padrão `vX.Y.Z` e pré-releases são ignoradas.
 Instalar por cima só funciona com o **mesmo keystore**; por isso o script se recusa a assinar
 sem o keystore de release (a não ser com `-DebugSign`, para teste).
 

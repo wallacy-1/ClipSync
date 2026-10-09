@@ -46,7 +46,8 @@ Sem servidor, sem conta, sem nuvem. Uma base de código: **Tauri 2 + React + Typ
 
 `tauri-plugin-updater` procura uma versão nova 15 s após abrir e a cada 6 h; Ajustes → Atualização mostra/instala.
 O pacote só é instalado se a assinatura bater com `plugins.updater.pubkey` (`tauri.conf.json`); com a chave vazia o
-updater fica desligado. Android atualiza pela loja/APK.
+updater fica desligado. O Android só avisa (consulta as releases do GitHub; "Baixar" abre a página do APK).
+O ajuste "Procurar atualizações" (Sobre) desliga a verificação automática nas duas plataformas.
 
 ### Eventos (Rust → React)
 
