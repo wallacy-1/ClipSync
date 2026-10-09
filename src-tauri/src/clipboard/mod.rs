@@ -83,10 +83,8 @@ impl ClipOrigin {
     }
 }
 
-/// Ponto único de entrada de clipboard local, para qualquer origem: anti-loop,
-/// dedupe, classificação, SQLite, evento e sync. Retorna o item salvo, se
-/// virou histórico (`None` = ignorado ou inválido, nunca erro).
-/// `html` é o formato rico lido junto do texto (só com "Manter formatação" ligado); o IME passa `None`.
+/// Entrada única de clipboard local (qualquer origem): anti-loop, dedupe, classificação,
+/// SQLite, evento e sync. `None` = ignorado ou inválido, nunca erro. O IME passa `html = None`.
 pub fn handle_text(app: &AppHandle, text: String, html: Option<String>, excluded_by_source: bool, origin: ClipOrigin) -> Option<ClipboardItem> {
     let state = app.state::<AppState>();
     if text.trim().is_empty() || text.len() > MAX_TEXT_BYTES {
@@ -170,10 +168,8 @@ pub fn ingest_shared_text(app: &AppHandle, text: String, sensitive: bool) -> Res
     Ok(item)
 }
 
-/// Escreve no clipboard local marcando o hash para o watcher **e o IME**
-/// ignorarem o eco (anti-loop). Toda escrita local de conteúdo remoto passa aqui.
-/// Com `html` (e "Manter formatação" ligado) escreve texto + HTML; o HTML é sanitizado aqui, o ponto
-/// único de escrita, e na dúvida (ou falha da escrita rica) vai só o texto.
+/// Toda escrita local de conteúdo remoto passa aqui: marca o hash para o watcher e o IME
+/// ignorarem o eco. O HTML é sanitizado aqui; na dúvida (ou falha da escrita rica) vai só o texto.
 pub fn write_local(app: &AppHandle, text: &str, html: Option<&str>) -> Result<()> {
     let state = app.state::<AppState>();
     let hash = content_hash(text);

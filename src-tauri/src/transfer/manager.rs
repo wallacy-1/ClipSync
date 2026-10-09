@@ -1,5 +1,4 @@
 //! Orquestra as transferências: tasks ativas, roteamento das mensagens `File*`, fila por device.
-//! - Mensagens já chegam autenticadas; só se confere que o `transfer_id` pertence àquele device.
 //! - `conn_id` amarra a task à conexão que a criou: a queda de uma conexão antiga não afeta a nova.
 //! - Estado só muda via [`apply`] → `state::transition` → SQLite → evento.
 use super::state::{transition, CancelledBy, Direction, Event, TransferState};
@@ -37,11 +36,11 @@ pub struct Active {
     pub conn_id: u64,
     pub direction: Direction,
     pub ctl: mpsc::UnboundedSender<Ctl>,
-    /// Receptor: quadros de dados (bounded → backpressure até o disco).
+    /// Bounded: backpressure até o disco.
     pub frames: Option<mpsc::Sender<DataFrame>>,
 }
 
-/// Oferta esperando o usuário decidir ("Aceitar/Recusar"). A linha já existe como `incoming`.
+/// A linha já existe como `incoming`.
 pub struct PendingOffer {
     pub device_id: String,
     pub conn_id: u64,
@@ -124,7 +123,6 @@ fn register(app: &AppHandle, id: &str, a: Active) {
     fgs::on_active(app, id, dir, 0);
 }
 
-/// Chamado pela própria task ao terminar (qualquer motivo).
 pub fn unregister(app: &AppHandle, id: &str) {
     let remaining = {
         let state = app_state(app);
@@ -139,8 +137,7 @@ pub fn unregister(app: &AppHandle, id: &str) {
     }
 }
 
-/// Foreground Service do Android: só enquanto há transferência ativa. No-op fora
-/// do Android. Fronteira explícita: IME = clipboard em background; FGS = transferência.
+/// FGS do Android só enquanto há transferência ativa; no-op fora do Android.
 mod fgs {
     use super::*;
 
@@ -243,8 +240,7 @@ pub fn peer_has_cap(app: &AppHandle, device_id: &str, cap: &str) -> bool {
     conns.get(device_id).map(|c| c.caps.iter().any(|x| x == cap)).unwrap_or(false)
 }
 
-/// Enfileira o envio de uma origem local (caminho ou `content://`) para um device
-/// pareado; o envio começa quando houver conexão com `file-v1`.
+/// O envio começa quando houver conexão com `file-v1`.
 pub fn send_file(app: &AppHandle, device_id: &str, source_str: &str) -> Result<TransferRecord> {
     send_file_with(app, device_id, source_str, None)
 }
@@ -293,7 +289,7 @@ pub fn list(app: &AppHandle, limit: u32) -> Result<Vec<TransferRecord>> {
     app_state(app).db.transfer_list(limit)
 }
 
-/// Tira uma transferência terminada da lista; o arquivo recebido fica.
+/// O arquivo recebido não é apagado.
 pub fn remove(app: &AppHandle, id: &str) -> Result<()> {
     let state = app_state(app);
     let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other(crate::i18n::tr("err.transfer_not_found").into()))?;
@@ -315,7 +311,6 @@ pub fn clear_finished(app: &AppHandle) -> Result<u32> {
     Ok(n)
 }
 
-/// Cancelamento local (usuário). Avisa o peer se houver conexão.
 pub fn cancel(app: &AppHandle, id: &str) -> Result<TransferRecord> {
     let state = app_state(app);
     let rec = state.db.transfer_get(id)?.ok_or_else(|| AppError::Other(crate::i18n::tr("err.transfer_not_found").into()))?;
@@ -424,9 +419,7 @@ pub fn on_connected(app: &AppHandle, device_id: &str) {
     kick(app, device_id);
 }
 
-/// A conexão `conn_id` com `device_id` caiu: as tasks amarradas a ela param e
-/// deixam a transferência retomável (`waiting`). Tasks de uma conexão mais nova
-/// (substituição) não são tocadas.
+/// Para só as tasks da conexão `conn_id` (ficam `waiting`); as de uma conexão mais nova seguem.
 pub fn on_disconnected(app: &AppHandle, device_id: &str, conn_id: u64) {
     let ctls: Vec<mpsc::UnboundedSender<Ctl>> = {
         let state = app_state(app);
@@ -778,19 +771,16 @@ pub async fn on_data(app: &AppHandle, device_id: &str, frame: DataFrame) {
     }
 }
 
-/// Remove o `.part` de uma transferência (qualquer erro é ignorado).
 pub fn cleanup_part(rec: &TransferRecord) {
     if let Some(p) = rec.temp_path.as_deref() {
         let _ = std::fs::remove_file(p);
     }
 }
 
-/// Revogação/bloqueio do device: cancela tudo (ativo ou na fila), apaga `.part`
-/// e, enquanto a conexão ainda existe, avisa o peer.
+/// Cancela tudo do device, apaga `.part` e avisa o peer enquanto a conexão existe.
 pub fn cancel_all_for_device(app: &AppHandle, device_id: &str) {
     let state = app_state(app);
     let open = state.db.transfer_open_for_device(device_id).unwrap_or_default();
-    // Avisa o peer enquanto a conexão ainda existe (o chamador manda Bye em seguida).
     for rec in &open {
         state.send_to(device_id, Message::FileCancel { transfer_id: rec.id.clone(), reason: FileCancelReason::Revoked });
     }

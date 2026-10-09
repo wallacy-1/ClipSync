@@ -125,7 +125,6 @@ pub enum Event {
     Offer,
     /// Emissor: peer aceitou (com offset de retomada).
     Accepted,
-    /// Emissor: peer recusou.
     Rejected(String),
     /// Receptor: decisão local (auto ou usuário).
     Accept,

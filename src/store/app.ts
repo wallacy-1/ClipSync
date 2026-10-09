@@ -76,7 +76,6 @@ interface AppStore {
   asks: string[];
   /** Android 13+: sem ela o progresso/Cancelar da transferência não aparece. null = não consultado. */
   notifyPerm: NotifyPermission | null;
-  /** Nova versão disponível (desktop). */
   update: UpdateInfo | null;
   updateBusy: "check" | "install" | null;
 

@@ -49,7 +49,6 @@ impl LocalIdentity {
         hex::encode(&self.public_key)
     }
 
-    /// Resumo público (enviado a outros dispositivos).
     pub fn summary(&self) -> DeviceIdentity {
         DeviceIdentity {
             device_id: self.device_id.clone(),

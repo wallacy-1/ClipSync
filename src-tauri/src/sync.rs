@@ -107,7 +107,6 @@ pub fn send_item(app: &AppHandle, item_id: &str, device_ids: &[String]) -> crate
     Ok(())
 }
 
-/// Conexão estabelecida: esvazia a fila pendente daquele dispositivo.
 pub fn on_connected(app: &AppHandle, device_id: &str) {
     let state = app.state::<AppState>();
     let pending = state.db.outbox_for(device_id).unwrap_or_default();

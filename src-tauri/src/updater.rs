@@ -79,7 +79,6 @@ pub fn pending() -> Option<UpdateInfo> {
     PENDING.lock().unwrap().clone()
 }
 
-/// Página da release pendente (Android).
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 pub fn pending_url() -> Option<String> {
     pending().and_then(|u| u.url)

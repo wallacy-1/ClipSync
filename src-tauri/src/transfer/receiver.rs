@@ -74,7 +74,6 @@ impl FrameSeq {
         if chunk_complete && !finished && chunk_bytes + len as u64 != self.chunk {
             return Err("short chunk");
         }
-        // Só agora o estado avança.
         self.expected_count = count;
         self.chunk_bytes = chunk_bytes + len as u64;
         self.received = received;

@@ -1,12 +1,6 @@
 //! Imagem copiada vira PNG em disco privado + item de histórico (`ContentType::Image`) e segue
 //! pela transferência de arquivos (`FileOffer.purpose = "clipboard"`), nunca por `Message::Clip`.
 //! Quem recebe registra o item e, se as regras deixam, põe no clipboard.
-//!
-//! ```text
-//! cópia ─▶ poll (sem texto) ─▶ PNG + miniatura em <app_data>/clip-images ─▶ item ─▶ send_file_with(purpose)
-//! FileOffer{purpose} ─▶ receiver ─▶ <app_data>/clip-images ─▶ on_received ─▶ item ─▶ clipboard
-//! ```
-//!
 //! O item guarda `content = "img:<sha256 do PNG>"` (igual nos dois lados, dá o dedupe) e
 //! `metadata = {path, thumb, width, height, bytes, mime}`. A UI só lê a imagem por `item_image`.
 //!
@@ -30,7 +24,6 @@ const KEEP_FOR: Duration = Duration::from_secs(3 * 24 * 3600);
 const SUBDIR: &str = "clip-images";
 /// Imagens não fixadas no histórico; ao passar disso a mais antiga sai (item e arquivos).
 pub const MAX_IMAGE_ITEMS: usize = 50;
-/// Lado maior da miniatura, em px.
 const THUMB_MAX: u32 = 320;
 /// A UI só pede a imagem inteira abaixo disso (data URL pelo IPC); acima, usa a miniatura.
 const FULL_MAX_BYTES: u64 = 4 * 1024 * 1024;
@@ -119,7 +112,6 @@ fn key_rgba(rgba: &[u8]) -> String {
     format!("img:{}", hex::encode(Sha256::digest(rgba)))
 }
 
-/// Envio automático ligado para imagens (mesmas regras do texto).
 fn send_wanted(app: &AppHandle) -> bool {
     let state = app.state::<AppState>();
     let s = state.settings();
@@ -281,18 +273,15 @@ fn existing_file(app: &AppHandle, item: &ClipboardItem) -> Result<PathBuf> {
     Err(AppError::Other(crate::i18n::tr("err.image_gone").into()))
 }
 
-/// Caminho do PNG de um item (para "Mostrar na pasta"); sumido = erro e item removido.
 pub fn file_of(app: &AppHandle, item: &ClipboardItem) -> Result<PathBuf> {
     existing_file(app, item)
 }
 
-/// "Copiar" um item de imagem: de volta ao clipboard pelo mesmo caminho de escrita (anti-loop incluso).
 pub fn copy_item(app: &AppHandle, item: &ClipboardItem) -> Result<()> {
     write_local(app, &existing_file(app, item)?)
 }
 
-/// "Enviar para" um item de imagem: transferência de arquivo com `purpose=clipboard` por destino.
-/// Peer conectado sem `clip-image-v1` (versão antiga) trataria o PNG como arquivo comum.
+/// Peer sem `clip-image-v1` trataria o PNG como arquivo comum.
 pub fn send_item(app: &AppHandle, item: &ClipboardItem, device_ids: &[String]) -> Result<()> {
     if device_ids.is_empty() {
         return Ok(());

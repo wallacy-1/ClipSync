@@ -11,7 +11,6 @@ export interface Target {
   selectable: boolean;
   /** Motivo de não estar disponível (esmaecido). */
   cap: "blocked" | "offline" | "unsupported" | null;
-  /** `cap` por extenso, no idioma ativo. */
   capLabel: string | null;
   detail: string;
 }

@@ -98,9 +98,7 @@ class TransferService : Service() {
         instance = this
         android.util.Log.i(TAG, "onCreate desired=$desired pending=${pendingStarts.get()}")
         if (!desired && pendingStarts.get() == 0) {
-            // Ninguém neste processo pediu o serviço: o sistema o recriou depois de o processo
-            // morrer com FGS ativo (swipe/kill) e já repôs a notificação antiga. Não há núcleo
-            // Rust nem transferência aqui — encerra (o `onStartCommand` reentregue pode nem vir).
+            // Serviço recriado pelo sistema após o processo morrer com FGS ativo: sem núcleo nem transferência, encerra.
             main.post {
                 if (desired || pendingStarts.get() > 0) return@post
                 android.util.Log.w(TAG, "serviço recriado pelo sistema sem transferência ativa: encerrando")
@@ -166,9 +164,7 @@ class TransferService : Service() {
         android.util.Log.i(TAG, "onStartCommand action=${intent?.action} desired=$desired pending=${pendingStarts.get()} running=$running")
         when (intent?.action) {
             ACTION_START -> {
-                // START sem `start()` neste processo = o sistema reentregou o intent depois de o
-                // processo morrer (swipe/kill com FGS ativo). Não há núcleo Rust nem transferência
-                // aqui: cumpre o contrato (startForeground) e encerra, senão fica um FGS fantasma.
+                // START reentregue após o processo morrer: cumpre o contrato (startForeground) e encerra, senão fica um FGS fantasma.
                 val ours = pendingStarts.getAndUpdate { if (it > 0) it - 1 else 0 } > 0
                 val ok = foreground(build(intent))
                 if (!ours) {

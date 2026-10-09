@@ -138,9 +138,8 @@ object FileBridge {
     }
 
     /**
- * Publica um `.part` verificado em Downloads/ClipSync via MediaStore: a linha fica
- * com `IS_PENDING=1` até a cópia terminar e é apagada em erro. O `.part` só é
- * apagado depois do sucesso. Retorna `{uri, name}`.
+     * Publica um `.part` verificado em Downloads/ClipSync via MediaStore (`IS_PENDING=1` até o fim
+     * da cópia; linha apagada em erro). O `.part` só sai depois do sucesso. Retorna `{uri, name}`.
      */
     @JvmStatic
     fun publishToDownloads(context: Context, partPath: String, displayName: String, mime: String?): String {

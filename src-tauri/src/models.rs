@@ -127,9 +127,8 @@ pub struct Settings {
     pub language_resolved: String,
 }
 
-/// Combinações no formato "Ctrl+Alt+Shift+V" (o mesmo que o `global-hotkey` entende).
-/// Padrão em Ctrl+Alt+Shift: Ctrl+Shift+V/S/P são de "colar sem formatação",
-/// "Salvar como" e paletas de comando em muitos apps, e o atalho global rouba a tecla deles.
+/// Formato "Ctrl+Alt+Shift+V" (o do `global-hotkey`). Padrão em Ctrl+Alt+Shift porque
+/// Ctrl+Shift+V/S/P já são usados por muitos apps.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Shortcuts {

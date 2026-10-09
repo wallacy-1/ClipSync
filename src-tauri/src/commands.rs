@@ -112,7 +112,7 @@ pub async fn item_image(app: AppHandle, id: String, full: bool) -> Result<String
     .map_err(|e| AppError::Other(e.to_string()))?
 }
 
-/// "Mostrar na pasta" do PNG de um item de imagem (só desktop).
+/// Só desktop.
 #[tauri::command]
 pub fn reveal_item_file(app: AppHandle, state: State<'_, AppState>, id: String) -> Result<()> {
     let Some(item) = state.db.get_item(&id)? else {
@@ -340,7 +340,6 @@ pub struct PairingInfo {
     pub addrs: Vec<String>,
 }
 
-/// Endereços deste aparelho na rede, no formato de `PairingInfo.addrs`.
 #[tauri::command]
 pub fn local_addresses(state: State<'_, AppState>) -> Vec<String> {
     transport::display_addrs(&transport::local_addrs(), state.port())
@@ -452,7 +451,6 @@ pub async fn pair_with_payload(app: AppHandle, raw: String) -> Result<DeviceIden
     pair_at(&app, addrs, Some(p.pairing_id), pairing::PairAuth::Qr, &p.secret).await
 }
 
-/// Pede a um dispositivo visto na rede que abra o pareamento e mostre o código.
 #[tauri::command]
 pub async fn request_pairing(app: AppHandle, device_id: String) -> Result<()> {
     transport::request::send(&app, &device_id).await
@@ -709,9 +707,7 @@ pub fn notify_permission_request(open_settings: bool) -> Result<()> {
     }
 }
 
-/// Texto compartilhado: vira item de histórico e vai para os dispositivos escolhidos.
-/// Se o poll acabou de registrar o mesmo texto (bloco/widget com o núcleo morto abre o app
-/// com o clipboard ainda nele), reaproveita o item: o receptor recusa o id repetido e nada duplica.
+/// Se o poll acabou de registrar o mesmo texto, reaproveita o item: o receptor recusa o id repetido.
 #[tauri::command]
 pub fn share_text(app: AppHandle, state: State<'_, AppState>, text: String, device_ids: Vec<String>) -> Result<ClipboardItem> {
     let hash = crate::db::content_hash(&text);
@@ -775,7 +771,7 @@ pub fn update_open(app: AppHandle) -> Result<()> {
     }
 }
 
-/// Ajusta a cor dos ícones das barras de status/navegação ao tema do app (só Android; nos demais é no-op).
+/// Cor dos ícones das barras do sistema (só Android).
 #[tauri::command]
 pub fn set_system_bars(dark: bool) -> Result<()> {
     #[cfg(target_os = "android")]

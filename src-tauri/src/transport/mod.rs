@@ -25,7 +25,6 @@ pub struct TransportHandle {
     pub discovery: Discovery,
 }
 
-/// Sobe listener TCP, anuncia via mDNS, inicia busca e o loop de reconexão.
 pub async fn start(app: AppHandle) -> Result<()> {
     let state = app.state::<AppState>();
 
@@ -214,7 +213,6 @@ pub fn wake(app: &AppHandle) {
     }
 }
 
-/// Abre conexão com um dispositivo pareado se fizer sentido agora.
 pub fn maybe_connect(app: AppHandle, device_id: String) {
     let state = app.state::<AppState>();
     let Ok(Some(d)) = state.db.get_device(&device_id) else { return };

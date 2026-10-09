@@ -20,7 +20,7 @@ export interface ClipboardItem {
   isPinned: boolean;
   isSensitive: boolean;
   syncState: SyncState;
-  /** Texto formatado: `{ formatted: true }` (o HTML fica no backend). Imagem: `{ path, thumb, width, height, bytes, mime }`; `content` é só o hash e nunca aparece. */
+  /** Formatado: `{ formatted: true }` (HTML fica no backend). Imagem: `{ path, thumb, width, height, bytes, mime }` e `content` é só o hash. */
   metadata: Record<string, unknown>;
 }
 
@@ -74,9 +74,7 @@ export interface Settings {
   autostartInitialized: boolean;
   /** Windows: atalhos globais ("Ctrl+Alt+Shift+V"); "" = desligado. */
   shortcuts: Shortcuts;
-  /** Aparência: "system" segue o tema do sistema. */
   theme: ThemePref;
-  /** Idioma da interface: "auto" segue o sistema. */
   language: "auto" | "pt-BR" | "en";
   /** "pt-BR" | "en" já resolvido pelo front (`navigator.language`); o Rust só lê este campo. */
   languageResolved: string;
@@ -227,6 +225,5 @@ export interface UpdateInfo {
   version: string;
   currentVersion: string;
   notes: string | null;
-  /** Página da release (Android). */
   url?: string | null;
 }

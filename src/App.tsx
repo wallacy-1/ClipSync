@@ -40,9 +40,8 @@ export default function App() {
       </div>
     );
   }
-  // Sem `key` por idioma: remontar zeraria o estado local (aba do Android, folhas abertas). `useT()` acima assina `lang`,
-  // então este componente re-renderiza ao trocar e, como nada na árvore usa `memo`, os filhos (que leem `t()` e os
-  // rótulos de `format.ts`) re-renderizam junto, no mesmo lugar.
+  // Sem `key` por idioma: remontar zeraria o estado local. `useT()` assina `lang` e nada usa `memo`,
+  // então a árvore re-renderiza no lugar.
   if (isTrayWindow) return <TrayPanel />;
   return platform === "android" || platform === "ios" ? <AndroidShell /> : <WinShell />;
 }

@@ -49,7 +49,6 @@ pub fn normalize_incoming(item: &mut ClipboardItem, keep_formatting: bool) {
     set_html(item, clean);
 }
 
-/// Atributos cujo valor é uma URL.
 const URL_ATTRS: [&str; 12] =
     ["href", "src", "action", "formaction", "xlink:href", "background", "poster", "data", "cite", "codebase", "lowsrc", "dynsrc"];
 /// Elementos removidos junto com o conteúdo.

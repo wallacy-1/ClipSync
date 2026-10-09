@@ -21,7 +21,6 @@ export const PLATFORM_LABEL: Record<string, string> = {
   ios: "iOS",
 };
 
-/** Itens que "Abrir" entende (o backend ainda valida o conteúdo). */
 /** Tem "Abrir": e-mail, ou link que `open_item` aceita (http/https, ou www. que vira https). */
 export function isOpenable(i: ClipboardItem) {
   return i.contentType === "email" || (i.contentType === "link" && /^\s*(https?:\/\/|www\.)/i.test(i.content));

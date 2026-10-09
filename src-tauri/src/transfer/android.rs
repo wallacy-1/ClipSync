@@ -177,7 +177,6 @@ pub fn pick_file() -> Result<bool> {
     })
 }
 
-/// JSON do resultado do seletor, se já chegou.
 pub fn take_pick_result() -> Result<Option<String>> {
     with_class(FILE_BRIDGE, |env, class, _ctx| {
         let out = env

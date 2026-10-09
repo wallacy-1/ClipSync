@@ -13,7 +13,6 @@ pub struct ImeTheme {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImeStatus {
-    /// Plataforma tem o teclado (só Android).
     pub supported: bool,
     /// Habilitado em Configurações → Teclados.
     pub enabled: bool,

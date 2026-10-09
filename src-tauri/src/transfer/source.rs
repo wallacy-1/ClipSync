@@ -1,12 +1,5 @@
-//! Origem de uma transferência de saída, atrás de uma abstração única:
-//!
-//! ```text
-//! TransferSource
-//!   ├── Path        (Windows; também caminhos privados no Android)
-//!   └── AndroidUri  (content://…, aberto via ContentResolver → fd → File)
-//! ```
-//!
-//! O emissor só vê um `std::fs::File` seekável + tamanho. No Android, uma URI
+//! Origem de uma transferência de saída: caminho ou `content://`. O emissor só vê um `File`
+//! seekável + tamanho. No Android, uma URI
 //! não-seekável (provider que devolve pipe) cai no **fallback em disco**: cópia
 //! única para `<privado>/transfers/out-<id>.tmp` — nunca para a memória.
 use crate::error::{AppError, Result};

@@ -21,7 +21,6 @@ pub enum Role {
 }
 
 pub enum Mode {
-    /// Conexão normal entre dispositivos já pareados.
     Session,
     /// Pareamento: PAKE com o segredo do QR ou o código digitado; a chave vira a PSK do Noise.
     Pair { auth: PairAuth, password: Vec<u8> },
@@ -93,7 +92,6 @@ fn file_msg_kind(m: &Message) -> &'static str {
     }
 }
 
-/// Conexão de saída para um dispositivo confiável já conhecido.
 pub async fn connect_session(app: AppHandle, device_id: String, addr: String) {
     let state = app.state::<AppState>();
     {
@@ -413,7 +411,6 @@ async fn run_with_pairing_id(
     sync::on_connected(&app, &stored.device_id);
     transfer::manager::on_connected(&app, &stored.device_id);
 
-    // 5. Loop de mensagens.
     let device_id = stored.device_id.clone();
     let mut ping = tokio::time::interval(PING_EVERY);
     ping.tick().await;
@@ -480,7 +477,6 @@ async fn run_with_pairing_id(
         }
     };
 
-    // 6. Encerramento.
     {
         let mut conns = state.connections.lock().unwrap();
         // Pelo `conn_id`: o endereço discado se repete entre reconexões e não identifica a conexão.

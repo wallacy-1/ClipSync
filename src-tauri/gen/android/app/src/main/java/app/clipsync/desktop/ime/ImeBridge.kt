@@ -18,7 +18,6 @@ object ImeBridge {
     private fun component(context: Context) =
         ComponentName(context, ClipSyncImeService::class.java)
 
-    /** IME aparece na lista "Teclados ativados" do sistema. */
     @JvmStatic
     fun isEnabled(context: Context): Boolean {
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager ?: return false
@@ -26,7 +25,6 @@ object ImeBridge {
         return imm.enabledInputMethodList.any { it.component == me }
     }
 
-    /** IME é o teclado padrão atual do usuário. */
     @JvmStatic
     fun isSelected(context: Context): Boolean {
         val current = Settings.Secure.getString(context.contentResolver, Settings.Secure.DEFAULT_INPUT_METHOD)
