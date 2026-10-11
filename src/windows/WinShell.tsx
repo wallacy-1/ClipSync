@@ -49,13 +49,13 @@ export function WinShell() {
     ? t("nav.statusPaused")
     : !sync.online
       ? t("nav.statusStarting")
-      : sync.queuedCount > 0 && connected === 0
-        ? t("nav.statusReconnecting")
-        : t("nav.statusSynced", { n: peers.length + 1 });
+      : connected === 0
+        ? (sync.queuedCount > 0 ? t("nav.statusReconnecting") : t("nav.statusNoneConnected"))
+        : t("nav.statusSynced", { n: connected + 1 });
   // Sem nenhum pareado não há o que sincronizar; o status só confundiria.
   const showStatus = peers.length > 0 || sync.paused;
   const panelShortcut = useApp((s) => s.settings?.shortcuts.openPanel);
-  const statusClass = sync.paused ? "" : sync.queuedCount > 0 && connected === 0 ? "warn" : "online";
+  const statusClass = sync.paused ? "" : connected === 0 ? (sync.queuedCount > 0 ? "warn" : "") : "online";
 
   return (
     <div className="win">

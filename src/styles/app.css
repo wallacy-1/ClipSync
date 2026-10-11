@@ -164,10 +164,13 @@ button { font-family: inherit; }
 }
 .row:hover { background: var(--color-surface); }
 .row.selected { background: var(--color-surface); border-color: color-mix(in srgb, var(--color-accent) 55%, transparent); }
+/* Colunas de largura fixa: tipo, estado e ações alinham entre linhas de tipos diferentes. */
+.row .kind { width: 84px; flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+.row .state { width: 104px; flex-shrink: 0; display: flex; justify-content: flex-end; }
 .row .body { flex: 1; min-width: 0; }
-.row .meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; font-size: 11.5px; color: var(--color-neutral-700); }
-.row .meta .note { font-weight: 700; color: var(--color-accent-800); }
-.row .actions { display: flex; gap: 2px; }
+.row .meta { display: flex; align-items: center; gap: 8px; margin-top: 3px; font-size: 11.5px; color: var(--color-neutral-700); white-space: nowrap; overflow: hidden; }
+.row .meta .note { font-weight: 700; color: var(--color-accent-800); min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.row .actions { display: flex; gap: 2px; flex-shrink: 0; }
 .row .btn-secondary.sm { font-size: 12.5px; padding: 6px 14px; }
 
 .rail {

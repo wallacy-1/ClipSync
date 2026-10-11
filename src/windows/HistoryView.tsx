@@ -3,7 +3,7 @@ import { useT, type Key } from "../i18n";
 import { Clipboard, Copy, External, Mail, Pause, Play, Search, Send, Trash, WifiOff } from "../components/Icons";
 import { PAUSE_OPTIONS, pausedUntilText } from "../components/pause";
 import { SHORTCUTS } from "../components/SettingsRows";
-import { CheckBox, Dot, ItemImage, ItemText, StateTag, TypeTag, useMasked } from "../components/ui";
+import { CheckBox, Confirm, Dot, ItemImage, ItemText, StateTag, TypeTag, useMasked } from "../components/ui";
 import { TYPE_LABEL, countdown, deviceName, imageLabel, isMono, isOpenable, relTime } from "../lib/format";
 import type { Filter } from "../lib/types";
 import { usePeers, useVisibleItems, useApp } from "../store/app";
@@ -32,13 +32,13 @@ export function HistoryView() {
   const peers = usePeers();
   const selectedId = useApp((s) => s.selectedId);
   const select = useApp((s) => s.select);
-  const sendTargets = useApp((s) => s.sendTargets);
   const setPaused = useApp((s) => s.setPaused);
   const retry = useApp((s) => s.retry);
-  const send = useApp((s) => s.send);
+  const clearHistory = useApp((s) => s.clearHistory);
   const searchRef = useRef<HTMLInputElement>(null);
   const [pauseMenu, setPauseMenu] = useState(false);
   const pauseRef = useRef<HTMLDivElement>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   // Menu de pausa: fecha com Esc, clique fora ou quando a pausa muda por outro caminho.
   useEffect(() => {
@@ -84,7 +84,7 @@ export function HistoryView() {
       ? t("history.pinnedCount", { n: pinned })
       : total === 0
         ? t("history.noItems")
-        : t("history.totalCount", { n: total, pinned });
+        : t("history.totalCount", { n: total, pinned: t("history.pinnedShort", { n: pinned }) });
 
   return (
     <>
@@ -96,11 +96,9 @@ export function HistoryView() {
               <input ref={searchRef} value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t("history.searchPlaceholder")} />
               <span className="kbd">Ctrl+F</span>
             </label>
-            {peers.length > 0 && (
-              <button className="btn btn-secondary" disabled={!selected} onClick={() => selected && send(selected.id, sendTargets)}>
-                <Send size={15} /> {t("history.sendTo")}
-              </button>
-            )}
+            <button className="btn btn-secondary" disabled={total === 0} onClick={() => setConfirmClear(true)}>
+              <Trash size={15} /> {t("history.clearHistory")}
+            </button>
             {sync.paused ? (
               <button className="btn btn-primary" onClick={() => setPaused(false)}>
                 <Play size={15} /> {t("history.resumeSync")}
@@ -176,6 +174,16 @@ export function HistoryView() {
       </div>
 
       <Rail />
+      {confirmClear && (
+        <Confirm
+          title={t("settings.clearTitle")}
+          body={t("settings.clearBody")}
+          confirmLabel={t("settings.clear")}
+          danger
+          onCancel={() => setConfirmClear(false)}
+          onConfirm={() => { setConfirmClear(false); void clearHistory(true); }}
+        />
+      )}
     </>
   );
 }
@@ -189,7 +197,7 @@ function Row({ id, selected }: { id: string; selected: boolean }) {
   const revealed = useApp((s) => !!s.revealed[id]);
   const hideSensitive = useApp((s) => s.settings?.hideSensitive ?? true);
   const hasPeers = usePeers().length > 0;
-  const { select, copy, remove, reveal, hide, send, sendTargets, openItem } = useApp.getState();
+  const { select, copy, remove, reveal, hide, send, sendTargets } = useApp.getState();
   if (!it) return null;
   const masked = it.isSensitive && hideSensitive && !revealed;
   const note = it.isSensitive
@@ -198,7 +206,7 @@ function Row({ id, selected }: { id: string; selected: boolean }) {
 
   return (
     <div className={`row${selected ? " selected" : ""}`} onClick={() => select(it.id)} onDoubleClick={() => copy(it.id)}>
-      <TypeTag item={it} />
+      <div className="kind"><TypeTag item={it} /></div>
       <div className="body">
         <ItemText item={it} />
         <div className="meta">
@@ -213,14 +221,9 @@ function Row({ id, selected }: { id: string; selected: boolean }) {
           {t(masked ? "history.reveal" : "history.hide")}
         </button>
       )}
-      {hasPeers && <StateTag item={it} />}
+      {hasPeers && <div className="state"><StateTag item={it} /></div>}
       <div className="actions">
         <button className="icon-btn" title={t("history.copy")} onClick={(e) => { e.stopPropagation(); void copy(it.id); }}><Copy size={15} /></button>
-        {isOpenable(it) && (
-          <button className="icon-btn" title={it.contentType === "email" ? t("history.writeEmail") : t("history.open")} disabled={masked} onClick={(e) => { e.stopPropagation(); void openItem(it.id); }}>
-            {it.contentType === "email" ? <Mail size={15} /> : <External size={15} />}
-          </button>
-        )}
         {hasPeers && <button className="icon-btn" title={t("history.sendToMarked")} onClick={(e) => { e.stopPropagation(); void send(it.id, sendTargets); }}><Send size={15} /></button>}
         <button className="icon-btn" title={t("history.delete")} onClick={(e) => { e.stopPropagation(); void remove(it.id); }}><Trash size={15} /></button>
       </div>

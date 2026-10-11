@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import { resolveLang, setLang, t, type Lang } from "../i18n";
-import { isClipImage, isTransferActive, transferError } from "../lib/format";
+import { TYPE_LABEL, deviceName, isClipImage, isTransferActive, transferError } from "../lib/format";
 import { api, errorText, listen } from "../lib/ipc";
 import type {
   ClipboardItem,
@@ -680,12 +680,19 @@ export const useApp = create<AppStore>((set, get) => ({
   },
 }));
 
+/** Conteúdo, tipo (no idioma ativo ou o id interno) ou nome do dispositivo de origem. */
+function matchesQuery(s: AppStore, it: ClipboardItem, q: string): boolean {
+  // Imagem guarda só um hash em `content`: a busca casa pelo tipo, não por ele.
+  if (it.contentType !== "image" && it.content.toLowerCase().includes(q)) return true;
+  if (it.contentType.includes(q) || TYPE_LABEL[it.contentType].toLowerCase().includes(q)) return true;
+  return deviceName(s.devices, it.sourceDeviceId, s.me?.deviceId ?? "").toLowerCase().includes(q);
+}
+
 export function selectVisibleItems(s: AppStore): ClipboardItem[] {
   const q = s.query.trim().toLowerCase();
   const f = s.view === "pinned" ? "pinned" : s.filter;
   return s.items.filter((it) => {
-    // Imagem guarda só um hash em `content`: a busca casa pelo tipo, não por ele.
-    if (q && !((it.contentType !== "image" && it.content.toLowerCase().includes(q)) || it.contentType.includes(q))) return false;
+    if (q && !matchesQuery(s, it, q)) return false;
     switch (f) {
       case "pinned": return it.isPinned;
       case "sensitive": return it.isSensitive;
