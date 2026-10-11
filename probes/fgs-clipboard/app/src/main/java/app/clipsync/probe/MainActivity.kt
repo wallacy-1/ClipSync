@@ -23,6 +23,24 @@ class MainActivity : AppCompatActivity() {
         val start = Button(this).apply { text = "Iniciar service"; setOnClickListener { startProbe() } }
         val stop = Button(this).apply { text = "Parar service"; setOnClickListener { stopService(Intent(this@MainActivity, ClipProbeService::class.java)) } }
         root.addView(status); root.addView(start); root.addView(stop)
+        // Automação: `--ez fields true` mostra um campo de cada tipo, para testar o teclado.
+        if (intent?.getBooleanExtra("fields", false) == true) {
+            val t = android.text.InputType.TYPE_CLASS_TEXT
+            listOf(
+                "senha" to (t or android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD),
+                "numero" to android.text.InputType.TYPE_CLASS_NUMBER,
+                "telefone" to android.text.InputType.TYPE_CLASS_PHONE,
+                "email" to (t or android.text.InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS),
+                "url" to (t or android.text.InputType.TYPE_TEXT_VARIATION_URI),
+                "busca" to t,
+            ).forEach { (hint, type) ->
+                root.addView(android.widget.EditText(this).apply {
+                    this.hint = hint
+                    inputType = type
+                    if (hint == "busca") imeOptions = android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH
+                })
+            }
+        }
         setContentView(root)
 
         if (Build.VERSION.SDK_INT >= 33 &&
@@ -35,6 +53,11 @@ class MainActivity : AppCompatActivity() {
         // Automação: `am start ... --es copy_image x.png` põe uma imagem no clipboard como
         // um app qualquer faria ("Copiar imagem"). O PNG vem de getExternalFilesDir (adb push).
         intent?.getStringExtra("copy_image")?.let { copyImage(it) }
+        // Automação: `am start ... --es copy_text "..."` põe texto no clipboard.
+        intent?.getStringExtra("copy_text")?.let {
+            getSystemService(android.content.ClipboardManager::class.java)
+                .setPrimaryClip(android.content.ClipData.newPlainText("probe", it))
+        }
     }
 
     private fun copyImage(name: String) {
