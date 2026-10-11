@@ -1,6 +1,7 @@
 package app.clipsync.desktop.clip
 
 import android.content.ClipData
+import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
@@ -24,6 +25,8 @@ object ClipImageBridge {
     private const val CACHE_SUBDIR = "clip"
     private const val KEEP_IN_CACHE = 5
     private const val TAG = "ClipSyncClip"
+    private const val READ_ATTEMPTS = 4
+    private const val READ_RETRY_MS = 250L
 
     private fun manager(context: Context) =
         context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -36,40 +39,66 @@ object ClipImageBridge {
     fun peek(context: Context): String? {
         val desc = runCatching { manager(context)?.primaryClipDescription }.getOrNull() ?: return null
         if (!desc.hasMimeType("image/*")) return null
-        if (desc.label?.toString() == OWN_LABEL) return null
-        val ts = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) desc.timestamp else 0L
-        val mime = (0 until desc.mimeTypeCount).map { desc.getMimeType(it) }.firstOrNull { it.startsWith("image/") }
+        if (isOwn(desc)) return null
         return JSONObject()
-            .put("stamp", "$ts|${desc.label ?: ""}|$mime")
-            .put("mime", mime ?: JSONObject.NULL)
+            .put("stamp", stamp(desc))
+            .put("mime", mimeOf(desc) ?: JSONObject.NULL)
             .toString()
     }
 
-    /**
-     * Converte a imagem do clipboard para PNG em [destPath] (o fio leva sempre PNG,
-     * o PC só decodifica PNG). Retorna o tamanho gravado, ou -1.
-     */
+    /** Imagem que o próprio ClipSync pôs no clipboard (anti-loop). */
     @JvmStatic
-    fun copyAsPng(context: Context, destPath: String): Long {
+    fun isOwn(desc: ClipDescription): Boolean = desc.label?.toString() == OWN_LABEL
+
+    @JvmStatic
+    fun mimeOf(desc: ClipDescription): String? =
+        (0 until desc.mimeTypeCount).map { desc.getMimeType(it) }.firstOrNull { it.startsWith("image/") }
+
+    /** Identifica uma cópia (não o conteúdo). O teclado usa o mesmo formato no inbox de imagens. */
+    @JvmStatic
+    fun stamp(desc: ClipDescription): String {
+        val ts = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) desc.timestamp else 0L
+        return "$ts|${desc.label ?: ""}|${mimeOf(desc)}"
+    }
+
+    /** Decodifica a imagem de [uri] e grava como PNG em [dest]. Retorna o tamanho gravado, ou -1. */
+    @JvmStatic
+    fun writePng(context: Context, uri: android.net.Uri, dest: File): Long {
         return try {
-            val clip = manager(context)?.primaryClip ?: return -1
-            if (clip.itemCount == 0) return -1
-            val uri = clip.getItemAt(0).uri ?: return -1
             val bitmap = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it) } ?: return -1
-            val out = File(destPath)
-            out.parentFile?.mkdirs()
-            FileOutputStream(out).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+            dest.parentFile?.mkdirs()
+            FileOutputStream(dest).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
             bitmap.recycle()
-            out.length()
-        } catch (_: Exception) {
+            dest.length()
+        } catch (_: Throwable) {
             -1
         }
     }
 
+    /** Converte a imagem do clipboard para PNG em [destPath] (o PC só decodifica PNG). Retorna o tamanho, ou -1. */
+    @JvmStatic
+    fun copyAsPng(context: Context, destPath: String): Long = clipToPng(context, File(destPath))
+
     /**
-     * Miniatura PNG de [src] em [dest], com o lado maior em até [max] px. Decodifica já reduzido
-     * (`inSampleSize`), então um print grande não ocupa memória inteira. Retorna
-     * `[largura, altura, larguraMiniatura, alturaMiniatura]` (largura e altura do original), ou null.
+     * Imagem atual do clipboard em PNG. Logo após a cópia a permissão de leitura pode ainda não valer
+     * (`SecurityException`): relê o clipboard e tenta de novo; desiste se já não é [expected]. Bloqueia.
+     */
+    @JvmStatic
+    @JvmOverloads
+    fun clipToPng(context: Context, dest: File, expected: android.net.Uri? = null): Long {
+        repeat(READ_ATTEMPTS) { attempt ->
+            if (attempt > 0) Thread.sleep(READ_RETRY_MS)
+            val current = runCatching { manager(context)?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.uri }.getOrNull()
+            if (expected != null && current != expected) return -1
+            val n = writePng(context, current ?: return -1, dest)
+            if (n > 0) return n
+        }
+        return -1
+    }
+
+    /**
+     * Miniatura PNG de [src] em [dest] (lado maior até [max] px), decodificada já reduzida. Retorna
+     * `[largura, altura, larguraMiniatura, alturaMiniatura]` (as duas primeiras do original), ou null.
      */
     @JvmStatic
     fun thumbnail(src: String, dest: String, max: Int): IntArray? {

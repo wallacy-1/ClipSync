@@ -199,6 +199,66 @@ mod bridge {
 }
 
 #[cfg(target_os = "android")]
+mod image_bridge {
+    use super::APP;
+    use crate::db::ItemFilter;
+    use crate::state::AppState;
+    use jni::objects::JClass;
+    use jni::sys::{jboolean, jint, jstring, JNI_FALSE, JNI_TRUE};
+    use jni::JNIEnv;
+    use tauri::Manager;
+
+    /// `CoreBridge.nativeOnImage(): Boolean` — o teclado viu uma imagem nova no clipboard.
+    /// Segue o mesmo caminho do polling (`image::poll`: dedupe, PNG, histórico, envio).
+    #[no_mangle]
+    pub extern "system" fn Java_app_clipsync_desktop_ime_CoreBridge_nativeOnImage(_env: JNIEnv, _class: JClass) -> jboolean {
+        let Some(app) = APP.get() else { return JNI_FALSE };
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| crate::clipboard::image::poll(app))) {
+            Ok(()) => JNI_TRUE,
+            Err(_) => {
+                log::error!("[CLIPBOARD] image::poll entrou em pânico na ponte do IME");
+                JNI_FALSE
+            }
+        }
+    }
+
+    /// `CoreBridge.nativeHistory(limit): String?` — JSON dos itens mais recentes para o painel do
+    /// teclado: `[{id, type, text, sensitive, pinned, ts, path, thumb}]`. `null` = núcleo não subiu.
+    #[no_mangle]
+    pub extern "system" fn Java_app_clipsync_desktop_ime_CoreBridge_nativeHistory(env: JNIEnv, _class: JClass, limit: jint) -> jstring {
+        let Some(app) = APP.get() else { return std::ptr::null_mut() };
+        let json = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let filter = ItemFilter { limit: limit.clamp(1, 100) as u32, ..Default::default() };
+            let items = app.state::<AppState>().db.list_items(&filter).unwrap_or_default();
+            let list: Vec<serde_json::Value> = items
+                .iter()
+                .map(|it| {
+                    let image = matches!(it.content_type, crate::content::ContentType::Image);
+                    serde_json::json!({
+                        "id": it.id,
+                        "type": it.content_type.as_str(),
+                        "text": if image { "" } else { it.content.as_str() },
+                        "sensitive": it.is_sensitive,
+                        "pinned": it.is_pinned,
+                        "ts": it.created_at,
+                        "path": it.metadata.get("path"),
+                        "thumb": it.metadata.get("thumb"),
+                    })
+                })
+                .collect();
+            serde_json::Value::Array(list).to_string()
+        }));
+        match json {
+            Ok(s) => env.new_string(s).map(|s| s.into_raw()).unwrap_or(std::ptr::null_mut()),
+            Err(_) => {
+                log::error!("[IME] histórico do teclado entrou em pânico");
+                std::ptr::null_mut()
+            }
+        }
+    }
+}
+
+#[cfg(target_os = "android")]
 mod wake_bridge {
     use super::APP;
     use jni::objects::JClass;
@@ -225,6 +285,14 @@ mod platform_inbox {
     use tauri::AppHandle;
 
     const CLASS: &str = "app.clipsync.desktop.ime.CoreBridge";
+
+    #[derive(serde::Deserialize)]
+    struct ImageEntry {
+        id: String,
+        path: String,
+        stamp: String,
+        ts: i64,
+    }
 
     #[derive(serde::Deserialize)]
     struct InboxEntry {
@@ -271,7 +339,64 @@ mod platform_inbox {
         })
     }
 
+    fn list_images() -> Result<Vec<ImageEntry>> {
+        let json = with_class(CLASS, |env, class, ctx| {
+            let out = env
+                .call_static_method(class, "listImageInbox", "(Landroid/content/Context;)Ljava/lang/String;", &[JValue::Object(ctx)])
+                .and_then(|v| v.l())
+                .map_err(|e| AppError::Other(format!("CoreBridge.listImageInbox: {e}")))?;
+            jstring_to_string(env, out)
+        })?;
+        Ok(serde_json::from_str(&json)?)
+    }
+
+    fn remove_image(id: &str) -> Result<()> {
+        with_class(CLASS, |env, class, ctx| {
+            let js = env.new_string(id).map_err(|e| AppError::Other(e.to_string()))?;
+            env.call_static_method(
+                class,
+                "removeImageInbox",
+                "(Landroid/content/Context;Ljava/lang/String;)V",
+                &[JValue::Object(ctx), JValue::Object(&js)],
+            )
+            .map_err(|e| AppError::Other(format!("CoreBridge.removeImageInbox: {e}")))?;
+            Ok(())
+        })
+    }
+
+    /// Imagens copiadas com o núcleo morto: entram no histórico e seguem para os pareados.
+    fn drain_images(app: &AppHandle) {
+        let entries = match list_images() {
+            Ok(e) => e,
+            Err(e) => {
+                log::warn!("[IME] inbox de imagens ilegível: {e}");
+                return;
+            }
+        };
+        if entries.is_empty() {
+            return;
+        }
+        log::info!("[IME] Draining image inbox count={}", entries.len());
+        let now = now_ms();
+        for e in entries {
+            if now - e.ts <= INBOX_TTL_MS {
+                let path = std::path::PathBuf::from(&e.path);
+                let ok = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                    clipboard::image::ingest_inbox_png(app, &path, &e.stamp)
+                }))
+                .is_ok();
+                if !ok {
+                    continue;
+                }
+            }
+            if let Err(err) = remove_image(&e.id) {
+                log::warn!("[IME] não removeu imagem do inbox id={}: {err}", e.id);
+            }
+        }
+    }
+
     pub fn drain_inbox(app: &AppHandle) {
+        drain_images(app);
         let entries = match list() {
             Ok(e) => e,
             Err(e) => {

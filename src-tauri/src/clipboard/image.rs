@@ -106,6 +106,31 @@ pub fn poll(app: &AppHandle) {
     }
 }
 
+/// Imagem que o teclado guardou em PNG enquanto o núcleo não existia (`ImeInbox`). `stamp` é o
+/// mesmo carimbo de `peek`, então a cópia que o polling também vir é descartada pelo dedupe.
+/// Sem `poll_changed` como filtro: o `prime` da subida já marcou esse carimbo como visto.
+/// Bloqueante (hash e miniatura); chamar fora da thread principal.
+#[cfg(target_os = "android")]
+pub fn ingest_inbox_png(app: &AppHandle, src: &Path, stamp: &str) {
+    let k = key(stamp);
+    let fresh = {
+        let state = app.state::<AppState>();
+        let mut d = state.clip_dedupe.lock().unwrap();
+        d.poll_changed(&k);
+        matches!(d.decide(&k, now_ms()), super::dedupe::Decision::New)
+    };
+    if !fresh {
+        return;
+    }
+    let Ok(path) = new_path(app) else { return };
+    if std::fs::rename(src, &path).is_err() && std::fs::copy(src, &path).is_err() {
+        log::warn!("[CLIPBOARD] imagem do inbox do teclado ilegível");
+        return;
+    }
+    let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(0);
+    on_local_image(app, &path, size);
+}
+
 #[cfg(windows)]
 fn key_rgba(rgba: &[u8]) -> String {
     use sha2::{Digest, Sha256};

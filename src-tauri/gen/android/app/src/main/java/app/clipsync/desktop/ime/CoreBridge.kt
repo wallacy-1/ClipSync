@@ -44,6 +44,24 @@ object CoreBridge {
     @JvmStatic
     external fun nativeCopyLatest(): Boolean
 
+    /** Imagem nova no clipboard: o núcleo lê, converte e envia (`image::poll`). `false` = indisponível. */
+    @JvmStatic
+    external fun nativeOnImage(): Boolean
+
+    /** JSON `[{id, type, text, sensitive, pinned, ts, path, thumb}]` dos itens recentes; `null` = núcleo fora. */
+    @JvmStatic
+    external fun nativeHistory(limit: Int): String?
+
+    @JvmStatic
+    fun history(limit: Int): String? = if (ready) runCatching { nativeHistory(limit) }.getOrNull() else null
+
+    /** JSON `[{id, path, stamp, ts}]` das imagens copiadas com o núcleo morto. */
+    @JvmStatic
+    fun listImageInbox(context: Context): String = ImeInbox.listImagesJson(context)
+
+    @JvmStatic
+    fun removeImageInbox(context: Context, id: String) = ImeInbox.removeImage(context, id)
+
     /** JSON `[{id, hash, text, ts, sensitive}]` dos itens ainda não processados. */
     @JvmStatic
     fun listInbox(context: Context): String = ImeInbox.listJson(context)

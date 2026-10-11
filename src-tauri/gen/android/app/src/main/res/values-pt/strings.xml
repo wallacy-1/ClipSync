@@ -5,12 +5,12 @@
     <string name="tile_label">Enviar clipboard</string>
     <string name="tile_no_device">Sem dispositivo pareado</string>
     <string name="tile_paused">Pausado</string>
-    <string name="tile_connected">%d conectados</string>
+    <string name="tile_connected">Conectados: %d</string>
     <string name="tile_offline">Offline · vai para a fila</string>
     <string name="process_text_label">ClipSync: enviar</string>
 
     <!-- Widget -->
-    <string name="widget_description">Status, último item copiado e botões para enviar o clipboard ao PC.</string>
+    <string name="widget_description">Status, último item copiado e botões para enviar o clipboard aos dispositivos pareados.</string>
     <string name="widget_open_app">Abra o ClipSync para começar</string>
     <string name="widget_no_device">Sem dispositivo pareado</string>
     <string name="widget_offline">Offline</string>
@@ -32,7 +32,7 @@
     <!-- Toasts do envio rápido -->
     <string name="quick_read_failed">Não foi possível ler a área de transferência</string>
     <string name="quick_empty">Área de transferência vazia</string>
-    <string name="quick_image">Imagem: enviada pelas regras de sync automático</string>
+    <string name="quick_image">Imagem: o ClipSync abre e envia conforme o sync automático</string>
     <string name="quick_sent">Enviado para %s</string>
     <string name="quick_queued">Na fila para %s (offline)</string>
     <string name="quick_sent_and_queued">Enviado para %1$s · na fila para %2$s</string>
@@ -48,15 +48,15 @@
     <string name="channel_received">Arquivos recebidos</string>
     <string name="received_open_with">Abrir com</string>
     <string name="channel_keepalive">Manter conectado</string>
-    <string name="channel_keepalive_desc">Mantém o ClipSync recebendo cópias com o app fechado</string>
+    <string name="channel_keepalive_desc">Mantém o ClipSync recebendo cópias com o app em segundo plano</string>
     <string name="keepalive_title">ClipSync conectado</string>
     <string name="keepalive_text">Recebendo cópias em segundo plano. Desligue em Ajustes → Manter conectado.</string>
-
-    <!-- Teclado: rótulo da tecla Enter conforme a ação do campo -->
-    <string name="ime_action_go">Ir</string>
-    <string name="ime_action_search">Buscar</string>
-    <string name="ime_action_send">Enviar</string>
-    <string name="ime_action_next">Próximo</string>
-    <string name="ime_action_done">OK</string>
-    <string name="ime_action_previous">Anterior</string>
+    <string name="ime_clip_image">Imagem</string>
+    <string name="ime_clip_image_unsupported">Este app não aceita imagem aqui</string>
+    <string name="ime_panel_emoji">Emoji</string>
+    <string name="ime_panel_history">Histórico</string>
+    <string name="ime_history_empty">Nada copiado ainda</string>
+    <string name="ime_history_unavailable">Abra o ClipSync para ver o histórico</string>
+    <string name="ime_open_app">Abrir ClipSync</string>
+    <string name="ime_history_partial">Só o que foi copiado com o ClipSync fechado</string>
 </resources>

@@ -88,4 +88,75 @@ object ImeInbox {
     }
 
     fun count(context: Context): Int = files(context).size
+
+    // ---- imagens ----
+    // PNG em `files/ime_inbox_img/<ts>-<id>.png` + `<ts>-<id>.stamp` (carimbo da cópia, para o
+    // dedupe do núcleo). Não selados: o histórico guarda as imagens em PNG puro de qualquer forma.
+
+    private const val IMG_DIR = "ime_inbox_img"
+    const val MAX_IMAGES = 5
+    /** Mesmo limite do núcleo (`image::MAX_BYTES`). */
+    private const val MAX_IMAGE_BYTES = 64L * 1024 * 1024
+
+    private fun imgDir(context: Context): File =
+        File(context.applicationContext.filesDir, IMG_DIR).apply { mkdirs() }
+
+    private fun images(context: Context): List<File> =
+        imgDir(context).listFiles { f -> f.isFile && f.name.endsWith(".png") }?.sortedBy { it.name } ?: emptyList()
+
+    private fun stampFile(png: File) = File(png.parentFile, png.name.removeSuffix(".png") + ".stamp")
+
+    @Synchronized
+    fun putImage(context: Context, uri: android.net.Uri, stamp: String): Boolean {
+        pruneImages(context)
+        val existing = images(context)
+        if (existing.any { runCatching { stampFile(it).readText() }.getOrNull() == stamp }) return true
+        if (existing.size >= MAX_IMAGES) existing.first().let { stampFile(it).delete(); it.delete() }
+        val ts = System.currentTimeMillis()
+        val id = UUID.randomUUID().toString()
+        val tmp = File(imgDir(context), "$ts-$id.tmp")
+        val size = app.clipsync.desktop.clip.ClipImageBridge.clipToPng(context, tmp, uri)
+        if (size <= 0 || size > MAX_IMAGE_BYTES) {
+            tmp.delete()
+            return false
+        }
+        val png = File(imgDir(context), "$ts-$id.png")
+        return runCatching {
+            stampFile(png).writeText(stamp)
+            tmp.renameTo(png)
+        }.getOrDefault(false)
+    }
+
+    @Synchronized
+    fun pruneImages(context: Context) {
+        val now = System.currentTimeMillis()
+        for (f in images(context)) {
+            if (now - tsOf(f) > TTL_MS) { stampFile(f).delete(); f.delete() }
+        }
+        imgDir(context).listFiles { f -> f.name.endsWith(".tmp") }?.forEach { it.delete() }
+    }
+
+    /** JSON `[{id, path, stamp, ts}]` das imagens pendentes, da mais antiga para a mais nova. */
+    @Synchronized
+    fun listImagesJson(context: Context): String {
+        pruneImages(context)
+        val arr = JSONArray()
+        for (f in images(context)) {
+            val stamp = runCatching { stampFile(f).readText() }.getOrNull() ?: continue
+            arr.put(
+                JSONObject()
+                    .put("id", f.name.substringAfter("-").removeSuffix(".png"))
+                    .put("path", f.absolutePath)
+                    .put("stamp", stamp)
+                    .put("ts", tsOf(f)),
+            )
+        }
+        return arr.toString()
+    }
+
+    /** O núcleo já moveu o PNG para o histórico; apaga o que sobrou. */
+    @Synchronized
+    fun removeImage(context: Context, id: String) {
+        imgDir(context).listFiles { f -> f.name.substringAfter("-").substringBeforeLast(".") == id }?.forEach { it.delete() }
+    }
 }

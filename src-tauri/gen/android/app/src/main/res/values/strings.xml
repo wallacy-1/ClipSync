@@ -13,12 +13,12 @@
     <string name="tile_label">Send clipboard</string>
     <string name="tile_no_device">No paired device</string>
     <string name="tile_paused">Paused</string>
-    <string name="tile_connected">%d connected</string>
+    <string name="tile_connected">Connected: %d</string>
     <string name="tile_offline">Offline · goes to the queue</string>
     <string name="process_text_label">ClipSync: send</string>
 
     <!-- Widget -->
-    <string name="widget_description">Status, last copied item and buttons to send the clipboard to your PC.</string>
+    <string name="widget_description">Status, last copied item and buttons to send the clipboard to your paired devices.</string>
     <string name="widget_open_app">Open ClipSync to get started</string>
     <string name="widget_no_device">No paired device</string>
     <string name="widget_offline">Offline</string>
@@ -40,7 +40,7 @@
     <!-- Toasts do envio rápido -->
     <string name="quick_read_failed">Couldn\'t read the clipboard</string>
     <string name="quick_empty">Clipboard is empty</string>
-    <string name="quick_image">Image: sent by the automatic sync rules</string>
+    <string name="quick_image">Image: ClipSync opens and sends it per your auto sync settings</string>
     <string name="quick_sent">Sent to %s</string>
     <string name="quick_queued">Queued for %s (offline)</string>
     <string name="quick_sent_and_queued">Sent to %1$s · queued for %2$s</string>
@@ -56,15 +56,15 @@
     <string name="channel_received">Received files</string>
     <string name="received_open_with">Open with</string>
     <string name="channel_keepalive">Stay connected</string>
-    <string name="channel_keepalive_desc">Keeps ClipSync receiving copies while the app is closed</string>
+    <string name="channel_keepalive_desc">Keeps ClipSync receiving copies while the app is in the background</string>
     <string name="keepalive_title">ClipSync connected</string>
     <string name="keepalive_text">Receiving copies in the background. Turn off in Settings → Stay connected.</string>
-
-    <!-- Teclado: rótulo da tecla Enter conforme a ação do campo -->
-    <string name="ime_action_go">Go</string>
-    <string name="ime_action_search">Search</string>
-    <string name="ime_action_send">Send</string>
-    <string name="ime_action_next">Next</string>
-    <string name="ime_action_done">Done</string>
-    <string name="ime_action_previous">Previous</string>
+    <string name="ime_clip_image">Image</string>
+    <string name="ime_clip_image_unsupported">This app doesn\'t accept images here</string>
+    <string name="ime_panel_emoji">Emoji</string>
+    <string name="ime_panel_history">Clipboard history</string>
+    <string name="ime_history_empty">Nothing copied yet</string>
+    <string name="ime_history_unavailable">Open ClipSync to see the history</string>
+    <string name="ime_open_app">Open ClipSync</string>
+    <string name="ime_history_partial">Only what was copied while ClipSync was closed</string>
 </resources>
