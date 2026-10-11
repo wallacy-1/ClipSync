@@ -55,7 +55,7 @@ table! {
     // Menu da bandeja
     "tray.window" => ("ClipSync — Painel rápido", "ClipSync — Quick panel"),
     "tray.open" => ("Abrir ClipSync", "Open ClipSync"),
-    "tray.paste_last" => ("Colar último item", "Paste last item"),
+    "tray.paste_last" => ("Copiar último item", "Copy last item"),
     "tray.send_last" => ("Enviar último item", "Send last item"),
     "tray.pause" => ("Pausar sync", "Pause sync"),
     "tray.pause_15" => ("15 minutos", "15 minutes"),
@@ -67,7 +67,7 @@ table! {
 
     // Atalhos globais (nomes e erros de validação)
     "sc.open_panel" => ("Abrir painel rápido", "Open quick panel"),
-    "sc.paste_last" => ("Colar último", "Paste last"),
+    "sc.paste_last" => ("Copiar último", "Copy last"),
     "sc.send_last" => ("Enviar último", "Send last"),
     "sc.toggle_pause" => ("Pausar sync", "Pause sync"),
     "sc.invalid" => ("Atalho inválido: {combo}", "Invalid shortcut: {combo}"),
