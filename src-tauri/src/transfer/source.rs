@@ -1,7 +1,6 @@
 //! Origem de uma transferência de saída: caminho ou `content://`. O emissor só vê um `File`
-//! seekável + tamanho. No Android, uma URI
-//! não-seekável (provider que devolve pipe) cai no **fallback em disco**: cópia
-//! única para `<privado>/transfers/out-<id>.tmp` — nunca para a memória.
+//! seekável + tamanho. No Android, URI não-seekável (provider que devolve pipe) vira uma cópia
+//! única em `<privado>/transfers/out-<id>.tmp`, nunca em memória.
 use crate::error::{AppError, Result};
 #[cfg(target_os = "android")]
 use std::io::{Seek, SeekFrom};
