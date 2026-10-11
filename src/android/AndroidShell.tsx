@@ -16,7 +16,7 @@ import { SendSheet } from "./SendSheet";
 import { ShareSheet } from "./ShareSheet";
 import { AskPrompt } from "../components/AskPrompt";
 import { ItemSheet } from "./ItemSheet";
-import { KeyboardPrompt } from "./KeyboardPrompt";
+import { PermissionsSetup } from "./PermissionsSetup";
 
 export type Tab = "home" | "history" | "transfers" | "devices" | "settings";
 
@@ -67,11 +67,13 @@ export function AndroidShell() {
     );
   }
 
-  // Teclado opcional: apresentado uma vez, na tela inicial (nunca no meio do pareamento).
+  // Quem já tinha passado do onboarding antes desta tela existir vê as permissões uma vez, na tela inicial.
   if (platform === "android" && !keyboardPromptSeen && tab === "home") {
     return (
       <div className="and">
-        <KeyboardPrompt onConfigure={() => { setSettingsSub("keyboard"); setTab("settings"); }} />
+        <PermissionsSetup>
+          <button className="btn btn-primary btn-block cta" onClick={() => void useApp.getState().dismissKeyboardPrompt()}>{t("android.perms.continue")}</button>
+        </PermissionsSetup>
         {pendingShare && <ShareSheet />}
         {!pendingShare && <AskPrompt variant="android" />}
         <PairPrompts />

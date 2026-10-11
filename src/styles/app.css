@@ -381,6 +381,17 @@ button { font-family: inherit; }
 .onboard .step .n { width: 34px; height: 34px; border-radius: 999px; background: var(--color-accent-2-200); color: var(--color-accent-2-800); display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 14px; flex-shrink: 0; }
 .onboard .cta { height: 54px; font-weight: 700; font-size: 16px; margin: 0 0 10px; }
 .onboard .btn-ghost { font-weight: 700; font-size: 14.5px; color: var(--color-accent-700); }
+.onboard .perm-list { display: flex; flex-direction: column; gap: 10px; }
+.onboard .perm-note { font-size: 12.5px; color: var(--color-neutral-700); margin: 12px 4px 20px; line-height: 1.5; }
+.perm-row { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: var(--radius-lg); background: var(--color-neutral-100); border: 1px solid var(--color-divider); }
+.perm-icon { width: 36px; height: 36px; border-radius: 999px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; background: var(--color-accent-200); color: var(--color-accent-800); }
+.perm-row.done .perm-icon { background: var(--color-accent-2-200); color: var(--color-accent-2-800); }
+.perm-body { flex: 1; min-width: 0; }
+.perm-title { font-size: 14.5px; font-weight: 700; }
+.perm-tag { font-size: 11px; font-weight: 600; color: var(--color-neutral-700); background: var(--color-neutral-300); border-radius: 999px; padding: 1px 7px; margin-left: 4px; vertical-align: 1px; }
+.perm-help { font-size: 12.5px; color: var(--color-neutral-700); margin-top: 3px; line-height: 1.45; }
+.perm-btn { flex-shrink: 0; font-size: 13px; padding: 7px 12px; }
+.perm-ok { flex-shrink: 0; font-size: 13px; font-weight: 700; color: var(--color-accent-2-700); }
 
 /* ajustes android */
 .and-settings { padding: 0 18px 24px; display: flex; flex-direction: column; gap: 22px; }

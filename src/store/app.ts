@@ -503,6 +503,8 @@ export const useApp = create<AppStore>((set, get) => ({
   async finishOnboarding() {
     await api.setOnboarded();
     set({ onboarded: true });
+    // No Android o onboarding já passou pela tela de permissões: não reaparece na tela inicial.
+    if (get().platform === "android" && !get().keyboardPromptSeen) await get().dismissKeyboardPrompt();
   },
   async dismissKeyboardPrompt() {
     set({ keyboardPromptSeen: true });

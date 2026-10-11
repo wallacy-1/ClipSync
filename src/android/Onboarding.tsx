@@ -1,10 +1,24 @@
+import { useState } from "react";
 import { ClipboardCheck } from "../components/Icons";
 import { useT } from "../i18n";
 import { useApp } from "../store/app";
+import { PermissionsSetup } from "./PermissionsSetup";
 
 export function Onboarding({ onPair }: { onPair: () => void }) {
   const t = useT();
   const finish = useApp((s) => s.finishOnboarding);
+  const platform = useApp((s) => s.platform);
+  const [step, setStep] = useState<"intro" | "perms">("intro");
+
+  if (step === "perms") {
+    return (
+      <PermissionsSetup>
+        <button className="btn btn-primary btn-block cta" onClick={onPair}>{t("android.onboarding.pair")}</button>
+        <button className="btn btn-ghost btn-block" onClick={() => void finish()}>{t("android.onboarding.localOnly")}</button>
+      </PermissionsSetup>
+    );
+  }
+
   return (
     <div className="onboard">
       <div className="logo"><ClipboardCheck size={36} /></div>
@@ -16,8 +30,14 @@ export function Onboarding({ onPair }: { onPair: () => void }) {
         <div className="step"><span className="n">3</span><span>{t("android.onboarding.step3")}</span></div>
       </div>
       <div className="grow" />
-      <button className="btn btn-primary btn-block cta" onClick={onPair}>{t("android.onboarding.pair")}</button>
-      <button className="btn btn-ghost btn-block" onClick={() => finish()}>{t("android.onboarding.localOnly")}</button>
+      {platform === "android" ? (
+        <button className="btn btn-primary btn-block cta" onClick={() => setStep("perms")}>{t("android.onboarding.start")}</button>
+      ) : (
+        <>
+          <button className="btn btn-primary btn-block cta" onClick={onPair}>{t("android.onboarding.pair")}</button>
+          <button className="btn btn-ghost btn-block" onClick={() => void finish()}>{t("android.onboarding.localOnly")}</button>
+        </>
+      )}
     </div>
   );
 }

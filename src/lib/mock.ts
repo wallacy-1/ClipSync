@@ -6,6 +6,7 @@ const params = new URLSearchParams(location.search);
 const platform = (params.get("platform") as Bootstrap["platform"]) || "windows";
 const scenario = params.get("state") || "";
 const imeScenario = params.get("ime") || "off";
+let notifyPerm = params.get("notify") ?? "granted";
 let ime: ImeStatus = {
   supported: platform === "android",
   enabled: imeScenario !== "off" && imeScenario !== "prompt",
@@ -398,8 +399,9 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
       return;
     }
     case "transfer_decline": return setTransfer(args.id as string, { state: { kind: "cancelled", by: "local" } });
-    case "notify_permission": return params.get("notify") ?? "granted";
-    case "notify_permission_request": return;
+    case "notify_permission": return notifyPerm;
+    // Simula o usuário tocando "Permitir" no diálogo do sistema.
+    case "notify_permission_request": notifyPerm = "granted"; return;
     case "share_take": {
       // ?share=files|text simula um "Compartilhar → ClipSync" (consumido uma vez).
       const kind = params.get("share");
