@@ -35,17 +35,6 @@
                 <!-- AndroidTV support -->
                 <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
             </intent-filter>
-            <!-- "Compartilhar → ClipSync": arquivos viram transferência; texto vira item de clipboard. -->
-            <intent-filter>
-                <action android:name="android.intent.action.SEND" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="*/*" />
-            </intent-filter>
-            <intent-filter>
-                <action android:name="android.intent.action.SEND_MULTIPLE" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <data android:mimeType="*/*" />
-            </intent-filter>
         </activity>
 
         <!-- "Tentar de novo" da inicialização travada: processo à parte para matar o principal e reabrir. -->
@@ -57,6 +46,28 @@
             android:excludeFromRecents="true"
             android:noHistory="true"
             android:taskAffinity="" />
+
+        <!-- "Compartilhar → ClipSync": arquivos viram transferência; texto vira item de clipboard.
+             Trampolim invisível que repassa à MainActivity (ver ShareActivity.kt). -->
+        <activity
+            android:name=".share.ShareActivity"
+            android:exported="true"
+            android:theme="@style/Theme.ClipSend"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="*/*" />
+            </intent-filter>
+        </activity>
 
         <!-- Bloco, widget e "Selecionar texto → ClipSync": Activity invisível que lê o clipboard e fecha.
              Exportada só por causa do PROCESS_TEXT; SEND_CLIPBOARD/COPY_LATEST exigem o token do app no Intent. -->
