@@ -58,6 +58,11 @@ class ClipSyncImeService : InputMethodService() {
     private var autoCap = false
     private var capsModes = 0
     private var isPassword = false
+    /**
+     * Campo da WebView do próprio ClipSync: roda na mesma thread do IME, então leituras síncronas
+     * do campo só respondem no timeout de 2 s. Aqui o teclado só escreve.
+     */
+    private var ownField = false
     /** Shift ligado automaticamente (início de frase): desliga sozinho após uma tecla. */
     private var autoShift = false
     /** Para o "espaço duplo vira ponto". */
@@ -245,8 +250,9 @@ class ClipSyncImeService : InputMethodService() {
 
         capsModes = inputType and (InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS or
             InputType.TYPE_TEXT_FLAG_CAP_WORDS or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES)
+        ownField = info?.packageName == packageName
         // Sem checar a classe: há apps (Contatos) que mandam classe 0 com CAP_WORDS.
-        autoCap = !isPassword && capsModes != 0
+        autoCap = !isPassword && !ownField && capsModes != 0
 
         layerId = when (klass) {
             InputType.TYPE_CLASS_NUMBER, InputType.TYPE_CLASS_DATETIME -> Layers.NUMBER
@@ -264,7 +270,7 @@ class ClipSyncImeService : InputMethodService() {
         symbolsFromLetters = false
         lastSpaceAt = 0L
         val noSuggest = (inputType and InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS) != 0
-        suggestOn = klass == InputType.TYPE_CLASS_TEXT && !isPassword && !noSuggest && variation !in setOf(
+        suggestOn = klass == InputType.TYPE_CLASS_TEXT && !isPassword && !ownField && !noSuggest && variation !in setOf(
             InputType.TYPE_TEXT_VARIATION_URI,
             InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS,
             InputType.TYPE_TEXT_VARIATION_WEB_EMAIL_ADDRESS,
@@ -563,7 +569,7 @@ class ClipSyncImeService : InputMethodService() {
         val kb = keyboard ?: return
         val now = SystemClock.uptimeMillis()
         // Espaço duplo depois de uma palavra vira ". ". Nunca em campo de senha.
-        if (!isPassword && layerId == Layers.LETTERS && now - lastSpaceAt < DOUBLE_SPACE_MS) {
+        if (!isPassword && !ownField && layerId == Layers.LETTERS && now - lastSpaceAt < DOUBLE_SPACE_MS) {
             val before = ic.getTextBeforeCursor(2, 0)
             if (before != null && before.length == 2 && before[1] == ' ' && before[0].isLetterOrDigit()) {
                 ic.beginBatchEdit()
@@ -593,6 +599,8 @@ class ClipSyncImeService : InputMethodService() {
 
     private fun backspace() {
         val ic = currentInputConnection ?: return
+        // A tecla apaga a seleção e pares substitutos sem ler o campo.
+        if (ownField) return sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
         val undo = lastCorrection
         lastCorrection = null
         if (undo != null && ic.getTextBeforeCursor(undo.second.length + 1, 0)?.toString() == undo.second + " ") {
@@ -614,9 +622,9 @@ class ClipSyncImeService : InputMethodService() {
         ic.deleteSurroundingText(n, 0)
     }
 
-    /** Backspace segurado por mais tempo: apaga a palavra anterior (e os espaços antes dela). */
     private fun deleteWord() {
         val ic = currentInputConnection ?: return
+        if (ownField) return backspace()
         if (!ic.getSelectedText(0).isNullOrEmpty()) return backspace()
         val before = ic.getTextBeforeCursor(64, 0) ?: return backspace()
         var i = before.length
