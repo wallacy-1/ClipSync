@@ -9,7 +9,6 @@ sealed class KeyAction {
     object Enter : KeyAction()
     object Space : KeyAction()
     data class Layer(val id: String) : KeyAction()
-    /** Troca para o próximo teclado do sistema (🌐). */
     object SwitchIme : KeyAction()
     /** Backspace segurado por um tempo: passa a apagar palavra inteira. */
     object DeleteWord : KeyAction()
@@ -43,11 +42,9 @@ object Layers {
     const val SYMBOLS_2 = "symbols2"
     /** Teclado numérico grande (campos de número e data). */
     const val NUMBER = "number"
-    /** Teclado de telefone (`* # +`). */
     const val PHONE = "phone"
 }
 
-/** Layout QWERTY (pt-BR/en) com acentos no toque longo. */
 object QwertyLayout {
     private fun t(ch: String, vararg alt: String) = Key(KeyAction.Text(ch), alternates = alt.toList())
     private fun s(ch: String, vararg alt: String) = Key(KeyAction.Text(ch, shifted = ch), alternates = alt.toList())

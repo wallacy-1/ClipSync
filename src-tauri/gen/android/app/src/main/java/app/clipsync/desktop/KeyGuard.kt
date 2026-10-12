@@ -8,10 +8,7 @@ import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
 import javax.crypto.spec.GCMParameterSpec
 
-/**
- * Cifra/decifra blobs com uma chave AES-256-GCM não exportável do Android Keystore.
- * Protege a KEK do núcleo Rust; chamado via JNI de qualquer thread.
- */
+/** Chave AES-256-GCM não exportável do Keystore que protege a KEK do núcleo Rust. Chamado via JNI de qualquer thread. */
 object KeyGuard {
     private const val ALIAS = "clipsync-kek-v1"
     private const val TRANSFORM = "AES/GCM/NoPadding"

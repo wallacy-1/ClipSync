@@ -46,7 +46,6 @@ object ClipImageBridge {
             .toString()
     }
 
-    /** Imagem que o próprio ClipSync pôs no clipboard (anti-loop). */
     @JvmStatic
     fun isOwn(desc: ClipDescription): Boolean = desc.label?.toString() == OWN_LABEL
 

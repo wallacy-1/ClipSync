@@ -5,9 +5,8 @@ import androidx.core.view.WindowCompat
 import java.lang.ref.WeakReference
 
 /**
- * Cor dos ícones das barras de status/navegação conforme o tema do app (não o do sistema).
- * Chamado pelo Rust (`set_system_bars`) fora da thread de UI; a Activity atual é registrada
- * em `MainActivity.onCreate`/`onResume`.
+ * Cor dos ícones das barras conforme o tema do app, não o do sistema. Chamado pelo Rust fora da
+ * thread de UI; a Activity atual é registrada pela MainActivity.
  */
 object SystemBars {
     private var activity: WeakReference<Activity>? = null

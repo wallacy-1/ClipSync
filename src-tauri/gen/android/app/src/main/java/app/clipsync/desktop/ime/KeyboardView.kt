@@ -89,7 +89,6 @@ class KeyboardView(context: Context) : View(context) {
     var onKeysArea: ((top: Int, height: Int) -> Unit)? = null
     private var lastKeysArea = -1 to -1
 
-    /** Cores atuais, para os painéis seguirem o mesmo tema. */
     val colors: Palette get() = palette
     val labelTypeface: Typeface get() = typeface ?: Typeface.DEFAULT
 
@@ -162,7 +161,6 @@ class KeyboardView(context: Context) : View(context) {
     private val longPressMs = ViewConfiguration.getLongPressTimeout().toLong()
     private val repeatStartMs = 350L
     private val repeatIntervalMs = 45L
-    /** Depois de tantas repetições o backspace passa a apagar palavras. */
     private val repeatsBeforeWords = 14
     private val wordRepeatIntervalMs = 160L
     private var repeatCount = 0
@@ -275,8 +273,6 @@ class KeyboardView(context: Context) : View(context) {
             onKeysArea?.invoke(area.first, area.second)
         }
     }
-
-    // ---- desenho ----
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
@@ -407,7 +403,6 @@ class KeyboardView(context: Context) : View(context) {
         canvas.restore()
     }
 
-    /** Balão com a letra logo acima da tecla. */
     private fun drawPreview(canvas: Canvas, slot: Slot, label: String, radius: Float) {
         if (label.isEmpty()) return
         val r = slot.rect
@@ -570,7 +565,6 @@ class KeyboardView(context: Context) : View(context) {
         chipTextPaint.isFakeBoldText = false
     }
 
-    /** Miniatura recortada ao centro e redonda, no lugar do ícone do chip. */
     private fun drawThumb(canvas: Canvas, bmp: Bitmap, dst: RectF) {
         val side = minOf(bmp.width, bmp.height)
         val src = Rect((bmp.width - side) / 2, (bmp.height - side) / 2, (bmp.width + side) / 2, (bmp.height + side) / 2)
@@ -580,8 +574,6 @@ class KeyboardView(context: Context) : View(context) {
         canvas.drawBitmap(bmp, src, dst, thumbPaint)
         canvas.restore()
     }
-
-    // ---- toque ----
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         when (event.actionMasked) {

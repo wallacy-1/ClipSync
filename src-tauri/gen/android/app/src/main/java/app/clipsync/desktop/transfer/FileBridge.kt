@@ -22,7 +22,7 @@ import java.io.FileOutputStream
 
 /** Ponte JNI para as APIs de arquivo do Android (SAF, ContentResolver, MediaStore, espaço livre). Sem regra de protocolo/estado. */
 object FileBridge {
-    const val PICK_REQUEST = 0x4C1F // "CLIF"
+    const val PICK_REQUEST = 0x4C1F
     private const val RELATIVE_DIR = "ClipSync"
 
     @Volatile private var pickResult: String? = null

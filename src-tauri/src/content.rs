@@ -153,7 +153,6 @@ pub fn link_target(content: &str, ty: ContentType) -> Result<String, AppError> {
             } else {
                 return Err(not_web());
             };
-            // Precisa de um host depois do esquema.
             if rest.split(['/', '?', '#']).next().unwrap_or("").is_empty() {
                 return Err(not_web());
             }

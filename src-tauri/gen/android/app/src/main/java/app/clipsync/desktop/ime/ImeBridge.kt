@@ -10,10 +10,6 @@ import android.view.inputmethod.InputMethodManager
 import org.json.JSONArray
 import org.json.JSONObject
 
-/**
- * Ponte JNI do IME: estado nas configurações do sistema, atalhos para as telas
- * oficiais do Android e preferência de tema.
- */
 object ImeBridge {
     private fun component(context: Context) =
         ComponentName(context, ClipSyncImeService::class.java)
@@ -33,10 +29,7 @@ object ImeBridge {
         return ComponentName.unflattenFromString(current) == me
     }
 
-    /**
-     * Estado completo em JSON:
-     * `{"enabled":bool,"selected":bool,"theme":"id","themes":[{"id","label"}]}`.
-     */
+    /** `{"enabled":bool,"selected":bool,"theme":"id","themes":[{"id","label"}]}` */
     @JvmStatic
     fun status(context: Context): String {
         val themes = JSONArray()
@@ -51,14 +44,12 @@ object ImeBridge {
             .toString()
     }
 
-    /** Abre Configurações → Idiomas e entrada → Teclado virtual (tela oficial). */
     @JvmStatic
     fun openSettings(context: Context) {
         val intent = Intent(Settings.ACTION_INPUT_METHOD_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         Handler(Looper.getMainLooper()).post { context.startActivity(intent) }
     }
 
-    /** Mostra o seletor de teclado do sistema (para o usuário escolher o ClipSync). */
     @JvmStatic
     fun showPicker(context: Context) {
         val imm = context.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager ?: return

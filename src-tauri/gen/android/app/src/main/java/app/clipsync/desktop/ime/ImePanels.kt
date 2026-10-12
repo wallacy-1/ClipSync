@@ -32,7 +32,6 @@ private fun rounded(color: Int, radius: Float) = GradientDrawable().apply {
     cornerRadius = radius
 }
 
-/** Ícone vetorial de [Icons] (grade 24×24), com a mesma espessura de traço do teclado. */
 private class IconView(context: Context, private val path: Path, private val color: Int, private val sizeDp: Float = 22f) : View(context) {
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE

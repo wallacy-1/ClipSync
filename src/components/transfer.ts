@@ -1,4 +1,3 @@
-// Lógica de transferência compartilhada pelas telas do Windows e do Android.
 import { useEffect, useState } from "react";
 import { t } from "../i18n";
 import { PLATFORM_LABEL, deviceName, isTransferActive, percent } from "../lib/format";
@@ -51,11 +50,7 @@ export interface PrimaryAction {
   disabled: boolean;
 }
 
-/**
- * Estado derivado e ações de uma linha de transferência. `canOpen` diz se um
- * arquivo concluído pode ser aberto por fora (no Android a imagem do clipboard
- * fica em disco privado).
- */
+/** `canOpen`: arquivo concluído pode ser aberto por fora (no Android a imagem do clipboard fica em disco privado). */
 export function useTransferRow(rec: TransferRecord, canOpen: boolean) {
   const devices = useApp((s) => s.devices);
   const selfId = useApp((s) => s.me?.deviceId ?? "");

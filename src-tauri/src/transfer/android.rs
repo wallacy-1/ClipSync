@@ -190,8 +190,6 @@ pub fn take_pick_result() -> Result<Option<String>> {
     })
 }
 
-// Foreground Service: só durante transferência ativa.
-
 fn jstr<'a>(env: &mut jni::JNIEnv<'a>, s: &str) -> Result<jni::objects::JString<'a>> {
     env.new_string(s).map_err(|e| AppError::Other(e.to_string()))
 }

@@ -17,7 +17,7 @@ import androidx.core.content.ContextCompat
  * notificação com progresso e o botão Cancelar ficam invisíveis.
  */
 object NotifyPermission {
-    const val REQUEST = 0x4E07 // "NO"
+    const val REQUEST = 0x4E07
     private const val PREFS = "clipsync_notify"
     private const val ASKED = "asked"
 
@@ -45,7 +45,6 @@ object NotifyPermission {
         return true
     }
 
-    /** Configurações de notificação do app (caminho quando está `blocked`). */
     @JvmStatic
     fun openSettings(context: Context) {
         val intent = Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)

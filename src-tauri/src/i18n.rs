@@ -1,9 +1,6 @@
-//! Textos do núcleo que chegam ao usuário (menu da bandeja, toasts do Windows, erros exibidos na UI),
-//! em pt-BR e en. Sem crate: uma tabela `match` com as duas línguas lado a lado (chave faltando em uma
-//! delas não compila). O idioma é o `Settings.language_resolved`, que o front grava a partir do
-//! `navigator.language`/ajuste; antes do primeiro bootstrap vale pt-BR.
-//!
-//! Textos de log e nomes de arquivo gerados (`imagem-….png`, `pasta.zip`) ficam como estão.
+//! Textos do núcleo que chegam ao usuário (bandeja, toasts, erros na UI) em pt-BR e en, numa tabela
+//! `match` com as duas línguas lado a lado (chave faltando em uma não compila). O idioma vem de
+//! `Settings.language_resolved`; antes do primeiro bootstrap vale pt-BR. Logs não são traduzidos.
 use crate::models::Settings;
 use std::sync::atomic::{AtomicBool, Ordering};
 

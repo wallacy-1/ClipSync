@@ -43,7 +43,6 @@ class MainActivity : TauriActivity() {
     CoreBridge.wake()
   }
 
-  // Seletor de documentos (SAF) da transferência de arquivos.
   @Deprecated("Deprecated in Java")
   override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
     if (requestCode == FileBridge.PICK_REQUEST) {

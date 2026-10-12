@@ -27,7 +27,6 @@ class SendTileService : TileService() {
 
     override fun onClick() {
         val intent = ClipSendActivity.intentFor(this, ClipSendActivity.ACTION_SEND_CLIPBOARD)
-        // Tela bloqueada: pede o desbloqueio antes de abrir a Activity.
         if (isLocked) unlockAndRun { launch(intent) } else launch(intent)
     }
 

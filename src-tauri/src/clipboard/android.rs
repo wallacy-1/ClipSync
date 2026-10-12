@@ -46,7 +46,6 @@ impl ClipboardProvider for AndroidClipboard {
     }
 }
 
-/// Ponte JNI do HTML (`ClipImageBridge.readHtml/setHtml`).
 mod bridge {
     use crate::android_jni::{jstring_to_string, with_class};
     use crate::error::AppError;

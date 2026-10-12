@@ -7,9 +7,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 /**
- * Consulta a última release no GitHub para o aviso de atualização. Chamada pelo Rust
- * (`updater.rs`) fora da thread principal; devolve o JSON ou lança (sem rede, HTTP != 200).
- * O Rust interpreta a resposta: aqui só há o transporte (não há cliente HTTP no lado Rust do Android).
+ * Última release no GitHub para o aviso de atualização (o Rust do Android não tem cliente HTTP).
+ * Só transporte: devolve o JSON ou lança; quem interpreta é o `updater.rs`.
  */
 object UpdateBridge {
     private const val TIMEOUT_MS = 10_000

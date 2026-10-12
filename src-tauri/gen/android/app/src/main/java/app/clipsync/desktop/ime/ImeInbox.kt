@@ -8,10 +8,8 @@ import java.io.File
 import java.util.UUID
 
 /**
- * Fila de clips detectados pelo IME com o núcleo Rust morto. Um arquivo por item em
- * `files/ime_inbox/`, selado com a chave do Keystore que protege a KEK ([KeyGuard]).
- * Expira em [TTL_MS] (como a limpeza do clipboard do Android 13+) e limita a
- * [MAX_ITEMS]. O núcleo só remove cada item depois de processá-lo.
+ * Clips detectados pelo IME com o núcleo morto: um arquivo por item em `files/ime_inbox/`, selado
+ * com a chave do [KeyGuard]. Expira em [TTL_MS], limita a [MAX_ITEMS]; o núcleo remove após processar.
  */
 object ImeInbox {
     private const val DIR = "ime_inbox"
@@ -89,9 +87,8 @@ object ImeInbox {
 
     fun count(context: Context): Int = files(context).size
 
-    // ---- imagens ----
-    // PNG em `files/ime_inbox_img/<ts>-<id>.png` + `<ts>-<id>.stamp` (carimbo da cópia, para o
-    // dedupe do núcleo). Não selados: o histórico guarda as imagens em PNG puro de qualquer forma.
+    // PNG em `files/ime_inbox_img/<ts>-<id>.png` + `.stamp` (carimbo da cópia, para o dedupe do núcleo).
+    // Não selados: o histórico já guarda as imagens em PNG puro.
 
     private const val IMG_DIR = "ime_inbox_img"
     const val MAX_IMAGES = 5

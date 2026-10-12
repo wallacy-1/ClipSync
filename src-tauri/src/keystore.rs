@@ -117,7 +117,6 @@ fn load_or_create_kek(app_dir: &Path) -> Result<[u8; KEK_LEN]> {
     Ok(k)
 }
 
-/// Ponte JNI para `app.clipsync.desktop.KeyGuard` (Android Keystore).
 #[cfg(target_os = "android")]
 mod android_keyguard {
     use crate::android_jni::with_class;

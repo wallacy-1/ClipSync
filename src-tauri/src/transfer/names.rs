@@ -22,25 +22,22 @@ fn is_bad_char(c: char) -> bool {
 
 /// Sanitiza um nome remoto. Determinística, idempotente, nunca vazia.
 pub fn sanitize(remote: &str) -> String {
-    // 1. Só o último componente, seja qual for o separador usado pela origem.
     let last = remote.rsplit(['/', '\\']).next().unwrap_or("");
-    // 2. Troca caracteres proibidos/controles por '_' e normaliza espaços.
     let mut s: String = last.chars().map(|c| if is_bad_char(c) { '_' } else { c }).collect();
     s = s.trim().to_string();
-    // 3. Windows não aceita ponto/espaço no fim.
+    // Windows não aceita ponto/espaço no fim.
     while s.ends_with('.') || s.ends_with(' ') {
         s.pop();
     }
-    // 4. `.`/`..` e vazio.
     if s.is_empty() || s == "." || s == ".." || s.chars().all(|c| c == '.') {
         s = FALLBACK_NAME.into();
     }
-    // 5. Nomes reservados (com ou sem extensão): CON, CON.txt…
+    // Nomes reservados do Windows (com ou sem extensão): CON, CON.txt…
     let stem = s.split('.').next().unwrap_or("").to_ascii_uppercase();
     if WINDOWS_RESERVED.contains(&stem.as_str()) {
         s = format!("_{s}");
     }
-    // 6. Limite em bytes, preservando extensão curta e sem cortar no meio de um char.
+    // Limite em bytes, preservando extensão curta e sem cortar um char no meio.
     if s.len() > MAX_NAME_BYTES {
         let (stem, ext) = split_ext(&s);
         let ext = if ext.len() <= 16 { ext } else { String::new() };

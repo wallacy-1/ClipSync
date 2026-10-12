@@ -138,8 +138,6 @@ class ClipSyncImeService : InputMethodService() {
         }
     }
 
-    // ---- painéis ----
-
     private fun showPanel(title: String, panel: View) {
         val host = panelHost ?: return
         host.removeAllViews()
@@ -169,7 +167,6 @@ class ClipSyncImeService : InputMethodService() {
         )
     }
 
-    /** Histórico vem do núcleo (SQLite); a leitura vai para fora da thread principal. */
     private fun openHistory() {
         val kb = keyboard ?: return
         val title = getString(R.string.ime_panel_history)
@@ -314,8 +311,6 @@ class ClipSyncImeService : InputMethodService() {
         updateSuggestions()
     }
 
-    // ---- sugestões ----
-
     private fun keyboardLocale(): Locale {
         val st = (getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager)?.currentInputMethodSubtype
         @Suppress("DEPRECATION")
@@ -364,7 +359,6 @@ class ClipSyncImeService : InputMethodService() {
         kb.suggestionPick = if (correction != null) 1 else -1
     }
 
-    /** Toque numa sugestão: troca a palavra atual por ela e põe um espaço. */
     private fun pickSuggestion(s: String) {
         val ic = currentInputConnection ?: return
         val word = currentWord()
@@ -424,7 +418,6 @@ class ClipSyncImeService : InputMethodService() {
         }
     }
 
-    /** Lê a imagem já reduzida (`inSampleSize`): um print grande não vai inteiro para a memória. */
     private fun loadThumb(uri: Uri, max: Int): Bitmap? = runCatching {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
@@ -518,7 +511,6 @@ class ClipSyncImeService : InputMethodService() {
         runCatching { startActivity(intent) }
     }
 
-    /** Shift automático no início de frase/palavra, só quando o campo pede (CAP_*). */
     private fun updateAutoShift() {
         val kb = keyboard ?: return
         if (!autoCap || kb.shift == ShiftState.LOCKED || layerId != Layers.LETTERS) return

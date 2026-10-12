@@ -37,7 +37,6 @@ impl From<tauri::Error> for AppError {
     }
 }
 
-// Tauri commands serialize errors as plain strings for the UI.
 impl Serialize for AppError {
     fn serialize<S: serde::Serializer>(&self, s: S) -> std::result::Result<S::Ok, S::Error> {
         s.serialize_str(&self.to_string())
