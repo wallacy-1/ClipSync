@@ -1,6 +1,7 @@
 //! Arquivos copiados no Explorer (Ctrl+C → `CF_HDROP`). Nunca saem sozinhos: Ctrl+C
 //! de arquivo é quase sempre para colar em outra pasta. O núcleo só avisa a UI
 //! (`clipboard:files`), que oferece "Enviar para…"; o envio usa `transfer_send`.
+//! Exceção: uma única imagem leve segue como imagem copiada (`image::from_file`), sem oferta.
 use crate::events;
 use crate::models::now_ms;
 use crate::state::AppState;
@@ -48,6 +49,17 @@ pub fn poll(app: &AppHandle) -> bool {
         offer.files.iter().filter(|f| f.dir).count(),
         offer.skipped_files
     );
+    // Uma imagem leve vai como imagem copiada (chega no clipboard do outro lado) e a oferta
+    // some, porque já foi enviada. "Enviar arquivo" manual não passa por aqui.
+    if let [f] = offer.files.as_slice() {
+        if !f.dir && f.size > 0 && f.size <= super::image::FROM_FILE_MAX && super::image::is_image_name(&f.name) {
+            let fallback = offer.clone();
+            let path = std::path::PathBuf::from(&f.path);
+            if super::image::from_file(app, &path, move |app| events::emit(app, events::CLIPBOARD_FILES, &fallback)) {
+                return true;
+            }
+        }
+    }
     if !offer.files.is_empty() {
         events::emit(app, events::CLIPBOARD_FILES, &offer);
     }

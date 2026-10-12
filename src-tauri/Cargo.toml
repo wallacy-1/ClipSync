@@ -70,6 +70,8 @@ tauri-plugin-updater = "~2.10"
 windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_System_DataExchange", "Win32_Storage_FileSystem"] }
 # Imagem do clipboard ↔ PNG (o fio leva sempre PNG).
 png = "0.17"
+# Arquivo de imagem copiado no Explorer → RGBA → PNG (`clipboard::image::from_file`).
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp"] }
 # Lista de arquivos copiados no Explorer (CF_HDROP); mesma versão que o plugin de clipboard já usa.
 arboard = "3.6"
 # Toasts do Windows com botões (Abrir, Aceitar/Recusar).

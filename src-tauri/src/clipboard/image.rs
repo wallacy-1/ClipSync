@@ -106,6 +106,41 @@ pub fn poll(app: &AppHandle) {
     }
 }
 
+/// Arquivo copiado no Explorer acima disso segue só como oferta de arquivo (`files`).
+#[cfg(windows)]
+pub const FROM_FILE_MAX: u64 = 10 * 1024 * 1024;
+
+#[cfg(windows)]
+pub fn is_image_name(name: &str) -> bool {
+    let ext = Path::new(name).extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    matches!(ext.as_str(), "png" | "jpg" | "jpeg" | "webp" | "gif" | "bmp")
+}
+
+/// Imagem leve copiada no Explorer segue como imagem copiada (PNG, histórico, envio); o dedupe já
+/// foi feito por `files::poll`. Sem destino devolve `false`; `on_fail` roda se a conversão falhar.
+#[cfg(windows)]
+pub fn from_file(app: &AppHandle, src: &Path, on_fail: impl FnOnce(&AppHandle) + Send + 'static) -> bool {
+    if auto_targets(app).is_empty() {
+        return false;
+    }
+    let app = app.clone();
+    let src = src.to_path_buf();
+    tauri::async_runtime::spawn_blocking(move || {
+        let converted = windows::decode_file(&src).and_then(|img| {
+            let path = new_path(&app)?;
+            Ok((windows::encode_png(&img, &path)?, path))
+        });
+        match converted {
+            Ok((size, path)) => on_local_image(&app, &path, size),
+            Err(e) => {
+                log::warn!("[CLIPBOARD] arquivo de imagem não convertido: {e}");
+                on_fail(&app);
+            }
+        }
+    });
+    true
+}
+
 /// Imagem que o teclado guardou em PNG enquanto o núcleo não existia (`ImeInbox`). `stamp` é o
 /// mesmo carimbo de `peek`, então a cópia que o polling também vir é descartada pelo dedupe.
 /// Sem `poll_changed` como filtro: o `prime` da subida já marcou esse carimbo como visto.
@@ -153,27 +188,30 @@ fn claim(app: &AppHandle, k: &str) -> bool {
     matches!(d.decide(k, now_ms()), super::dedupe::Decision::New)
 }
 
+/// Dispositivos que recebem a imagem copiada aqui (vazio se as regras não deixam enviar).
+fn auto_targets(app: &AppHandle) -> Vec<String> {
+    if !send_wanted(app) {
+        return Vec::new();
+    }
+    app.state::<AppState>()
+        .db
+        .list_devices()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|d| d.auto_send && !d.blocked)
+        .map(|d| d.device_id)
+        .collect()
+}
+
 fn on_local_image(app: &AppHandle, path: &Path, size: u64) {
     if size == 0 || size > MAX_BYTES {
         log::info!("[CLIPBOARD] imagem ignorada size={size} (limite {MAX_BYTES})");
         let _ = std::fs::remove_file(path);
         return;
     }
-    let state = app.state::<AppState>();
     let Some(item) = register(app, path, size, None) else { return };
     events::emit(app, events::CLIPBOARD_CHANGED, &item);
-    let targets: Vec<String> = if send_wanted(app) {
-        state
-            .db
-            .list_devices()
-            .unwrap_or_default()
-            .into_iter()
-            .filter(|d| d.auto_send && !d.blocked)
-            .map(|d| d.device_id)
-            .collect()
-    } else {
-        Vec::new()
-    };
+    let targets = auto_targets(app);
     log::info!("[CLIPBOARD] Image detected id={} size={size} targets={}", item.id, targets.len());
     let src = path.to_string_lossy();
     for dev in targets {
@@ -543,6 +581,17 @@ mod windows {
         Ok(std::fs::metadata(path)?.len())
     }
 
+    /// PNG, JPEG, WebP, GIF (primeiro quadro) ou BMP para RGBA 8 bits.
+    pub fn decode_file(path: &Path) -> Result<Rgba> {
+        let img = ::image::ImageReader::open(path)?
+            .with_guessed_format()?
+            .decode()
+            .map_err(|e| AppError::Other(e.to_string()))?
+            .into_rgba8();
+        let (width, height) = img.dimensions();
+        Ok(Rgba { rgba: img.into_raw(), width, height })
+    }
+
     /// Decodifica qualquer PNG (paleta, cinza, 16 bits) para RGBA 8 bits.
     pub fn decode_png(path: &Path) -> Result<Rgba> {
         let mut dec = png::Decoder::new(std::io::BufReader::new(std::fs::File::open(path)?));
@@ -574,6 +623,18 @@ mod windows {
             let _ = std::fs::remove_file(&p);
             assert_eq!((back.width, back.height), (3, 2));
             assert_eq!(back.rgba, img.rgba);
+        }
+
+        #[test]
+        fn decode_file_guesses_format_by_content() {
+            let img = Rgba { rgba: vec![9; 4 * 2 * 2], width: 2, height: 2 };
+            // Extensão errada de propósito: o formato vem do cabeçalho.
+            let p = std::env::temp_dir().join(format!("clipsync-img-{}.jpg", uuid::Uuid::new_v4()));
+            encode_png(&img, &p).unwrap();
+            let back = decode_file(&p).unwrap();
+            let _ = std::fs::remove_file(&p);
+            assert_eq!(back.rgba, img.rgba);
+            assert!(super::super::is_image_name("Foto.JPEG") && !super::super::is_image_name("doc.pdf"));
         }
     }
 }
