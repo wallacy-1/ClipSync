@@ -426,24 +426,41 @@ pub fn cancel_pairing(app: AppHandle, state: State<'_, AppState>) -> Result<()> 
     Ok(())
 }
 
-/// Rodadas do pareamento por QR. Logo após entrar na rede (ou com o aviso do firewall
-/// aberto no PC) o primeiro connect costuma falhar; o segredo do QR está sempre certo,
-/// então repetir é seguro e fica abaixo de `MAX_PAIR_FAILURES` do outro lado.
-const QR_PAIR_ATTEMPTS: u32 = 3;
+/// Logo após entrar na rede (ou com o aviso do firewall aberto no PC) o primeiro connect
+/// costuma falhar. Fica abaixo de `MAX_PAIR_FAILURES` mesmo que toda rodada chegue ao PAKE.
+const PAIR_ATTEMPTS: u32 = 3;
 
-async fn pair_at(
+/// Falha de rede antes de testar o segredo: repetir não gasta palpite do código.
+fn is_transient(e: &AppError) -> bool {
+    matches!(e, AppError::Net(_) | AppError::Io(_))
+}
+
+/// `addrs` é remontado a cada rodada (o mDNS pode ter achado o outro lado). `retry_any`: QR
+/// (segredo sempre certo) repete qualquer erro; código digitado só repete falha de rede.
+async fn pair_retrying(
     app: &AppHandle,
-    addrs: Vec<String>,
+    mut addrs: impl FnMut() -> Vec<String>,
     pairing_id: Option<String>,
     auth: pairing::PairAuth,
-    secret_or_code: &str,
+    password: &[u8],
+    retry_any: bool,
 ) -> Result<DeviceIdentity> {
-    let password = pairing::password_for(auth, secret_or_code);
-    let r = try_pair_addrs(app, addrs, pairing_id, auth, &password).await;
-    if let Err(e) = &r {
-        events::emit(app, events::PAIRING_FAILED, serde_json::json!({ "reason": e.to_string() }));
+    let mut attempt = 1;
+    loop {
+        match try_pair_addrs(app, addrs(), pairing_id.clone(), auth, password).await {
+            Ok(id) => return Ok(id),
+            Err(e) if attempt < PAIR_ATTEMPTS && (retry_any || is_transient(&e)) => {
+                log::warn!("[PAIRING] Attempt {attempt}/{PAIR_ATTEMPTS} failed ({}): {e}", auth.as_str());
+                tokio::time::sleep(std::time::Duration::from_millis(1500 * u64::from(attempt))).await;
+                attempt += 1;
+            }
+            Err(e) => return Err(e),
+        }
     }
-    r
+}
+
+fn emit_pair_failed(app: &AppHandle, e: &AppError) {
+    events::emit(app, events::PAIRING_FAILED, serde_json::json!({ "reason": e.to_string() }));
 }
 
 async fn try_pair_addrs(
@@ -480,28 +497,20 @@ pub async fn pair_with_payload(app: AppHandle, raw: String) -> Result<DeviceIden
         return Err(AppError::Pairing(crate::i18n::tr("err.pair_self").into()));
     }
     let password = pairing::password_for(pairing::PairAuth::Qr, &p.secret);
-    let mut last_err = AppError::Pairing(crate::i18n::tr("err.pair_no_addr").into());
-    for attempt in 1..=QR_PAIR_ATTEMPTS {
-        if attempt > 1 {
-            tokio::time::sleep(std::time::Duration::from_millis(1500 * u64::from(attempt - 1))).await;
-        }
-        // Remonta a cada rodada: o mDNS pode ter achado o PC enquanto isso.
+    let addrs = || {
         let mut addrs: Vec<String> = p.addrs.iter().map(|a| SocketAddr::new(*a, p.port).to_string()).collect();
         for a in transport::candidate_addrs(&state, &p.device_id) {
             if !addrs.contains(&a) {
                 addrs.push(a);
             }
         }
-        match try_pair_addrs(&app, addrs, Some(p.pairing_id.clone()), pairing::PairAuth::Qr, &password).await {
-            Ok(id) => return Ok(id),
-            Err(e) => {
-                log::warn!("[PAIRING] QR attempt {attempt}/{QR_PAIR_ATTEMPTS} failed: {e}");
-                last_err = e;
-            }
-        }
+        addrs
+    };
+    let r = pair_retrying(&app, addrs, Some(p.pairing_id.clone()), pairing::PairAuth::Qr, &password, true).await;
+    if let Err(e) = &r {
+        emit_pair_failed(&app, e);
     }
-    events::emit(&app, events::PAIRING_FAILED, serde_json::json!({ "reason": last_err.to_string() }));
-    Err(last_err)
+    r
 }
 
 #[tauri::command]
@@ -519,9 +528,14 @@ pub async fn pair_with_code(app: AppHandle, code: String, device_id: Option<Stri
     if code.len() != 7 {
         return Err(AppError::Pairing(crate::i18n::tr("err.pair_code_len").into()));
     }
+    let password = pairing::password_for(pairing::PairAuth::Code, &code);
     if let Some(addr) = addr.as_deref().map(str::trim).filter(|a| !a.is_empty()) {
-        let sock = transport::parse_manual_addr(addr, transport::PREFERRED_PORT)?;
-        return pair_at(&app, vec![sock.to_string()], None, pairing::PairAuth::Code, &code).await;
+        let sock = transport::parse_manual_addr(addr, transport::PREFERRED_PORT)?.to_string();
+        let r = pair_retrying(&app, || vec![sock.clone()], None, pairing::PairAuth::Code, &password, false).await;
+        if let Err(e) = &r {
+            emit_pair_failed(&app, e);
+        }
+        return r;
     }
     let state = app.state::<AppState>();
     // O anúncio mDNS com pairing=1 pode levar alguns segundos para chegar.
@@ -547,10 +561,22 @@ pub async fn pair_with_code(app: AppHandle, code: String, device_id: Option<Stri
         return Err(AppError::Pairing(crate::i18n::tr("err.pair_none_listening").into()));
     }
     let mut last = AppError::Pairing(crate::i18n::tr("err.pair_bad_code").into());
-    for (_id, addrs) in candidates {
-        match pair_at(&app, addrs, None, pairing::PairAuth::Code, &code).await {
+    for (id, first) in candidates {
+        let addrs = || {
+            let mut addrs = first.clone();
+            for a in transport::candidate_addrs(&state, &id) {
+                if !addrs.contains(&a) {
+                    addrs.push(a);
+                }
+            }
+            addrs
+        };
+        match pair_retrying(&app, addrs, None, pairing::PairAuth::Code, &password, false).await {
             Ok(id) => return Ok(id),
-            Err(e) => last = e,
+            Err(e) => {
+                emit_pair_failed(&app, &e);
+                last = e;
+            }
         }
     }
     Err(last)

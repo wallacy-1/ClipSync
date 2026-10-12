@@ -19,6 +19,8 @@ use tokio::net::TcpStream;
 
 pub const MODE: &str = "request";
 const TIMEOUT: Duration = Duration::from_secs(6);
+/// Rodadas do pedido quando nenhum endereço responde (rede recém-conectada, firewall).
+const ATTEMPTS: u32 = 3;
 /// Pedidos do mesmo IP mais próximos que isso são recusados (evita enxurrada de avisos).
 const MIN_INTERVAL_MS: i64 = 10_000;
 const MAX_NAME: usize = 64;
@@ -99,22 +101,40 @@ pub async fn send(app: &AppHandle, device_id: &str) -> Result<()> {
     let hello = PreHello { v: PROTOCOL_VERSION, mode: MODE.into(), pairing_id: None, auth: None, from: Some(me) };
     let bytes = serde_json::to_vec(&hello)?;
 
+    // Só repete se nenhum endereço aceitou o TCP: se o pedido chegou, o outro lado
+    // recusa o mesmo IP por `MIN_INTERVAL_MS` e a nova rodada viraria "aguarde".
     let mut last = AppError::Pairing(crate::i18n::tr("err.pair_unreachable").into());
-    for addr in addrs {
-        let res = tokio::time::timeout(TIMEOUT, async {
-            let mut s = TcpStream::connect(addr).await?;
-            write_frame(&mut s, &bytes).await?;
-            read_frame(&mut s).await
-        })
-        .await;
-        match res {
-            Ok(Ok(raw)) => {
-                let r: Reply = serde_json::from_slice(&raw).map_err(|_| AppError::Pairing(crate::i18n::tr("err.pair_bad_reply").into()))?;
-                return if r.ok { Ok(()) } else { Err(AppError::Pairing(refusal_text(r.reason))) };
-            }
-            Ok(Err(e)) => last = e,
-            // Versões antigas tratam o pedido como sessão e ficam esperando o handshake.
-            Err(_) => last = AppError::Pairing(crate::i18n::tr("err.pair_no_reply_update").into()),
+    for attempt in 1..=ATTEMPTS {
+        if attempt > 1 {
+            log::warn!("[PAIRING] Request attempt {}/{ATTEMPTS} failed: {last}", attempt - 1);
+            tokio::time::sleep(Duration::from_millis(1500 * u64::from(attempt - 1))).await;
+        }
+        for addr in &addrs {
+            let mut s = match tokio::time::timeout(TIMEOUT, TcpStream::connect(addr)).await {
+                Ok(Ok(s)) => s,
+                Ok(Err(e)) => {
+                    last = e.into();
+                    continue;
+                }
+                Err(_) => {
+                    last = AppError::Pairing(crate::i18n::tr("err.pair_unreachable").into());
+                    continue;
+                }
+            };
+            let res = tokio::time::timeout(TIMEOUT, async {
+                write_frame(&mut s, &bytes).await?;
+                read_frame(&mut s).await
+            })
+            .await;
+            return match res {
+                Ok(Ok(raw)) => {
+                    let r: Reply = serde_json::from_slice(&raw).map_err(|_| AppError::Pairing(crate::i18n::tr("err.pair_bad_reply").into()))?;
+                    if r.ok { Ok(()) } else { Err(AppError::Pairing(refusal_text(r.reason))) }
+                }
+                Ok(Err(e)) => Err(e),
+                // Versões antigas tratam o pedido como sessão e ficam esperando o handshake.
+                Err(_) => Err(AppError::Pairing(crate::i18n::tr("err.pair_no_reply_update").into())),
+            };
         }
     }
     Err(last)
