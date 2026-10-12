@@ -21,6 +21,9 @@ export const en: typeof pt = {
   },
   app: {
     startFailed: "ClipSync couldn't start.",
+    startStuck: "ClipSync is taking too long to start.",
+    retry: "Try again",
+    restarting: "Restarting…",
   },
   type: {
     text: "Text",

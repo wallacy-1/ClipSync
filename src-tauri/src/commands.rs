@@ -28,8 +28,23 @@ pub struct Bootstrap {
     pub keyboard_prompt_seen: bool,
 }
 
+/// Fora da thread principal: a UI tem tempo limite e um lock preso aqui não trava a janela.
+/// Os logs mostram no logcat/console se a chamada chegou e quanto levou.
 #[tauri::command]
-pub fn bootstrap(state: State<'_, AppState>) -> Result<Bootstrap> {
+pub async fn bootstrap(app: AppHandle) -> Result<Bootstrap> {
+    log::info!("[BOOT] bootstrap requested");
+    let started = std::time::Instant::now();
+    let r = tauri::async_runtime::spawn_blocking(move || build_bootstrap(&app.state::<AppState>()))
+        .await
+        .map_err(|e| AppError::Other(e.to_string()))?;
+    match &r {
+        Ok(_) => log::info!("[BOOT] bootstrap done in {} ms", started.elapsed().as_millis()),
+        Err(e) => log::warn!("[BOOT] bootstrap failed in {} ms: {e}", started.elapsed().as_millis()),
+    }
+    r
+}
+
+fn build_bootstrap(state: &AppState) -> Result<Bootstrap> {
     let me = state.identity.read().unwrap().summary();
     let (total, pinned) = state.db.count_items()?;
     Ok(Bootstrap {

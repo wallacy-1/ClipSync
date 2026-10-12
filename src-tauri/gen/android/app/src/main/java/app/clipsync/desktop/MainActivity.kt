@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.net.wifi.WifiManager
 import android.os.Bundle
+import android.webkit.JavascriptInterface
+import android.webkit.WebView
 import androidx.activity.enableEdgeToEdge
 import app.clipsync.desktop.ime.CoreBridge
 import app.clipsync.desktop.share.ShareBridge
@@ -26,6 +28,16 @@ class MainActivity : TauriActivity() {
     // Recriada pelo sistema (ou reaberta pelos recentes) = mesmo Intent de antes: não reenvia.
     val fromHistory = intent?.flags?.and(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY) != 0
     if (savedInstanceState == null && !fromHistory) ShareBridge.onIntent(this, intent)
+  }
+
+  // Fora do IPC do Tauri: o "Tentar de novo" precisa funcionar com o núcleo travado.
+  override fun onWebViewCreate(webView: WebView) {
+    webView.addJavascriptInterface(NativeBridge(applicationContext), "ClipSyncNative")
+  }
+
+  private class NativeBridge(private val ctx: Context) {
+    @JavascriptInterface
+    fun restart() = RestartActivity.start(ctx)
   }
 
   // "Compartilhar → ClipSync" com o app já aberto (singleTask).

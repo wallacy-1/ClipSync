@@ -48,6 +48,16 @@
             </intent-filter>
         </activity>
 
+        <!-- "Tentar de novo" da inicialização travada: processo à parte para matar o principal e reabrir. -->
+        <activity
+            android:name=".RestartActivity"
+            android:exported="false"
+            android:process=":restart"
+            android:theme="@style/Theme.ClipSend"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity="" />
+
         <!-- Bloco, widget e "Selecionar texto → ClipSync": Activity invisível que lê o clipboard e fecha.
              Exportada só por causa do PROCESS_TEXT; SEND_CLIPBOARD/COPY_LATEST exigem o token do app no Intent. -->
         <activity

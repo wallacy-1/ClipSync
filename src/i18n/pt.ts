@@ -20,6 +20,9 @@ export const pt = {
   },
   app: {
     startFailed: "O ClipSync não conseguiu iniciar.",
+    startStuck: "O ClipSync está demorando para iniciar.",
+    retry: "Tentar de novo",
+    restarting: "Reiniciando…",
   },
   type: {
     text: "Texto",

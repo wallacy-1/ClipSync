@@ -14,3 +14,5 @@
 -keep class app.clipsync.desktop.quick.StatusStore { *; }
 -keep class app.clipsync.desktop.quick.QuickAdd { *; }
 -keep class app.clipsync.desktop.update.UpdateBridge { *; }
+# Ponte JS do "Tentar de novo" (addJavascriptInterface acha o método pelo nome).
+-keepclassmembers class * { @android.webkit.JavascriptInterface <methods>; }
