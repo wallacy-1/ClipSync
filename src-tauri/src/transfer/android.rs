@@ -168,6 +168,16 @@ pub fn notify_received(id: &str, title: &str, text: &str, uri: &str, mime: Optio
     })
 }
 
+/// "Abrir" de uma transferência (`content://` vai por Intent, não por caminho).
+pub fn open_view(uri: &str) -> Result<bool> {
+    with_class(FILE_BRIDGE, |env, class, ctx| {
+        let ju = jstr(env, uri)?;
+        env.call_static_method(class, "openView", "(Landroid/content/Context;Ljava/lang/String;)Z", &[JValue::Object(ctx), JValue::Object(&ju)])
+            .and_then(|v| v.z())
+            .map_err(|e| AppError::Other(format!("FileBridge.openView: {e}")))
+    })
+}
+
 /// Abre o seletor SAF (precisa da Activity). O resultado vem por [`take_pick_result`].
 pub fn pick_file() -> Result<bool> {
     with_class(FILE_BRIDGE, |env, class, ctx| {

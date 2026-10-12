@@ -693,6 +693,13 @@ pub fn transfer_reveal(app: AppHandle, id: String) -> Result<()> {
 /// Abre o arquivo de uma transferência concluída, ou (`reveal`) mostra na pasta.
 pub(crate) fn open_transfer(app: &AppHandle, id: &str, reveal: bool) -> Result<()> {
     let target = transfer_target(app, id)?;
+    #[cfg(target_os = "android")]
+    if !reveal {
+        return match crate::transfer::android::open_view(&target)? {
+            true => Ok(()),
+            false => Err(AppError::Other(crate::i18n::tr("err.no_app_to_open").into())),
+        };
+    }
     let r = if reveal { tauri_plugin_opener::reveal_item_in_dir(&target) } else { tauri_plugin_opener::open_path(&target, None::<&str>) };
     r.map_err(|e| AppError::Other(e.to_string()))
 }

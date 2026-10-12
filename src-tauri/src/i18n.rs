@@ -176,6 +176,7 @@ table! {
     "err.transfer_queue_full" => ("fila de transferências cheia para este dispositivo", "transfer queue is full for this device"),
     "err.file_too_big" => ("arquivo maior que o limite de {gib} GiB", "file is larger than the {gib} GiB limit"),
     "err.file_gone" => ("o arquivo não está mais disponível", "the file is no longer available"),
+    "err.no_app_to_open" => ("nenhum app abre este arquivo", "no app can open this file"),
     "err.file_unreadable" => ("arquivo inacessível: {e}", "file is not accessible: {e}"),
     "err.not_a_file" => ("não é um arquivo", "not a file"),
     "err.downloads_unavailable" => ("pasta de downloads indisponível: {e}", "downloads folder is not available: {e}"),

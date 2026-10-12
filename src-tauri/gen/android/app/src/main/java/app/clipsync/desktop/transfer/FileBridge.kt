@@ -53,6 +53,21 @@ object FileBridge {
         return true
     }
 
+    /**
+     * "Abrir" de uma transferência: `content://` não é caminho, então vai por `ACTION_VIEW` com
+     * leitura concedida a quem abrir. `false` = nenhum app abre esse tipo.
+     */
+    @JvmStatic
+    fun openView(context: Context, uri: String): Boolean {
+        val u = Uri.parse(uri)
+        val view = Intent(Intent.ACTION_VIEW)
+            .setDataAndType(u, context.contentResolver.getType(u) ?: "*/*")
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+        val chooser = Intent.createChooser(view, context.getString(app.clipsync.desktop.R.string.received_open_with))
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        return runCatching { context.startActivity(chooser); true }.getOrDefault(false)
+    }
+
     /** Chamado pela Activity. Persiste a permissão de leitura para retomar depois. */
     fun onPickResult(context: Context, resultCode: Int, data: Intent?) {
         val uris = mutableListOf<Uri>()
