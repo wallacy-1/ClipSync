@@ -28,6 +28,7 @@ function ListView({ onAdd }: { onAdd: () => void }) {
   const removeDevice = useApp((s) => s.removeDevice);
   const setDeviceAddress = useApp((s) => s.setDeviceAddress);
   const [confirm, setConfirm] = useState<Device | null>(null);
+  const [repair, setRepair] = useState<Device | null>(null);
   const [editAddr, setEditAddr] = useState<Device | null>(null);
   const discovered = useDiscovered();
   const requestPairing = useApp((s) => s.requestPairing);
@@ -52,7 +53,7 @@ function ListView({ onAdd }: { onAdd: () => void }) {
                   <div className="detail">
                     {d.isSelf
                       ? t("devices.thisDevice", { platform: PLATFORM_LABEL[d.platform] ?? d.platform })
-                      : `${PLATFORM_LABEL[d.platform] ?? d.platform} · ${d.lastError ? d.lastError : d.state === "connected" ? t("android.devices.seenNow", { addr: d.address ? ` · ${d.address.replace(/:47820$/, "")}` : "" }) : d.state === "connecting" ? t("devices.connecting") : t("devices.seen", { when: relTime(d.lastSeen, now) })}`}
+                      : `${PLATFORM_LABEL[d.platform] ?? d.platform} · ${d.revoked ? t("devices.revokedDetail") : d.lastError ? d.lastError : d.state === "connected" ? t("android.devices.seenNow", { addr: d.address ? ` · ${d.address.replace(/:47820$/, "")}` : "" }) : d.state === "connecting" ? t("devices.connecting") : t("devices.seen", { when: relTime(d.lastSeen, now) })}`}
                   </div>
                 </div>
                 <DeviceBadge device={d} />
@@ -63,6 +64,9 @@ function ListView({ onAdd }: { onAdd: () => void }) {
                     globalOff={settings?.autoSend === false} disabled={d.state === "blocked"} onChange={(v) => setDeviceFlags(d.deviceId, { autoSend: v })} />
                   <DeviceFlag label={t("devices.receiveAuto")} help={t("devices.receiveAutoHelp")} on={d.autoReceive}
                     globalOff={settings?.autoReceive === false} disabled={d.state === "blocked"} onChange={(v) => setDeviceFlags(d.deviceId, { autoReceive: v })} />
+                  {d.revoked && (
+                    <button className="btn btn-primary btn-block" onClick={() => setRepair(d)}>{t("devices.repairAgain")}</button>
+                  )}
                   <div className="row-btns">
                     <button className="btn btn-ghost plain" disabled={d.state === "blocked"} onClick={() => setEditAddr(d)}>{t("android.devices.setAddress")}</button>
                     <button className="btn btn-ghost" onClick={() => setConfirm(d)}>{t("devices.remove")}</button>
@@ -111,6 +115,15 @@ function ListView({ onAdd }: { onAdd: () => void }) {
           inputMode="url"
           onCancel={() => setEditAddr(null)}
           onSubmit={async (addr) => { await setDeviceAddress(editAddr.deviceId, addr); setEditAddr(null); }}
+        />
+      )}
+      {repair && (
+        <Confirm
+          title={t("devices.repairTitle", { name: repair.name })}
+          body={t("android.devices.repairBody")}
+          confirmLabel={t("devices.removeAndRepair")}
+          onCancel={() => setRepair(null)}
+          onConfirm={async () => { const d = repair; setRepair(null); await removeDevice(d.deviceId); onAdd(); }}
         />
       )}
       {confirm && (

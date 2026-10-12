@@ -219,6 +219,10 @@ pub fn maybe_connect(app: AppHandle, device_id: String) {
     if d.blocked || state.is_connected(&device_id) || state.connecting.lock().unwrap().contains(&device_id) {
         return;
     }
+    // Removido do outro lado: tentar de novo só gera recusa. Volta com novo pareamento ou "Tentar agora".
+    if state.revoked.lock().unwrap().contains(&device_id) {
+        return;
+    }
     let seen_since = state.peers.lock().unwrap().get(&device_id).map(|p| p.first_seen);
     if !should_initiate(&state.self_id(), &device_id, seen_since) {
         return;

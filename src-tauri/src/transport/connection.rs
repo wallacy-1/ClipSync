@@ -173,6 +173,12 @@ async fn authenticate_session(
             }
             caps
         }
+        // A chave do handshake já provou que é o próprio device: `Bye` aqui = ele nos removeu (ou bloqueou).
+        Ok(Ok(Message::Bye)) => {
+            log::warn!("[AUTH] Peer refused session (removed this device) id={}", d.device_id);
+            state.revoked.lock().unwrap().insert(d.device_id.clone());
+            return Err(AppError::Net(crate::i18n::tr("err.peer_revoked").into()));
+        }
         _ => return Err(AppError::Net("hello inválido".into())),
     };
     let stored = state.db.get_device(&d.device_id)?.unwrap_or(d);
@@ -218,6 +224,17 @@ async fn complete_pairing(
         paired_at: now_ms(),
     };
     state.db.upsert_device(&d)?;
+    state.revoked.lock().unwrap().remove(&d.device_id);
+    // Mesmo nome e plataforma, chave diferente e offline: quase sempre o app reinstalado.
+    // A entrada antiga nunca mais conecta; a UI oferece removê-la (não remove sozinha: dois aparelhos iguais existem).
+    let replaces: Vec<serde_json::Value> = state
+        .db
+        .list_devices()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|o| o.device_id != d.device_id && o.name == d.name && o.platform == d.platform && !state.is_connected(&o.device_id))
+        .map(|o| serde_json::json!({ "deviceId": o.device_id, "name": o.name }))
+        .collect();
     log::info!("[PAIRING] Pairing completed with id={} name={:?} platform={}", peer.remote_id, identity.name, identity.platform);
     if let Role::Responder = role {
         *state.pairing.lock().unwrap() = None;
@@ -228,7 +245,7 @@ async fn complete_pairing(
     events::emit(
         app,
         events::PAIRING_COMPLETED,
-        serde_json::json!({ "deviceId": peer.remote_id, "name": identity.name, "pairingId": pairing_id }),
+        serde_json::json!({ "deviceId": peer.remote_id, "name": identity.name, "pairingId": pairing_id, "replaces": replaces }),
     );
     if let Some(tx) = paired_tx.take() {
         let _ = tx.send(Ok(identity));
@@ -400,6 +417,7 @@ async fn run_with_pairing_id(
         }
     }
     state.db.touch_device(&stored.device_id, dial_addr.as_deref())?;
+    state.revoked.lock().unwrap().remove(&stored.device_id);
     *state.last_error.lock().unwrap() = None;
     log::info!("[DEVICE] Connected id={} name={:?} addr={} role={}", stored.device_id, stored.name, peer_addr, if matches!(role, Role::Initiator) { "initiator" } else { "responder" });
     events::emit(

@@ -129,6 +129,7 @@ impl StoredDevice {
             paired_at: Some(self.paired_at),
             last_error: None,
             queued,
+            revoked: false,
         }
     }
 }
@@ -421,11 +422,17 @@ impl Db {
         Ok(())
     }
 
-    /// Remove o dispositivo e revoga a confiança (chave pública deixa de ser aceita).
-    pub fn remove_device(&self, id: &str) -> Result<()> {
+    /// Remove o device, revoga a chave e apaga a fila dele. Item que só esperava por ele deixa de ficar
+    /// "na fila": vira `synced` se veio de outro aparelho, `local` se foi copiado aqui (`self_id`).
+    pub fn remove_device(&self, id: &str, self_id: &str) -> Result<()> {
         let c = self.conn.lock().unwrap();
         c.execute("DELETE FROM devices WHERE device_id = ?1", [id])?;
         c.execute("DELETE FROM outbox WHERE device_id = ?1", [id])?;
+        c.execute(
+            "UPDATE clipboard_items SET sync_state = CASE WHEN source_device_id = ?1 THEN 'local' ELSE 'synced' END
+             WHERE sync_state IN ('queued', 'sending') AND id NOT IN (SELECT item_id FROM outbox)",
+            [self_id],
+        )?;
         Ok(())
     }
 

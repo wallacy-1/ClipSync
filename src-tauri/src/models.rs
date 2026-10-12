@@ -77,6 +77,8 @@ pub struct Device {
     pub paired_at: Option<i64>,
     pub last_error: Option<String>,
     pub queued: u32,
+    /// O outro lado removeu este aparelho: recusa a sessão até um novo pareamento.
+    pub revoked: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

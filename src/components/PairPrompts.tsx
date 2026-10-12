@@ -10,6 +10,7 @@ export function PairPrompts() {
     <>
       <IncomingRequest />
       <OutgoingRequest />
+      <ReplacePrompt />
     </>
   );
 }
@@ -130,6 +131,26 @@ function OutgoingRequest() {
         <div className="dialog-actions">
           <button className="btn btn-secondary" onClick={dismissPairOutgoing}>{t("common.cancel")}</button>
           <button className="btn btn-primary" disabled={!valid || busy} onClick={submit}>{busy ? t("pair.pairing") : t("pair.pair")}</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Pareou um aparelho com o mesmo nome de uma entrada antiga offline: oferece remover a antiga. */
+function ReplacePrompt() {
+  const t = useT();
+  const r = useApp((s) => s.pairReplace);
+  const resolve = useApp((s) => s.resolvePairReplace);
+  if (!r) return null;
+  return (
+    <div className="dialog-backdrop">
+      <div className="dialog">
+        <div className="dialog-title">{t("pair.replaceTitle", { name: r.name })}</div>
+        <div className="dialog-body">{t("pair.replaceBody", { name: r.name })}</div>
+        <div className="dialog-actions">
+          <button className="btn btn-secondary" onClick={() => void resolve(false)}>{t("pair.replaceKeep")}</button>
+          <button className="btn btn-primary" onClick={() => void resolve(true)}>{t("pair.replaceRemove")}</button>
         </div>
       </div>
     </div>

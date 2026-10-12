@@ -60,6 +60,8 @@ interface AppStore {
   pairRequest: PairRequest | null;
   /** Este dispositivo pediu; espera o código que aparece no outro. */
   pairOutgoing: PairRequest | null;
+  /** Pareou de novo um aparelho com o mesmo nome de uma entrada antiga offline (app reinstalado?). */
+  pairReplace: { name: string; old: { deviceId: string; name: string }[] } | null;
   toast: Toast | null;
   /** Transferências de arquivo, mais recente primeiro. Carregadas sob demanda. */
   transfers: TransferRecord[];
@@ -107,6 +109,7 @@ interface AppStore {
   requestPairing: (device: Device) => Promise<void>;
   dismissPairRequest: () => void;
   dismissPairOutgoing: () => void;
+  resolvePairReplace: (remove: boolean) => Promise<void>;
   clearHistory: (keepPinned: boolean) => Promise<void>;
   finishOnboarding: () => Promise<void>;
   dismissKeyboardPrompt: () => Promise<void>;
@@ -210,6 +213,7 @@ export const useApp = create<AppStore>((set, get) => ({
   pairing: null,
   pairRequest: null,
   pairOutgoing: null,
+  pairReplace: null,
   toast: null,
   transfers: [],
   transfersLoaded: false,
@@ -288,8 +292,8 @@ export const useApp = create<AppStore>((set, get) => ({
         syncResolvedLang(settings, lang);
       }),
       listen<PairRequest>("pairing:request", (req) => set({ pairRequest: req })),
-      listen<{ deviceId: string; name: string }>("pairing:completed", ({ name }) => {
-        set({ pairing: null, pairRequest: null, pairOutgoing: null });
+      listen<{ deviceId: string; name: string; replaces?: { deviceId: string; name: string }[] }>("pairing:completed", ({ name, replaces }) => {
+        set({ pairing: null, pairRequest: null, pairOutgoing: null, ...(replaces?.length ? { pairReplace: { name, old: replaces } } : {}) });
         get().showToast(t("toast.paired", { name }));
         void get().refreshDevices();
       }),
@@ -473,6 +477,8 @@ export const useApp = create<AppStore>((set, get) => ({
     const devices = await api.removeDevice(deviceId);
     set((s) => ({ devices, sendTargets: pruneTargets(s.sendTargets, devices) }));
     get().showToast(t("toast.deviceRemoved"));
+    // Itens que só esperavam por ele saem de "na fila".
+    void get().refreshItems();
   },
   async startPairing() {
     set({ pairing: await api.startPairing() });
@@ -490,6 +496,14 @@ export const useApp = create<AppStore>((set, get) => ({
   },
   dismissPairOutgoing() {
     set({ pairOutgoing: null });
+  },
+  async resolvePairReplace(remove) {
+    const r = get().pairReplace;
+    set({ pairReplace: null });
+    if (!remove || !r) return;
+    for (const o of r.old) await api.removeDevice(o.deviceId);
+    await get().refreshDevices();
+    void get().refreshItems();
   },
   async cancelPairing() {
     await api.cancelPairing();

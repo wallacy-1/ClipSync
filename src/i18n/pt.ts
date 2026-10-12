@@ -85,6 +85,7 @@ export const pt = {
     blocked: "Bloqueado",
     onNetwork: "Na rede",
     failed: "Falhou",
+    revoked: "Desvinculado",
     offline: "Offline",
     offlineLower: "offline",
     globalOff: "Desligado no ajuste geral",
@@ -229,12 +230,13 @@ export const pt = {
     shortcuts: "Atalhos",
   },
   devices: {
-    sendFailed: "Falha ao enviar para {name} — {error}.",
     waiting: {
       one: "{n} item aguarda {name} voltar à rede.",
       other: "{n} itens aguardam {name} voltar à rede.",
     },
-    repair: "Reparear",
+    revoked: "{name} removeu este aparelho. Pareie de novo para voltar a sincronizar.",
+    revokedDetail: "removeu este aparelho",
+    repairAgain: "Parear de novo",
     yourDevices: "Seus dispositivos",
     cancelPairing: "Cancelar pareamento",
     add: "Adicionar dispositivo",
@@ -276,6 +278,10 @@ export const pt = {
     sentBody: "Aceite o pedido em {name}. Um código de 6 caracteres aparece lá; digite aqui.",
     pair: "Parear",
     pairing: "Pareando…",
+    replaceTitle: "Remover o {name} antigo?",
+    replaceBody: "Você já tinha um {name} pareado. Se é o mesmo aparelho (app reinstalado ou dados apagados), a entrada antiga não conecta mais e só deixa itens presos na fila.",
+    replaceKeep: "Manter os dois",
+    replaceRemove: "Remover antigo",
   },
   transfers: {
     title: "Transferências",
@@ -513,6 +519,7 @@ export const pt = {
       askCode: "Pede que {name} mostre um código",
       request: "Solicitar",
       setAddress: "Definir endereço",
+      repairBody: "O vínculo antigo é removido e o leitor de QR abre. No PC, vá em Dispositivos → Adicionar dispositivo.",
     },
     scan: {
       title: "Escanear código",

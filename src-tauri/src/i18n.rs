@@ -150,6 +150,7 @@ table! {
     "err.device_not_found" => ("dispositivo não encontrado", "device not found"),
     "err.device_blocked" => ("dispositivo bloqueado", "device is blocked"),
     "err.device_not_paired" => ("dispositivo não pareado", "device is not paired"),
+    "err.peer_revoked" => ("o outro aparelho removeu este pareamento", "the other device removed this pairing"),
     "err.open_not_web" => ("Só links http/https podem ser abertos", "Only http/https links can be opened"),
     "err.open_bad_email" => ("Endereço de e-mail inválido", "Invalid email address"),
     "err.open_nothing" => ("Este item não tem link para abrir", "This item has no link to open"),

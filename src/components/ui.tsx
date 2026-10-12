@@ -110,6 +110,7 @@ export function Avatar({ device }: { device: Device }) {
 export function DeviceBadge({ device }: { device: Device }) {
   const t = useT();
   if (device.isSelf) return <span className="tag tag-synced">{t("device.active")}</span>;
+  if (device.revoked && device.state !== "connected") return <span className="tag tag-failed">{t("device.revoked")}</span>;
   switch (device.state) {
     case "connected": return <span className="tag tag-synced">{t("device.connected")}</span>;
     case "connecting": return <span className="tag tag-sending">{t("device.connecting")}</span>;

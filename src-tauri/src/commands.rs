@@ -329,15 +329,19 @@ pub fn remove_device(app: AppHandle, state: State<'_, AppState>, device_id: Stri
     log::info!("[DEVICE] Removed and revoked id={device_id}");
     crate::transfer::manager::cancel_all_for_device(&app, &device_id);
     state.send_to(&device_id, crate::transport::protocol::Message::Bye);
-    state.db.remove_device(&device_id)?;
+    state.db.remove_device(&device_id, &state.self_id())?;
     state.connections.lock().unwrap().remove(&device_id);
+    state.revoked.lock().unwrap().remove(&device_id);
+    // Sem isso a entrada do mDNS (TTL longo) o mantém em "na rede", mesmo quando era um app reinstalado.
+    state.peers.lock().unwrap().remove(&device_id);
     let devices = state.devices();
     events::emit(&app, events::DEVICE_UPDATED, &devices);
     Ok(devices)
 }
 
 #[tauri::command]
-pub fn connect_device(app: AppHandle, device_id: String) -> Result<()> {
+pub fn connect_device(app: AppHandle, state: State<'_, AppState>, device_id: String) -> Result<()> {
+    state.revoked.lock().unwrap().remove(&device_id);
     transport::maybe_connect(app, device_id);
     Ok(())
 }

@@ -89,6 +89,7 @@ pub fn run() {
                 peers: Mutex::new(HashMap::new()),
                 connections: Mutex::new(HashMap::new()),
                 connecting: Mutex::new(HashSet::new()),
+                revoked: Mutex::new(HashSet::new()),
                 pairing: Mutex::new(None),
                 listen_port: AtomicU16::new(0),
                 last_error: Mutex::new(None),

@@ -48,21 +48,21 @@ const settings: Settings = {
 let devices: Device[] = [
   {
     deviceId: "estacao", name: "Estação-Dev", platform: "windows", publicKey: "aa", state: "connected",
-    isSelf: SELF === "estacao", autoSend: true, autoReceive: true, lastSeen: now, address: null, pairedAt: now - 30 * 86400000, lastError: null, queued: 0,
+    isSelf: SELF === "estacao", autoSend: true, autoReceive: true, lastSeen: now, address: null, pairedAt: now - 30 * 86400000, lastError: null, queued: 0, revoked: false,
   },
   {
     deviceId: "pixel8", name: "Pixel 8", platform: "android", publicKey: "bb",
     state: scenario === "offline" ? "disconnected" : "connected",
     isSelf: SELF === "pixel8", autoSend: true, autoReceive: true, lastSeen: now, address: "192.168.0.14:47820", pairedAt: now - 20 * 86400000, lastError: null,
-    queued: scenario === "offline" ? 4 : 0,
+    queued: scenario === "offline" ? 4 : 0, revoked: false,
   },
   {
     deviceId: "notebook", name: "Notebook-Casa", platform: "windows", publicKey: "cc", state: scenario === "error" ? "blocked" : "disconnected",
     isSelf: false, autoSend: false, autoReceive: true, lastSeen: now - 2 * 86400000, address: null, pairedAt: now - 60 * 86400000,
-    lastError: scenario === "error" ? "chave de pareamento expirada" : null, queued: scenario === "error" ? 2 : 0,
+    lastError: scenario === "error" ? "chave de pareamento expirada" : null, queued: scenario === "error" ? 2 : 0, revoked: false,
   },  {
     deviceId: "tablet", name: "Galaxy Tab", platform: "android", publicKey: "dd", state: "discovered",
-    isSelf: false, autoSend: false, autoReceive: false, lastSeen: now, address: "192.168.0.21:47820", pairedAt: null, lastError: null, queued: 0,
+    isSelf: false, autoSend: false, autoReceive: false, lastSeen: now, address: "192.168.0.21:47820", pairedAt: null, lastError: null, queued: 0, revoked: false,
   },
 ];
 
@@ -336,7 +336,7 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
       if (cmd === "pair_with_code" && code !== "4K7Q2M") throw "código incorreto ou expirado";
       const id = { deviceId: "estacao", name: "Estação-Dev", platform: "windows", publicKey: "aa" };
       if (!devices.some((d) => d.deviceId === id.deviceId)) {
-        devices = [...devices, { ...id, state: "connected", isSelf: false, autoSend: true, autoReceive: true, lastSeen: Date.now(), address: "192.168.0.10:47820", pairedAt: Date.now(), lastError: null, queued: 0 }];
+        devices = [...devices, { ...id, state: "connected", isSelf: false, autoSend: true, autoReceive: true, lastSeen: Date.now(), address: "192.168.0.10:47820", pairedAt: Date.now(), lastError: null, queued: 0, revoked: false }];
       }
       emit("pairing:completed", { deviceId: id.deviceId, name: id.name });
       emit("device:updated", devices);

@@ -25,7 +25,7 @@ export function DevicesView() {
   const requestPairing = useApp((s) => s.requestPairing);
   const [requesting, setRequesting] = useState<string | null>(null);
 
-  const failed = peers.filter((d) => d.lastError || (d.queued > 0 && d.state !== "connected"));
+  const failed = peers.filter((d) => d.revoked || (d.queued > 0 && d.state !== "connected"));
   const meDevice = useApp((s) => s.devices.find((d) => d.isSelf));
 
   return (
@@ -35,12 +35,12 @@ export function DevicesView() {
           <div className="banner error" key={d.deviceId}>
             <Alert size={18} />
             <span>
-              {d.lastError
-                ? t("devices.sendFailed", { name: d.name, error: d.lastError })
+              {d.revoked
+                ? t("devices.revoked", { name: d.name })
                 : t("devices.waiting", { n: d.queued, name: d.name })}
             </span>
-            {d.lastError ? (
-              <button className="btn btn-secondary" onClick={() => setConfirmRemove(d)}>{t("devices.repair")}</button>
+            {d.revoked ? (
+              <button className="btn btn-secondary" onClick={() => setConfirmRemove(d)}>{t("devices.repairAgain")}</button>
             ) : (
               <button className="btn btn-secondary" onClick={() => api.connectDevice(d.deviceId)}>{t("common.retryNow")}</button>
             )}
@@ -74,8 +74,8 @@ export function DevicesView() {
                 <div className="name">{d.name}</div>
                 <div className="detail">
                   {PLATFORM_LABEL[d.platform] ?? d.platform} ·{" "}
-                  {d.lastError
-                    ? d.lastError
+                  {d.revoked
+                    ? t("devices.revokedDetail")
                     : d.state === "connected"
                       ? `${t("devices.seenNow")}${d.address ? ` · ${d.address.replace(/:47820$/, "")}` : ""}`
                       : d.state === "connecting"
@@ -146,16 +146,16 @@ export function DevicesView() {
 
       {confirmRemove && (
         <Confirm
-          title={t(confirmRemove.lastError ? "devices.repairTitle" : "devices.removeTitle", { name: confirmRemove.name })}
-          body={t(confirmRemove.lastError ? "devices.repairBody" : "devices.removeBody")}
-          confirmLabel={t(confirmRemove.lastError ? "devices.removeAndRepair" : "devices.remove")}
+          title={t(confirmRemove.revoked ? "devices.repairTitle" : "devices.removeTitle", { name: confirmRemove.name })}
+          body={t(confirmRemove.revoked ? "devices.repairBody" : "devices.removeBody")}
+          confirmLabel={t(confirmRemove.revoked ? "devices.removeAndRepair" : "devices.remove")}
           danger
           onCancel={() => setConfirmRemove(null)}
           onConfirm={async () => {
             const d = confirmRemove;
             setConfirmRemove(null);
             await removeDevice(d.deviceId);
-            if (d.lastError) await startPairing();
+            if (d.revoked) await startPairing();
           }}
         />
       )}

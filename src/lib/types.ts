@@ -38,6 +38,8 @@ export interface Device {
   pairedAt: number | null;
   lastError: string | null;
   queued: number;
+  /** O outro lado removeu este aparelho: não reconecta até parear de novo. */
+  revoked: boolean;
 }
 
 export interface DeviceIdentity {

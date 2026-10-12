@@ -86,6 +86,7 @@ export const en: typeof pt = {
     blocked: "Blocked",
     onNetwork: "On network",
     failed: "Failed",
+    revoked: "Unlinked",
     offline: "Offline",
     offlineLower: "offline",
     globalOff: "Turned off by the general setting",
@@ -230,12 +231,13 @@ export const en: typeof pt = {
     shortcuts: "Shortcuts",
   },
   devices: {
-    sendFailed: "Couldn't send to {name} — {error}.",
     waiting: {
       one: "{n} item is waiting for {name} to come back online.",
       other: "{n} items are waiting for {name} to come back online.",
     },
-    repair: "Re-pair",
+    revoked: "{name} removed this device. Pair again to sync again.",
+    revokedDetail: "removed this device",
+    repairAgain: "Pair again",
     yourDevices: "Your devices",
     cancelPairing: "Cancel pairing",
     add: "Add device",
@@ -277,6 +279,10 @@ export const en: typeof pt = {
     sentBody: "Accept the request on {name}. A 6-character code appears there; enter it here.",
     pair: "Pair",
     pairing: "Pairing…",
+    replaceTitle: "Remove the old {name}?",
+    replaceBody: "You already had a {name} paired. If it's the same device (app reinstalled or data cleared), the old entry will never connect again and only leaves items stuck in the queue.",
+    replaceKeep: "Keep both",
+    replaceRemove: "Remove old",
   },
   transfers: {
     title: "Transfers",
@@ -514,6 +520,7 @@ export const en: typeof pt = {
       askCode: "Asks {name} to show a code",
       request: "Request",
       setAddress: "Set address",
+      repairBody: "The old link is removed and the QR scanner opens. On the PC, go to Devices → Add device.",
     },
     scan: {
       title: "Scan code",

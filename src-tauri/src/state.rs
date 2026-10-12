@@ -52,6 +52,8 @@ pub struct AppState {
     pub peers: Mutex<HashMap<String, PeerInfo>>,
     pub connections: Mutex<HashMap<String, ConnHandle>>,
     pub connecting: Mutex<std::collections::HashSet<String>>,
+    /// Pareados que recusaram a sessão (removeram este aparelho). Só em memória: ao reabrir tenta de novo uma vez.
+    pub revoked: Mutex<std::collections::HashSet<String>>,
     pub pairing: Mutex<Option<PairingSession>>,
     pub listen_port: AtomicU16,
     pub last_error: Mutex<Option<String>>,
@@ -142,10 +144,12 @@ impl AppState {
             paired_at: None,
             last_error: None,
             queued: 0,
+            revoked: false,
         }];
         let peers = self.peers.lock().unwrap().clone();
         let conns = self.connections.lock().unwrap();
         let connecting = self.connecting.lock().unwrap();
+        let revoked = self.revoked.lock().unwrap();
         let queued = self.db.outbox_counts().unwrap_or_default();
         let stored = self.db.list_devices().unwrap_or_default();
         for d in &stored {
@@ -160,6 +164,7 @@ impl AppState {
                 (DeviceState::Disconnected, None)
             };
             let mut dev = d.to_device(state, address, *queued.get(&d.device_id).unwrap_or(&0));
+            dev.revoked = revoked.contains(&d.device_id);
             if let Some(p) = peer {
                 dev.last_seen = Some(p.last_seen.max(d.last_seen.unwrap_or(0)));
             }
@@ -183,6 +188,7 @@ impl AppState {
                 paired_at: None,
                 last_error: None,
                 queued: 0,
+                revoked: false,
             });
         }
         out
