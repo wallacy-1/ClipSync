@@ -426,6 +426,11 @@ pub fn cancel_pairing(app: AppHandle, state: State<'_, AppState>) -> Result<()> 
     Ok(())
 }
 
+/// Rodadas do pareamento por QR. Logo após entrar na rede (ou com o aviso do firewall
+/// aberto no PC) o primeiro connect costuma falhar; o segredo do QR está sempre certo,
+/// então repetir é seguro e fica abaixo de `MAX_PAIR_FAILURES` do outro lado.
+const QR_PAIR_ATTEMPTS: u32 = 3;
+
 async fn pair_at(
     app: &AppHandle,
     addrs: Vec<String>,
@@ -434,9 +439,23 @@ async fn pair_at(
     secret_or_code: &str,
 ) -> Result<DeviceIdentity> {
     let password = pairing::password_for(auth, secret_or_code);
+    let r = try_pair_addrs(app, addrs, pairing_id, auth, &password).await;
+    if let Err(e) = &r {
+        events::emit(app, events::PAIRING_FAILED, serde_json::json!({ "reason": e.to_string() }));
+    }
+    r
+}
+
+async fn try_pair_addrs(
+    app: &AppHandle,
+    addrs: Vec<String>,
+    pairing_id: Option<String>,
+    auth: pairing::PairAuth,
+    password: &[u8],
+) -> Result<DeviceIdentity> {
     let mut last_err = AppError::Pairing(crate::i18n::tr("err.pair_no_addr").into());
     for addr in addrs {
-        match connection::connect_pair(app.clone(), addr.clone(), pairing_id.clone(), auth, password.clone()).await {
+        match connection::connect_pair(app.clone(), addr.clone(), pairing_id.clone(), auth, password.to_vec()).await {
             // A conexão do pareamento já segue como sessão cifrada; nada a reconectar.
             Ok(id) => return Ok(id),
             Err(e) => {
@@ -449,7 +468,6 @@ async fn pair_at(
             }
         }
     }
-    events::emit(app, events::PAIRING_FAILED, serde_json::json!({ "reason": last_err.to_string() }));
     Err(last_err)
 }
 
@@ -461,13 +479,29 @@ pub async fn pair_with_payload(app: AppHandle, raw: String) -> Result<DeviceIden
     if p.device_id == state.self_id() {
         return Err(AppError::Pairing(crate::i18n::tr("err.pair_self").into()));
     }
-    let mut addrs: Vec<String> = p.addrs.iter().map(|a| SocketAddr::new(*a, p.port).to_string()).collect();
-    for a in transport::candidate_addrs(&state, &p.device_id) {
-        if !addrs.contains(&a) {
-            addrs.push(a);
+    let password = pairing::password_for(pairing::PairAuth::Qr, &p.secret);
+    let mut last_err = AppError::Pairing(crate::i18n::tr("err.pair_no_addr").into());
+    for attempt in 1..=QR_PAIR_ATTEMPTS {
+        if attempt > 1 {
+            tokio::time::sleep(std::time::Duration::from_millis(1500 * u64::from(attempt - 1))).await;
+        }
+        // Remonta a cada rodada: o mDNS pode ter achado o PC enquanto isso.
+        let mut addrs: Vec<String> = p.addrs.iter().map(|a| SocketAddr::new(*a, p.port).to_string()).collect();
+        for a in transport::candidate_addrs(&state, &p.device_id) {
+            if !addrs.contains(&a) {
+                addrs.push(a);
+            }
+        }
+        match try_pair_addrs(&app, addrs, Some(p.pairing_id.clone()), pairing::PairAuth::Qr, &password).await {
+            Ok(id) => return Ok(id),
+            Err(e) => {
+                log::warn!("[PAIRING] QR attempt {attempt}/{QR_PAIR_ATTEMPTS} failed: {e}");
+                last_err = e;
+            }
         }
     }
-    pair_at(&app, addrs, Some(p.pairing_id), pairing::PairAuth::Qr, &p.secret).await
+    events::emit(&app, events::PAIRING_FAILED, serde_json::json!({ "reason": last_err.to_string() }));
+    Err(last_err)
 }
 
 #[tauri::command]
