@@ -438,8 +438,10 @@ button { font-family: inherit; }
 .ask-card.android { position: fixed; left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom)); box-shadow: var(--shadow-lg); z-index: 45; animation: csSlide .18s ease-out; }
 
 /* toast */
-.toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--color-text); color: var(--color-bg); padding: 10px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; box-shadow: var(--shadow-lg); z-index: 50; animation: csSlide .18s ease-out; max-width: 90vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.toast { position: fixed; left: 50%; bottom: 24px; translate: -50% 0; background: var(--color-text); color: var(--color-bg); padding: 10px 18px; border-radius: 999px; font-size: 13px; font-weight: 600; box-shadow: var(--shadow-lg); z-index: 50; animation: csSlide .18s ease-out; max-width: 90vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .toast.error { background: var(--color-danger-fg); }
+/* Android: acima da barra de abas e do botão Enviar das Transferências. */
+.and .toast { bottom: calc(156px + env(safe-area-inset-bottom)); }
 
 /* confirm dialog */
 .dialog-backdrop { position: fixed; inset: 0; display: grid; place-items: center; padding: var(--space-4); background: var(--color-overlay-strong); z-index: 40; }
