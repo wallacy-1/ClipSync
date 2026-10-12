@@ -13,8 +13,12 @@ export function Onboarding({ onPair }: { onPair: () => void }) {
   if (step === "perms") {
     return (
       <PermissionsSetup>
-        <button className="btn btn-primary btn-block cta" onClick={onPair}>{t("android.onboarding.pair")}</button>
-        <button className="btn btn-ghost btn-block" onClick={() => void finish()}>{t("android.onboarding.localOnly")}</button>
+        {(ready) => (
+          <>
+            <button className="btn btn-primary btn-block cta" disabled={!ready} onClick={onPair}>{t("android.onboarding.pair")}</button>
+            <button className="btn btn-ghost btn-block" onClick={() => void finish()}>{t("android.onboarding.localOnly")}</button>
+          </>
+        )}
       </PermissionsSetup>
     );
   }

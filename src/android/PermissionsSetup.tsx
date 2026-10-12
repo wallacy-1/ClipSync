@@ -1,4 +1,5 @@
 // Tudo o que o app pode pedir numa tela só. Nada é ativado sozinho: cada item leva ao diálogo/tela do sistema.
+// Teclado e "Manter conectado" são exigidos para parear: sem eles o Android só deixa sincronizar com o app na tela.
 import { useEffect } from "react";
 import { Bell, Check, Keyboard as KeyboardIcon, Shield, Transfers } from "../components/Icons";
 import { Toggle } from "../components/ui";
@@ -6,7 +7,7 @@ import { useT } from "../i18n";
 import { useApp } from "../store/app";
 import { imeState } from "./KeyboardView";
 
-export function PermissionsSetup({ children }: { children: React.ReactNode }) {
+export function PermissionsSetup({ children }: { children: (ready: boolean) => React.ReactNode }) {
   const t = useT();
   const notifyPerm = useApp((s) => s.notifyPerm);
   const requestNotifyPerm = useApp((s) => s.requestNotifyPerm);
@@ -26,6 +27,7 @@ export function PermissionsSetup({ children }: { children: React.ReactNode }) {
   }, [refreshIme]);
 
   const kb = imeState(ime);
+  const ready = kb === "active" && keepAlive;
   const showNotify = notifyPerm !== null && notifyPerm !== "unsupported";
 
   return (
@@ -49,7 +51,7 @@ export function PermissionsSetup({ children }: { children: React.ReactNode }) {
           Icon={KeyboardIcon}
           title={t("android.perms.kbTitle")}
           help={kb === "enabled" ? t("android.perms.kbHelpEnabled") : t("android.perms.kbHelp")}
-          optional
+          required
           done={kb === "active"}
           action={kb === "enabled" ? t("android.perms.kbSelect") : t("android.perms.kbEnable")}
           onAction={() => void (kb === "enabled" ? showImePicker() : openImeSettings())}
@@ -57,25 +59,25 @@ export function PermissionsSetup({ children }: { children: React.ReactNode }) {
         <div className={`perm-row${keepAlive ? " done" : ""}`}>
           <span className="perm-icon"><Transfers size={18} /></span>
           <div className="perm-body">
-            <div className="perm-title">{t("android.perms.bgTitle")} <span className="perm-tag">{t("android.perms.optional")}</span></div>
+            <div className="perm-title">{t("android.perms.bgTitle")} {!keepAlive && <span className="perm-tag">{t("android.perms.required")}</span>}</div>
             <div className="perm-help">{t("android.perms.bgHelp")}</div>
           </div>
           <Toggle on={keepAlive} onChange={(v) => void saveSettings({ keepAlive: v })} />
         </div>
       </div>
-      <p className="perm-note">{t("android.perms.note")}</p>
+      <p className="perm-note">{t(ready ? "android.perms.noteDone" : "android.perms.note")}</p>
 
       <div className="grow" />
-      {children}
+      {children(ready)}
     </div>
   );
 }
 
-function PermRow({ Icon, title, help, optional, done, action, onAction }: {
+function PermRow({ Icon, title, help, required, done, action, onAction }: {
   Icon: typeof Bell;
   title: string;
   help: string;
-  optional?: boolean;
+  required?: boolean;
   done: boolean;
   action: string;
   onAction: () => void;
@@ -85,7 +87,7 @@ function PermRow({ Icon, title, help, optional, done, action, onAction }: {
     <div className={`perm-row${done ? " done" : ""}`}>
       <span className="perm-icon">{done ? <Check size={18} /> : <Icon size={18} />}</span>
       <div className="perm-body">
-        <div className="perm-title">{title} {optional && <span className="perm-tag">{t("android.perms.optional")}</span>}</div>
+        <div className="perm-title">{title} {required && !done && <span className="perm-tag">{t("android.perms.required")}</span>}</div>
         <div className="perm-help">{help}</div>
       </div>
       {done

@@ -72,7 +72,7 @@ export function AndroidShell() {
     return (
       <div className="and">
         <PermissionsSetup>
-          <button className="btn btn-primary btn-block cta" onClick={() => void useApp.getState().dismissKeyboardPrompt()}>{t("android.perms.continue")}</button>
+          {() => <button className="btn btn-primary btn-block cta" onClick={() => void useApp.getState().dismissKeyboardPrompt()}>{t("android.perms.continue")}</button>}
         </PermissionsSetup>
         {pendingShare && <ShareSheet />}
         {!pendingShare && <AskPrompt variant="android" />}
