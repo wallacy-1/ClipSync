@@ -3,6 +3,8 @@ name = "clipsync"
 version = "1.0.0"
 description = "ClipSync — área de transferência sincronizada por P2P na rede local"
 authors = ["wallacy"]
+license = "MIT"
+repository = "https://github.com/wallacy-1/ClipSync"
 edition = "2021"
 rust-version = "1.77"
 
