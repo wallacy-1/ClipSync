@@ -36,7 +36,7 @@ import kotlin.math.abs
 /**
  * Teclado opcional do ClipSync. Nada do que é digitado é registrado, persistido ou
  * enviado; a única coisa observada fora do fluxo normal do teclado é o clipboard,
- * via [ClipboardBridge] (ver docs/ime.md).
+ * via [ClipboardBridge].
  */
 class ClipSyncImeService : InputMethodService() {
 

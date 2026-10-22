@@ -9,8 +9,8 @@ import java.security.MessageDigest
 import java.util.concurrent.Executors
 
 /**
- * Único leitor de clipboard do IME: como teclado padrão recebe o listener mesmo sem foco
- * (docs/ime-probe-clipboard.md). Núcleo vivo: `CoreBridge.nativeOnClip`; morto: [ImeInbox].
+ * Único leitor de clipboard do IME: como teclado padrão recebe o listener mesmo sem foco.
+ * Núcleo vivo: `CoreBridge.nativeOnClip`; morto: [ImeInbox].
  * Nunca registra o conteúdo (log só de hash/tamanho, em debug).
  */
 object ClipboardBridge {

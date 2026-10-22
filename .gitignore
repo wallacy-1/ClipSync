@@ -24,7 +24,7 @@ keystore.properties
 key.properties
 .env
 .env.*
-# Chaves do updater/Android ficam fora do repo (ver docs/release.md); isto é só rede de segurança.
+# Chaves do updater/Android ficam fora do repo; isto é só rede de segurança.
 *.key
 *.key.pub
 *.password

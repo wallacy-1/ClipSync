@@ -85,7 +85,7 @@ fn preview_of(item: &ClipboardItem, hide_sensitive: bool) -> String {
     }
 }
 
-/// `{ paired, connected, paused, pausedUntil, last, updatedAt }` (ver docs/features/04).
+/// `{ paired, connected, paused, pausedUntil, last, updatedAt }`.
 /// `last.local` diz se o item nasceu neste aparelho (o Kotlin escreve "de PC" só quando não).
 #[cfg_attr(not(target_os = "android"), allow(dead_code))]
 fn status_json(app: &AppHandle) -> Value {

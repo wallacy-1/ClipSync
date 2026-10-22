@@ -21,7 +21,7 @@ import org.json.JSONObject
  * Activity invisível por trás do bloco, do widget e de "Selecionar texto → ClipSync": ganha foco por
  * um instante (única forma de ler o clipboard no Android 10+ sem ser o teclado), entrega o texto e fecha.
  * Núcleo vivo: envio explícito pela JNI + Toast com o resultado. Núcleo morto: abre o app na folha
- * "Enviar para" (mesmo caminho do "Compartilhar"). Ver docs/features/04-android-bloco-widget-texto.md.
+ * "Enviar para" (mesmo caminho do "Compartilhar").
  */
 class ClipSendActivity : Activity() {
     private val main = Handler(Looper.getMainLooper())
