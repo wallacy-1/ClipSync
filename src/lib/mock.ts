@@ -1,18 +1,23 @@
 // Mock para rodar a UI no navegador (npm run dev sem Tauri).
-// `?platform=android` troca o shell; `?state=offline|empty|error` simula cenários; `?ime=off|enabled|selected|prompt` o teclado.
+// `?platform=android` troca o shell; `?state=offline|empty|error` simula cenários; `?ime=off|enabled|selected|prompt` o teclado;
+// `?lang=en|pt` fixa o idioma e os dados de exemplo (prints do README).
 import type { Bootstrap, ClipboardItem, Device, ImeStatus, PairingInfo, Settings, SyncStatus, TransferRecord } from "./types";
 
 const params = new URLSearchParams(location.search);
 const platform = (params.get("platform") as Bootstrap["platform"]) || "windows";
 const scenario = params.get("state") || "";
 const imeScenario = params.get("ime") || "off";
+const langParam = params.get("lang");
+const EN = langParam === "en";
+/** Texto de exemplo no idioma do mock. */
+const L = (pt: string, en: string) => (EN ? en : pt);
 let notifyPerm = params.get("notify") ?? "granted";
 let ime: ImeStatus = {
   supported: platform === "android",
   enabled: imeScenario !== "off" && imeScenario !== "prompt",
   selected: imeScenario === "selected",
   theme: "default",
-  themes: [{ id: "default", label: "Padrão" }, { id: "clipsync", label: "ClipSync" }],
+  themes: [{ id: "default", label: L("Padrão", "Default") }, { id: "clipsync", label: "ClipSync" }],
 };
 
 const now = Date.now();
@@ -20,7 +25,7 @@ const min = 60_000;
 const SELF = platform === "android" ? "pixel8" : "estacao";
 
 const settings: Settings = {
-  deviceName: platform === "android" ? "Pixel 8" : "Estação-Dev",
+  deviceName: platform === "android" ? "Pixel 8" : L("Estação-Dev", "Workstation"),
   autoSend: true,
   autoReceive: true,
   syncedTypes: ["text", "link", "code", "email", "image"],
@@ -40,14 +45,14 @@ const settings: Settings = {
   sensitiveExpireMinutes: 2,
   launchAtLogin: false,
   theme: "system",
-  language: "auto",
-  languageResolved: "pt-BR",
+  language: EN ? "en" : langParam === "pt" ? "pt-BR" : "auto",
+  languageResolved: EN ? "en" : "pt-BR",
   shortcuts: { openPanel: "Ctrl+Alt+Shift+V", pasteLast: "Ctrl+Alt+Shift+C", sendLast: "Ctrl+Alt+Shift+E", togglePause: "Ctrl+Alt+Shift+P" },
 };
 
 let devices: Device[] = [
   {
-    deviceId: "estacao", name: "Estação-Dev", platform: "windows", publicKey: "aa", state: "connected",
+    deviceId: "estacao", name: L("Estação-Dev", "Workstation"), platform: "windows", publicKey: "aa", state: "connected",
     isSelf: SELF === "estacao", autoSend: true, autoReceive: true, lastSeen: now, address: null, pairedAt: now - 30 * 86400000, lastError: null, queued: 0, revoked: false,
   },
   {
@@ -57,9 +62,9 @@ let devices: Device[] = [
     queued: scenario === "offline" ? 4 : 0, revoked: false,
   },
   {
-    deviceId: "notebook", name: "Notebook-Casa", platform: "windows", publicKey: "cc", state: scenario === "error" ? "blocked" : "disconnected",
+    deviceId: "notebook", name: L("Notebook-Casa", "Home-Laptop"), platform: "windows", publicKey: "cc", state: scenario === "error" ? "blocked" : "disconnected",
     isSelf: false, autoSend: false, autoReceive: true, lastSeen: now - 2 * 86400000, address: null, pairedAt: now - 60 * 86400000,
-    lastError: scenario === "error" ? "chave de pareamento expirada" : null, queued: scenario === "error" ? 2 : 0, revoked: false,
+    lastError: scenario === "error" ? L("chave de pareamento expirada", "pairing key expired") : null, queued: scenario === "error" ? 2 : 0, revoked: false,
   },  {
     deviceId: "tablet", name: "Galaxy Tab", platform: "android", publicKey: "dd", state: "discovered",
     isSelf: false, autoSend: false, autoReceive: false, lastSeen: now, address: "192.168.0.21:47820", pairedAt: null, lastError: null, queued: 0, revoked: false,
@@ -90,18 +95,18 @@ const mkImage = (id: string, w: number, h: number, bytes: number, a: string, b: 
 };
 
 let items: ClipboardItem[] = scenario === "empty" ? [] : [
-  mkImage("img-captura", 1920, 1080, 2_516_582, "#7a5cff", "#2fb5c8", "Captura de tela", { createdAt: now - 1 * min }),
+  mkImage("img-captura", 1920, 1080, 2_516_582, "#7a5cff", "#2fb5c8", L("Captura de tela", "Screenshot"), { createdAt: now - 1 * min }),
   mk({ content: "docker compose up -d --build", contentType: "command", createdAt: now - 2 * min, isPinned: true }),
   mk({ content: "https://github.com/clipsync/core/pull/482", contentType: "link", sourceDeviceId: "pixel8", createdAt: now - 8 * min }),
   mk({ content: "const { data } = await db.from('devices').select('*')", contentType: "code", createdAt: now - 14 * min }),
   mk({ content: "sk_live_51NfQ2mB7xKpLd8vR", contentType: "token", sourceDeviceId: "notebook", createdAt: now - 21 * min, isSensitive: true, expiresAt: now + 2 * min }),
-  mk({ content: "Rua Aurora 128, ap. 41 — Porto Alegre / RS", contentType: "text", sourceDeviceId: "pixel8", createdAt: now - 40 * min }),
-  mk({ content: "Reunião sexta: veja a pauta", contentType: "text", createdAt: now - 42 * min, metadata: { formatted: true } }),
-  mkImage("img-foto", 1080, 1440, 1_153_434, "#ff9a5c", "#c8456f", "Foto do celular", { sourceDeviceId: "pixel8", createdAt: now - 45 * min }),
+  mk({ content: L("Rua Aurora 128, ap. 41 — Porto Alegre / RS", "742 Evergreen Terrace, Apt 41 — Springfield"), contentType: "text", sourceDeviceId: "pixel8", createdAt: now - 40 * min }),
+  mk({ content: L("Reunião sexta: veja a pauta", "Friday meeting: see the agenda"), contentType: "text", createdAt: now - 42 * min, metadata: { formatted: true } }),
+  mkImage("img-foto", 1080, 1440, 1_153_434, "#ff9a5c", "#c8456f", L("Foto do celular", "Phone photo"), { sourceDeviceId: "pixel8", createdAt: now - 45 * min }),
   mk({ content: "ssh deploy@10.0.4.12 -p 2202", contentType: "command", createdAt: now - 60 * min }),
   mk({ content: "https://tauri.app/v2/guides/distribution", contentType: "link", createdAt: now - 120 * min }),
   mk({ content: "git rebase -i HEAD~4", contentType: "command", sourceDeviceId: "notebook", createdAt: now - 26 * 60 * min }),
-  mk({ content: "ana.souza@example.com", contentType: "email", sourceDeviceId: "pixel8", createdAt: now - 27 * 60 * min }),
+  mk({ content: L("ana.souza@example.com", "jane.doe@example.com"), contentType: "email", sourceDeviceId: "pixel8", createdAt: now - 27 * 60 * min }),
 ];
 if (scenario === "offline") items = items.map((it, i) => (i < 4 ? { ...it, syncState: "queued" } : it));
 
@@ -111,7 +116,7 @@ let sync: SyncStatus = {
   online: scenario !== "offline",
   connectedCount: scenario === "offline" ? 0 : 1,
   queuedCount: scenario === "offline" ? 4 : scenario === "error" ? 2 : 0,
-  lastError: scenario === "error" ? "Falha ao enviar 2 itens para Notebook-Casa — chave de pareamento expirada." : null,
+  lastError: scenario === "error" ? L("Falha ao enviar 2 itens para Notebook-Casa — chave de pareamento expirada.", "Failed to send 2 items to Home-Laptop — pairing key expired.") : null,
 };
 
 // Transferências de arquivo. `?transfers=waiting|failed|history|empty` troca o cenário.
@@ -136,17 +141,17 @@ const mkT = (p: Partial<TransferRecord> & { originalName: string; size: number; 
   ...p,
 });
 const T = {
-  enviando: () => mkT({ originalName: "relatório-métricas-Q3.pdf", size: 12.4 * MB, bytesDone: 8.1 * MB, deviceId: "pixel8", direction: "out", state: { kind: "transferring" } }),
+  enviando: () => mkT({ originalName: L("relatório-métricas-Q3.pdf", "metrics-report-Q3.pdf"), size: 12.4 * MB, bytesDone: 8.1 * MB, deviceId: "pixel8", direction: "out", state: { kind: "transferring" } }),
   grande: () => mkT({ originalName: "build-1.4.2-arm64.apk", size: 1.2 * 1024 * MB, bytesDone: 450 * MB, deviceId: "notebook", direction: "out", state: { kind: "transferring" } }),
-  recebendo: () => mkT({ originalName: "captura de tela — 2026-09-20 às 14.02.png", size: 3.8 * MB, bytesDone: 3.1 * MB, deviceId: "pixel8", direction: "in", state: { kind: "transferring" } }),
+  recebendo: () => mkT({ originalName: L("captura de tela — 2026-09-20 às 14.02.png", "screenshot 2026-09-20 at 14.02.png"), size: 3.8 * MB, bytesDone: 3.1 * MB, deviceId: "pixel8", direction: "in", state: { kind: "transferring" } }),
   fila: () => mkT({ originalName: "dump-clipsync-prod", size: 86.3 * MB, deviceId: "notebook", direction: "out", state: { kind: "queued" } }),
-  verificando: () => mkT({ originalName: "contrato-assinado.pdf", size: 2.1 * MB, bytesDone: 2.1 * MB, deviceId: "pixel8", direction: "in", state: { kind: "verifying" } }),
-  concluido: () => mkT({ originalName: "apresentação-clipsync.key", size: 54.6 * MB, bytesDone: 54.6 * MB, deviceId: "pixel8", direction: "out", state: { kind: "completed" } }),
+  verificando: () => mkT({ originalName: L("contrato-assinado.pdf", "signed-contract.pdf"), size: 2.1 * MB, bytesDone: 2.1 * MB, deviceId: "pixel8", direction: "in", state: { kind: "verifying" } }),
+  concluido: () => mkT({ originalName: L("apresentação-clipsync.key", "clipsync-presentation.key"), size: 54.6 * MB, bytesDone: 54.6 * MB, deviceId: "pixel8", direction: "out", state: { kind: "completed" } }),
   esperando: () => mkT({ originalName: "build-1.4.2-arm64.apk", size: 1.2 * 1024 * MB, bytesDone: 612 * MB, deviceId: "notebook", direction: "out", state: { kind: "waiting", reason: "disconnected" } }),
-  oferta: () => mkT({ originalName: "vídeo-demo-sync.mp4", size: 128 * MB, deviceId: "pixel8", direction: "out", state: { kind: "offered" } }),
-  falhaEspaco: () => mkT({ originalName: "vídeo-demo-sync.mp4", size: 128 * MB, bytesDone: 96 * MB, deviceId: "pixel8", direction: "out", state: { kind: "failed", error: "rejected:noSpace" } }),
+  oferta: () => mkT({ originalName: L("vídeo-demo-sync.mp4", "sync-demo-video.mp4"), size: 128 * MB, deviceId: "pixel8", direction: "out", state: { kind: "offered" } }),
+  falhaEspaco: () => mkT({ originalName: L("vídeo-demo-sync.mp4", "sync-demo-video.mp4"), size: 128 * MB, bytesDone: 96 * MB, deviceId: "pixel8", direction: "out", state: { kind: "failed", error: "rejected:noSpace" } }),
   falhaChecksum: () => mkT({ originalName: "dump-clipsync-prod", size: 86.3 * MB, bytesDone: 86.3 * MB, deviceId: "notebook", direction: "in", state: { kind: "failed", error: "checksum:mismatch" } }),
-  cancelado: () => mkT({ originalName: "backup-fotos-2026.zip", size: 3.4 * 1024 * MB, bytesDone: 920 * MB, deviceId: "notebook", direction: "out", state: { kind: "cancelled", by: "local" } }),
+  cancelado: () => mkT({ originalName: L("backup-fotos-2026.zip", "photos-backup-2026.zip"), size: 3.4 * 1024 * MB, bytesDone: 920 * MB, deviceId: "notebook", direction: "out", state: { kind: "cancelled", by: "local" } }),
 };
 let transfers: TransferRecord[] = ({
   "": [T.enviando(), T.grande(), T.recebendo(), T.fila(), T.verificando(), T.concluido()],
@@ -180,7 +185,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 // ?ask=1 simula um arquivo grande chegando que pede "Aceitar/Recusar".
 if (params.get("ask")) {
   setTimeout(() => {
-    const rec = mkT({ originalName: "video-ferias-2026.mp4", size: 850 * MB, deviceId: "pixel8", direction: "in", state: { kind: "incoming" } });
+    const rec = mkT({ originalName: L("video-ferias-2026.mp4", "vacation-video-2026.mp4"), size: 850 * MB, deviceId: "pixel8", direction: "in", state: { kind: "incoming" } });
     transfers = [rec, ...transfers];
     emit("transfer:ask", rec);
   }, 1200);
@@ -350,7 +355,7 @@ export async function mockInvoke(cmd: string, args: Record<string, unknown> = {}
       await sleep(400);
       if (args.folder) return { files: [{ uri: "C:\\Users\\wallacy\\Documents\\projeto", name: "projeto", size: 0, mime: null, dir: true }] };
       return { files: [
-        { uri: "C:\\Users\\wallacy\\Documents\\relatório-métricas-Q3.pdf", name: "relatório-métricas-Q3.pdf", size: 12.4 * MB, mime: "application/pdf" },
+        { uri: "C:\\Users\\wallacy\\Documents\\relatório-métricas-Q3.pdf", name: L("relatório-métricas-Q3.pdf", "metrics-report-Q3.pdf"), size: 12.4 * MB, mime: "application/pdf" },
         { uri: "C:\\Users\\wallacy\\Documents\\planilha.xlsx", name: "planilha.xlsx", size: 0.8 * MB, mime: null },
       ] };
     case "transfer_remove": {
@@ -430,13 +435,21 @@ export async function mockScan(): Promise<string | null> {
   return JSON.stringify({ v: 1, pairingId: "abc123", deviceId: "estacao", name: "Estação-Dev", platform: "windows", publicKey: "aa", addrs: ["192.168.0.10"], port: 47820, code: "4K7-Q2M" });
 }
 
+/** QR de mentira 25×25: três marcadores de canto + módulos pseudoaleatórios (só aparência). */
 function fakeQr() {
-  const bits = "1110111100100101101110101010001101011011100001011101110";
+  const N = 25;
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff);
+  const finder = (x: number, y: number) =>
+    `<rect x="${x}" y="${y}" width="7" height="7" fill="#201e1d"/><rect x="${x + 1}" y="${y + 1}" width="5" height="5" fill="#fff"/><rect x="${x + 2}" y="${y + 2}" width="3" height="3" fill="#201e1d"/>`;
+  const inFinder = (x: number, y: number) => (x < 8 && y < 8) || (x >= N - 8 && y < 8) || (x < 8 && y >= N - 8);
   let rects = "";
-  for (let i = 0; i < 49; i++) {
-    if (bits[i % bits.length] === "1") rects += `<rect x="${(i % 7) * 10}" y="${Math.floor(i / 7) * 10}" width="9" height="9" rx="1.5" fill="#201e1d"/>`;
+  for (let y = 0; y < N; y++) {
+    for (let x = 0; x < N; x++) {
+      if (!inFinder(x, y) && rnd() < 0.48) rects += `<rect x="${x}" y="${y}" width="1" height="1" fill="#201e1d"/>`;
+    }
   }
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 69 69">${rects}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 ${N + 2} ${N + 2}" shape-rendering="crispEdges"><rect x="-1" y="-1" width="${N + 2}" height="${N + 2}" fill="#fff"/>${finder(0, 0)}${finder(N - 7, 0)}${finder(0, N - 7)}${rects}</svg>`;
 }
 
 // Simula um item chegando do celular a cada 25 s no cenário padrão.
